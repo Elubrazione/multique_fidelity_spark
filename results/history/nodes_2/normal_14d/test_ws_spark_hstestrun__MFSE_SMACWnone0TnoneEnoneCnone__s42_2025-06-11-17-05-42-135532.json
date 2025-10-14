@@ -1,0 +1,979 @@
+{
+  "task_id": "test_ws_spark_hstestrun__MFSE_SMACWnone0TnoneEnoneCnone__s42",
+  "num_objectives": 1,
+  "num_constraints": 0,
+  "ref_point": null,
+  "meta_info": {
+    "meta_feature": null,
+    "ini_context": null,
+    "shap_k": 35,
+    "seed": 42,
+    "rand_prob": 0.15,
+    "rand_mode": "ran",
+    "ori_space": {
+      "hyperparameters": [
+        {
+          "name": "spark.default.parallelism",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 100,
+          "upper": 330,
+          "default": 330
+        },
+        {
+          "name": "spark.driver.cores",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 1,
+          "upper": 8,
+          "default": 1
+        },
+        {
+          "name": "spark.driver.memory",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 52,
+          "upper": 112,
+          "default": 52
+        },
+        {
+          "name": "spark.executor.cores",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 12,
+          "upper": 18,
+          "default": 16
+        },
+        {
+          "name": "spark.executor.instances",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 5,
+          "upper": 23,
+          "default": 12
+        },
+        {
+          "name": "spark.executor.memory",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 42,
+          "upper": 96,
+          "default": 52
+        },
+        {
+          "name": "spark.executor.memoryOverhead",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 608,
+          "upper": 20096,
+          "default": 1024
+        },
+        {
+          "name": "spark.locality.wait",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 0,
+          "upper": 3,
+          "default": 0
+        },
+        {
+          "name": "spark.network.timeout",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 346,
+          "upper": 1426,
+          "default": 600
+        },
+        {
+          "name": "spark.sql.autoBroadcastJoinThreshold",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 223,
+          "upper": 447,
+          "default": 223
+        },
+        {
+          "name": "spark.sql.broadcastTimeout",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 365,
+          "upper": 2332,
+          "default": 600
+        },
+        {
+          "name": "spark.sql.shuffle.partitions",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 814,
+          "upper": 1165,
+          "default": 814
+        },
+        {
+          "name": "spark.sql.sources.parallelPartitionDiscovery.parallelism",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 27,
+          "upper": 98,
+          "default": 60
+        },
+        {
+          "name": "spark.task.cpus",
+          "type": "uniform_int",
+          "log": false,
+          "lower": 1,
+          "upper": 3,
+          "default": 1
+        }
+      ],
+      "conditions": [],
+      "forbiddens": [],
+      "python_module_version": "0.6.1",
+      "json_format_version": 0.4
+    },
+    "R_eta": "64_4",
+    "tl_ws": []
+  },
+  "global_start_time": "2025-06-11T17:05:42.137175",
+  "observations": [
+    {
+      "config": {
+        "spark.default.parallelism": 212,
+        "spark.driver.cores": 2,
+        "spark.driver.memory": 53,
+        "spark.executor.cores": 12,
+        "spark.executor.instances": 21,
+        "spark.executor.memory": 42,
+        "spark.executor.memoryOverhead": 2424,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 1276,
+        "spark.sql.autoBroadcastJoinThreshold": 331,
+        "spark.sql.broadcastTimeout": 2206,
+        "spark.sql.shuffle.partitions": 830,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 66,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11443.982000000004
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15999.94945859909,
+      "create_time": "2025-06-14T11:00:48.263777",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 307,
+        "spark.driver.cores": 3,
+        "spark.driver.memory": 90,
+        "spark.executor.cores": 14,
+        "spark.executor.instances": 18,
+        "spark.executor.memory": 49,
+        "spark.executor.memoryOverhead": 3767,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 599,
+        "spark.sql.autoBroadcastJoinThreshold": 301,
+        "spark.sql.broadcastTimeout": 976,
+        "spark.sql.shuffle.partitions": 1057,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 86,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        Infinity
+      ],
+      "constraints": null,
+      "trial_state": 2,
+      "elapsed_time": 5060.6153881549835,
+      "create_time": "2025-06-14T11:00:48.264576",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 210,
+        "spark.driver.cores": 5,
+        "spark.driver.memory": 55,
+        "spark.executor.cores": 16,
+        "spark.executor.instances": 23,
+        "spark.executor.memory": 51,
+        "spark.executor.memoryOverhead": 5055,
+        "spark.locality.wait": 1,
+        "spark.network.timeout": 825,
+        "spark.sql.autoBroadcastJoinThreshold": 239,
+        "spark.sql.broadcastTimeout": 1745,
+        "spark.sql.shuffle.partitions": 1035,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 69,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        9248.602999999997
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 13835.74074268341,
+      "create_time": "2025-06-14T17:36:21.125041",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 297,
+        "spark.driver.cores": 7,
+        "spark.driver.memory": 102,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 17,
+        "spark.executor.memory": 66,
+        "spark.executor.memoryOverhead": 623,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 1364,
+        "spark.sql.autoBroadcastJoinThreshold": 260,
+        "spark.sql.broadcastTimeout": 995,
+        "spark.sql.shuffle.partitions": 841,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 54,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        12362.053999999996
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16897.371208429337,
+      "create_time": "2025-06-14T18:27:22.755828",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 140,
+        "spark.driver.cores": 2,
+        "spark.driver.memory": 90,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 6,
+        "spark.executor.memory": 45,
+        "spark.executor.memoryOverhead": 14947,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 539,
+        "spark.sql.autoBroadcastJoinThreshold": 335,
+        "spark.sql.broadcastTimeout": 2150,
+        "spark.sql.shuffle.partitions": 845,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 62,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10882.245999999997
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14980.478354215622,
+      "create_time": "2025-06-15T01:25:51.526763",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 307,
+        "spark.driver.cores": 4,
+        "spark.driver.memory": 98,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 9,
+        "spark.executor.memory": 56,
+        "spark.executor.memoryOverhead": 2668,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 1245,
+        "spark.sql.autoBroadcastJoinThreshold": 319,
+        "spark.sql.broadcastTimeout": 1314,
+        "spark.sql.shuffle.partitions": 1165,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 68,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11782.784000000007
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16307.934318304062,
+      "create_time": "2025-06-15T01:47:58.984103",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 202,
+        "spark.driver.cores": 6,
+        "spark.driver.memory": 79,
+        "spark.executor.cores": 15,
+        "spark.executor.instances": 21,
+        "spark.executor.memory": 54,
+        "spark.executor.memoryOverhead": 8863,
+        "spark.locality.wait": 1,
+        "spark.network.timeout": 1028,
+        "spark.sql.autoBroadcastJoinThreshold": 359,
+        "spark.sql.broadcastTimeout": 1954,
+        "spark.sql.shuffle.partitions": 1013,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 97,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        9916.694000000009
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14454.942800283432,
+      "create_time": "2025-06-15T08:30:56.502258",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 262,
+        "spark.driver.cores": 1,
+        "spark.driver.memory": 80,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 13,
+        "spark.executor.memory": 44,
+        "spark.executor.memoryOverhead": 5483,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 1168,
+        "spark.sql.autoBroadcastJoinThreshold": 373,
+        "spark.sql.broadcastTimeout": 1329,
+        "spark.sql.shuffle.partitions": 850,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 38,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11272.420999999997
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15795.096185922623,
+      "create_time": "2025-06-15T08:53:16.657055",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 259,
+        "spark.driver.cores": 1,
+        "spark.driver.memory": 77,
+        "spark.executor.cores": 15,
+        "spark.executor.instances": 21,
+        "spark.executor.memory": 55,
+        "spark.executor.memoryOverhead": 4887,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 381,
+        "spark.sql.autoBroadcastJoinThreshold": 240,
+        "spark.sql.broadcastTimeout": 560,
+        "spark.sql.shuffle.partitions": 1115,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 53,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10219.051000000003
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14686.86955833435,
+      "create_time": "2025-06-15T15:42:39.144536",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 308,
+        "spark.driver.cores": 8,
+        "spark.driver.memory": 71,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 13,
+        "spark.executor.memory": 52,
+        "spark.executor.memoryOverhead": 10959,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 378,
+        "spark.sql.autoBroadcastJoinThreshold": 390,
+        "spark.sql.broadcastTimeout": 1823,
+        "spark.sql.shuffle.partitions": 863,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 32,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        12254.910000000003
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16781.079409122467,
+      "create_time": "2025-06-15T16:17:33.355247",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 193,
+        "spark.driver.cores": 1,
+        "spark.driver.memory": 111,
+        "spark.executor.cores": 14,
+        "spark.executor.instances": 11,
+        "spark.executor.memory": 43,
+        "spark.executor.memoryOverhead": 19942,
+        "spark.locality.wait": 1,
+        "spark.network.timeout": 499,
+        "spark.sql.autoBroadcastJoinThreshold": 419,
+        "spark.sql.broadcastTimeout": 1916,
+        "spark.sql.shuffle.partitions": 1155,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 72,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10199.202000000003
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14414.620172739029,
+      "create_time": "2025-06-15T23:16:08.079485",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 138,
+        "spark.driver.cores": 7,
+        "spark.driver.memory": 56,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 20,
+        "spark.executor.memory": 52,
+        "spark.executor.memoryOverhead": 17974,
+        "spark.locality.wait": 1,
+        "spark.network.timeout": 1200,
+        "spark.sql.autoBroadcastJoinThreshold": 437,
+        "spark.sql.broadcastTimeout": 684,
+        "spark.sql.shuffle.partitions": 864,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 92,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11910.833999999995
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16437.447232961655,
+      "create_time": "2025-06-15T23:49:50.908734",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 153,
+        "spark.driver.cores": 3,
+        "spark.driver.memory": 109,
+        "spark.executor.cores": 16,
+        "spark.executor.instances": 9,
+        "spark.executor.memory": 57,
+        "spark.executor.memoryOverhead": 16263,
+        "spark.locality.wait": 2,
+        "spark.network.timeout": 1164,
+        "spark.sql.autoBroadcastJoinThreshold": 370,
+        "spark.sql.broadcastTimeout": 1341,
+        "spark.sql.shuffle.partitions": 954,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 29,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        9884.869
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 13906.246905326843,
+      "create_time": "2025-06-16T06:31:54.217551",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 260,
+        "spark.driver.cores": 5,
+        "spark.driver.memory": 91,
+        "spark.executor.cores": 17,
+        "spark.executor.instances": 7,
+        "spark.executor.memory": 57,
+        "spark.executor.memoryOverhead": 15759,
+        "spark.locality.wait": 2,
+        "spark.network.timeout": 1108,
+        "spark.sql.autoBroadcastJoinThreshold": 335,
+        "spark.sql.broadcastTimeout": 2239,
+        "spark.sql.shuffle.partitions": 914,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 72,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        12251.018000000005
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16335.056151866913,
+      "create_time": "2025-06-16T07:12:23.027701",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 105,
+        "spark.driver.cores": 5,
+        "spark.driver.memory": 98,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 18,
+        "spark.executor.memory": 81,
+        "spark.executor.memoryOverhead": 19735,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 649,
+        "spark.sql.autoBroadcastJoinThreshold": 392,
+        "spark.sql.broadcastTimeout": 1978,
+        "spark.sql.shuffle.partitions": 1072,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 67,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10978.674000000008
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15474.455119848251,
+      "create_time": "2025-06-16T14:22:20.446403",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 185,
+        "spark.driver.cores": 5,
+        "spark.driver.memory": 108,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 9,
+        "spark.executor.memory": 43,
+        "spark.executor.memoryOverhead": 13775,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 506,
+        "spark.sql.autoBroadcastJoinThreshold": 313,
+        "spark.sql.broadcastTimeout": 812,
+        "spark.sql.shuffle.partitions": 1153,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 37,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11135.343
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15195.166140794754,
+      "create_time": "2025-06-16T14:22:20.447190",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 311,
+        "spark.driver.cores": 3,
+        "spark.driver.memory": 92,
+        "spark.executor.cores": 13,
+        "spark.executor.instances": 11,
+        "spark.executor.memory": 55,
+        "spark.executor.memoryOverhead": 15261,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 972,
+        "spark.sql.autoBroadcastJoinThreshold": 291,
+        "spark.sql.broadcastTimeout": 730,
+        "spark.sql.shuffle.partitions": 885,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 58,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10280.24
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14243.76728963852,
+      "create_time": "2025-06-16T21:17:43.639609",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 193,
+        "spark.driver.cores": 4,
+        "spark.driver.memory": 73,
+        "spark.executor.cores": 13,
+        "spark.executor.instances": 21,
+        "spark.executor.memory": 42,
+        "spark.executor.memoryOverhead": 11552,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 796,
+        "spark.sql.autoBroadcastJoinThreshold": 344,
+        "spark.sql.broadcastTimeout": 925,
+        "spark.sql.shuffle.partitions": 1050,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 51,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11116.348000000005
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15644.860774040222,
+      "create_time": "2025-06-16T21:41:04.734155",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 310,
+        "spark.driver.cores": 5,
+        "spark.driver.memory": 82,
+        "spark.executor.cores": 14,
+        "spark.executor.instances": 20,
+        "spark.executor.memory": 47,
+        "spark.executor.memoryOverhead": 7094,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 1243,
+        "spark.sql.autoBroadcastJoinThreshold": 276,
+        "spark.sql.broadcastTimeout": 555,
+        "spark.sql.shuffle.partitions": 1141,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 35,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        9297.143999999998
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 13744.94168138504,
+      "create_time": "2025-06-17T04:15:57.925205",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 197,
+        "spark.driver.cores": 1,
+        "spark.driver.memory": 96,
+        "spark.executor.cores": 14,
+        "spark.executor.instances": 18,
+        "spark.executor.memory": 60,
+        "spark.executor.memoryOverhead": 2054,
+        "spark.locality.wait": 2,
+        "spark.network.timeout": 575,
+        "spark.sql.autoBroadcastJoinThreshold": 239,
+        "spark.sql.broadcastTimeout": 1012,
+        "spark.sql.shuffle.partitions": 986,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 79,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        12059.019000000002
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16596.16818213463,
+      "create_time": "2025-06-17T05:03:29.155235",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 126,
+        "spark.driver.cores": 1,
+        "spark.driver.memory": 65,
+        "spark.executor.cores": 14,
+        "spark.executor.instances": 9,
+        "spark.executor.memory": 58,
+        "spark.executor.memoryOverhead": 6655,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 914,
+        "spark.sql.autoBroadcastJoinThreshold": 237,
+        "spark.sql.broadcastTimeout": 1301,
+        "spark.sql.shuffle.partitions": 818,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 77,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10162.305000000002
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14309.377475976944,
+      "create_time": "2025-06-17T11:52:11.885278",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 178,
+        "spark.driver.cores": 1,
+        "spark.driver.memory": 76,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 16,
+        "spark.executor.memory": 52,
+        "spark.executor.memoryOverhead": 698,
+        "spark.locality.wait": 2,
+        "spark.network.timeout": 862,
+        "spark.sql.autoBroadcastJoinThreshold": 238,
+        "spark.sql.broadcastTimeout": 918,
+        "spark.sql.shuffle.partitions": 1093,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 89,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11391.353000000001
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15927.298849344254,
+      "create_time": "2025-06-17T12:19:09.808870",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 126,
+        "spark.driver.cores": 2,
+        "spark.driver.memory": 55,
+        "spark.executor.cores": 16,
+        "spark.executor.instances": 6,
+        "spark.executor.memory": 45,
+        "spark.executor.memoryOverhead": 3201,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 1122,
+        "spark.sql.autoBroadcastJoinThreshold": 345,
+        "spark.sql.broadcastTimeout": 1427,
+        "spark.sql.shuffle.partitions": 1028,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 89,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        11601.797999999999
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 15707.598353624344,
+      "create_time": "2025-06-17T19:26:39.405629",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 123,
+        "spark.driver.cores": 8,
+        "spark.driver.memory": 98,
+        "spark.executor.cores": 16,
+        "spark.executor.instances": 7,
+        "spark.executor.memory": 77,
+        "spark.executor.memoryOverhead": 1548,
+        "spark.locality.wait": 2,
+        "spark.network.timeout": 385,
+        "spark.sql.autoBroadcastJoinThreshold": 398,
+        "spark.sql.broadcastTimeout": 539,
+        "spark.sql.shuffle.partitions": 843,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 56,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        13653.662000000002
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 18193.057213544846,
+      "create_time": "2025-06-17T20:08:04.867149",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 266,
+        "spark.driver.cores": 6,
+        "spark.driver.memory": 82,
+        "spark.executor.cores": 16,
+        "spark.executor.instances": 17,
+        "spark.executor.memory": 45,
+        "spark.executor.memoryOverhead": 5458,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 1223,
+        "spark.sql.autoBroadcastJoinThreshold": 410,
+        "spark.sql.broadcastTimeout": 1420,
+        "spark.sql.shuffle.partitions": 987,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 79,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        9427.906
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 13844.446553230286,
+      "create_time": "2025-06-18T02:47:08.315735",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 212,
+        "spark.driver.cores": 7,
+        "spark.driver.memory": 53,
+        "spark.executor.cores": 18,
+        "spark.executor.instances": 19,
+        "spark.executor.memory": 57,
+        "spark.executor.memoryOverhead": 8979,
+        "spark.locality.wait": 3,
+        "spark.network.timeout": 1374,
+        "spark.sql.autoBroadcastJoinThreshold": 430,
+        "spark.sql.broadcastTimeout": 947,
+        "spark.sql.shuffle.partitions": 934,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 76,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        12255.075000000003
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16788.140718460083,
+      "create_time": "2025-06-18T03:36:12.012354",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 117,
+        "spark.driver.cores": 6,
+        "spark.driver.memory": 87,
+        "spark.executor.cores": 15,
+        "spark.executor.instances": 12,
+        "spark.executor.memory": 70,
+        "spark.executor.memoryOverhead": 731,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 1147,
+        "spark.sql.autoBroadcastJoinThreshold": 307,
+        "spark.sql.broadcastTimeout": 2309,
+        "spark.sql.shuffle.partitions": 1083,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 48,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        10073.110999999995
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 14672.426702260971,
+      "create_time": "2025-06-18T10:30:32.662913",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    },
+    {
+      "config": {
+        "spark.default.parallelism": 120,
+        "spark.driver.cores": 4,
+        "spark.driver.memory": 108,
+        "spark.executor.cores": 15,
+        "spark.executor.instances": 12,
+        "spark.executor.memory": 66,
+        "spark.executor.memoryOverhead": 8317,
+        "spark.locality.wait": 0,
+        "spark.network.timeout": 700,
+        "spark.sql.autoBroadcastJoinThreshold": 394,
+        "spark.sql.broadcastTimeout": 2142,
+        "spark.sql.shuffle.partitions": 1104,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 34,
+        "spark.task.cpus": 1
+      },
+      "objectives": [
+        12139.148000000003
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 16673.59520840645,
+      "create_time": "2025-06-18T11:03:53.832915",
+      "extra_info": {
+        "last_context": null,
+        "context": null,
+        "origin": "MFSE Random Sample"
+      }
+    }
+  ]
+}

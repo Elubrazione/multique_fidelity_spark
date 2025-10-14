@@ -1,0 +1,62 @@
+{
+    "read_ahead_kb": {
+        "default": 4096,
+        "type": "integer",
+        "min": 128,
+        "max": 8192,
+        "description": "磁盘预读大小(KB)"
+    },
+    "max_sectors_kb": {
+        "default": 128,
+        "type": "integer", 
+        "min": 32,
+        "max": 128,
+        "description": "磁盘最大扇区大小(KB)，最多是128是因为/sys/block/{device}/queue/max_hw_sectors_kb的限制"
+    },
+    "scheduler": {
+        "default": "mq-deadline",
+        "type": "categorical",
+        "choice_values": ["mq-deadline", "kyber", "bfq"],
+        "description": "磁盘调度器，去掉了none模式，none模式会限制nr_requests的上限为32（即queue_depth的值）"
+    },
+    "nr_requests": {
+        "default": 64,
+        "type": "integer",
+        "min": 64,
+        "max": 2048,
+        "description": "磁盘请求队列长度"
+    },
+    "vm_swappiness": {
+        "default": 60,
+        "type": "integer",
+        "min": 0,
+        "max": 60,
+        "description": "VM交换倾向性"
+    },
+    "vm_dirty_ratio": {
+        "default": 20,
+        "type": "integer",
+        "min": 5,
+        "max": 80,
+        "description": "VM脏页比例"
+    },
+    "combined_queues": {
+        "default": 64,
+        "type": "integer",
+        "min": 8,
+        "max": 64,
+        "description": "网络接口combined队列"
+    },
+    "rx_ring_buffer": {
+        "default": 1024,
+        "type": "categorical",
+        "choice_values": [256, 512, 1024, 2048, 4096, 8192],
+        "description": "网络接口RX环形缓冲区大小"
+    },
+    "tx_ring_buffer": {
+        "default": 1024,
+        "type": "categorical",
+        "choice_values": [256, 512, 1024, 2048, 4096, 8192],
+        "description": "网络接口TX环形缓冲区大小"
+    }
+}

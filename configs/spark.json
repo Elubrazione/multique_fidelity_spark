@@ -1,0 +1,37 @@
+{
+    "log_dir": "results/details",
+    "result_dir": "results/results",
+    "database": "tpcds_3000g",
+    "spark": {
+      "nodes": ["agent1", "agent2", "server1"],
+      "server_node": "server1",
+      "username": "root",
+      "password": "rootroot"
+    },
+    "multi_cluster": {
+      "usernames": ["root", "root"],
+      "passwords": ["root", "rootroot"],
+      "servers": ["192.168.90.76", "192.168.90.153"],
+      "nodes": [
+        ["192.168.90.76", "192.168.90.77", "192.168.90.78"],
+        ["192.168.90.151", "192.168.90.152", "192.168.90.153"]
+      ]
+    },
+    "env": {
+      "spark_sql_path": "/usr/local/spark/bin/spark-sql",
+      "yarn_path": "/usr/local/hadoop/bin/yarn"
+    },
+    "data_dir": "/home/hive-testbench-hdp3/spark-queries-tpcds",
+    "files": {
+      "sql_segmentation": "results/data/validate_sql_filter_20250508-060105.csv",
+      "timeout_csv": "results/data/results.csv",
+      "timeout_log": "log/spark_hstest/BOHB_SMAC/test_ws_spark_hstestrun__BOHB_SMACWnone1TnoneEnoneCnone__s42_2025-04-17-08-16-50-026245.log"
+    },
+    "history": {
+      "compress_dir": "results/history/",
+      "range_compress_data": "results/history/nodes_3/merge_83d/",
+      "range_compress_data_single": "results/history/nodes_2/huge_80d/node2_results.json"
+    },
+    "config_space": "configs/config_space/huge_space.json",
+    "os_config_space": "configs/config_space/os_params.json"
+  }
