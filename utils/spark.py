@@ -2,7 +2,8 @@ import re
 import numpy as np
 import pandas as pd
 from openbox import logger
-from config import FILE_TIMEOUT_CSV
+from config import FILE_TIMEOUT_CSV, DATABASE, DATA_DIR
+import os, subprocess, paramiko
 
 def convert_to_spark_params(config: dict):
     memory_params = {
@@ -89,3 +90,67 @@ def off_line_greedy_selection(time_dicts: dict, ratio=1, excluded_sqls=None):
         if total_time >= time_target * 0.98:
             break
     return selected_queries, total_time
+
+def run_spark(config, sql, result_dir):
+    spark_cmd = [
+        "spark-sql",
+        "--master", "yarn",
+        "--database", f"{DATABASE}",
+        *convert_to_spark_params(config),
+        "-f", f"{DATA_DIR}/{sql}.sql"
+    ]
+
+    log_file = f"{result_dir}/{sql}.log"
+    try:
+        with open(log_file, 'w') as f:
+            subprocess.run(spark_cmd, check=True, stdout=f, stderr=f, text=True)
+        return {"status": "success"}
+    except subprocess.CalledProcessError as e:
+        return {"status": "failed", "error": str(e)}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def get_full_queries_tasks(query_dir=f"{DATA_DIR}/"):
+    queries = os.listdir(query_dir)
+    queries = sorted(
+        [q.rstrip('.sql') for q in queries if q.startswith('q') and q.endswith('.sql')],
+        key=lambda x: custom_sort(x)
+    )
+    return queries
+
+def clear_cache_on_remote(server, username = "root", password = "root"):
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(server, username=username, password=password)
+        stdin, stdout, stderr = client.exec_command("echo 3 > /proc/sys/vm/drop_caches")
+        error = stderr.read().decode()
+        if error:
+            print(f"[{server}] Error: {error}")
+        else:
+            print(f"[{server}] Cache cleared successfully.")
+
+        stdin, stdout, stderr = client.exec_command("free -g")
+        print(f"[{server}] Memory status:\n{stdout.read().decode()}")
+
+        client.close()
+    except Exception as e:
+        print(f"[{server}] Error: {e}")
+
+def parse_spark_log(log_dir, queries, suffix_type='log'):
+    results = {}
+    time_pattern = re.compile(r'Time taken: ([\d.]+) seconds')
+    cost = 0
+    for i in queries:
+        results[i] = np.Inf
+        if os.path.exists(os.path.join(log_dir, f"{i}.{suffix_type}")):
+            with open(os.path.join(log_dir, f"{i}.{suffix_type}"), 'r') as f:
+                for line in f:
+                    time_match = time_pattern.search(line)
+                    if time_match:
+                        execution_time = float(time_match.group(1))
+                        results[i] = execution_time
+                        cost += execution_time
+
+    sorted_results = dict(sorted(results.items(), key=lambda x: custom_sort(x[0])))
+    return cost, sorted_results
