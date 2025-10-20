@@ -115,7 +115,7 @@ def run_spark(config, sql, result_dir):
 def get_full_queries_tasks(query_dir=f"{DATA_DIR}/"):
     queries = os.listdir(query_dir)
     queries = sorted(
-        [q.rstrip('.sql') for q in queries if q.startswith('q') and q.endswith('.sql')],
+        [q[: -4] for q in queries if q.endswith('.sql')],
         key=lambda x: custom_sort(x)
     )
     return queries
