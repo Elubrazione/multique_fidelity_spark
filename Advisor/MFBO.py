@@ -14,6 +14,7 @@ class MFBO(BO):
                  tl_args={'topk': 5}, source_hpo_data=None,
                  cprs_strategy='none', space_history = None, cp_topk=35, range_config_space=None,
                  ep_args=None, ep_strategy='none', expert_params=[],
+                 enable_range_compression=False, range_compress_data_path=None,
                  safe_flag=False, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
         super().__init__(config_space, meta_feature=meta_feature,
                          surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
@@ -21,7 +22,8 @@ class MFBO(BO):
                          tl_args=tl_args, source_hpo_data=source_hpo_data,
                          ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
                          cprs_strategy=cprs_strategy, space_history=space_history, cp_topk=cp_topk, range_config_space=range_config_space,
-                         safe_flag=safe_flag, seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
+                         safe_flag=safe_flag, seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
+                         enable_range_compression=enable_range_compression, range_compress_data_path=range_compress_data_path, **kwargs)
 
         self.history_list: List[History] = list()  # 低精度组的 history -> List[History]
         self.resource_identifiers = list()
@@ -41,50 +43,90 @@ class MFBO(BO):
         if not self.source_hpo_data or not self.source_hpo_data_sims:
             return
 
-        best_src_idx = self.source_hpo_data_sims[0][0]
-        src_history = self.source_hpo_data[best_src_idx]
-        sim_obs = list(src_history.observations)
-        if not sim_obs:
-            return
+        num_source_tasks = len(self.source_hpo_data)
+        if num_source_tasks == 1:
+            best_src_idx = self.source_hpo_data_sims[0][0]
+            src_history = self.source_hpo_data[best_src_idx]
+            sim_obs = list(src_history.observations)
+            if not sim_obs:
+                return
 
-        sim_obs.sort(key=lambda x: x.objectives[0])
-        take = min(ws_topk, len(sim_obs))
-        top_obs = sim_obs[:take]
+            sim_obs.sort(key=lambda x: x.objectives[0])
+            take = min(ws_topk, len(sim_obs))
+            top_obs = sim_obs[:take]
 
-        # generate center out index order
-        def center_out_order(n: int):
-            order = []
-            m = n // 2
-            indices = list(range(1, n + 1))
-            def push(i):
-                if 1 <= i <= n and i not in order:
-                    order.append(i)
-            push(m)
-            step = 1
-            while len(order) < n:
-                push(m + step)  # m+1, m+2, ...
-                if len(order) >= n:
+            # generate center out index order
+            def center_out_order(n: int):
+                order = []
+                m = n // 2
+                indices = list(range(1, n + 1))
+                def push(i):
+                    if 1 <= i <= n and i not in order:
+                        order.append(i)
+                push(m)
+                step = 1
+                while len(order) < n:
+                    push(m + step)  # m+1, m+2, ...
+                    if len(order) >= n:
+                        break
+                    push(m - step)  # m-1, m-2, ...
+                    step += 1
+                for i in indices:
+                    if i not in order:
+                        order.append(i)
+                return [i - 1 for i in order]
+
+            reorder = center_out_order(take)
+
+            ini_list = []
+            for idx in reorder:
+                old_conf = top_obs[idx].config
+                logger.info("Warm start configuration, objective: %s" % (top_obs[idx].objectives[0]))
+                new_conf = Configuration(self.config_space, values={
+                    name: old_conf[name] for name in self.sample_space.get_hyperparameter_names()
+                })
+                new_conf.origin = f"mfbo_ws:{src_history.task_id}"
+                ini_list.append(new_conf)
+
+            self.ini_configs = ini_list
+        else:
+            ini_list = []
+            
+            source_observations = []
+            for i, src_history in enumerate(self.source_hpo_data):
+                sim_obs = list(src_history.observations)
+                if sim_obs:
+                    sim_obs.sort(key=lambda x: x.objectives[0])
+                    source_observations.append(sim_obs)
+                    logger.info("Source task %d (%s): %d observations" % (i, src_history.task_id, len(sim_obs)))
+                else:
+                    source_observations.append([])
+                    logger.warning("Source task %d (%s): no observations" % (i, src_history.task_id))
+            
+            # 轮询选择：a.topk_1, b.topk_1, c.topk_1, a.topk_2, b.topk_2, c.topk_2, ...
+            config_count = 0
+            rank = 0
+            while config_count < ws_topk:
+                if all(rank >= len(obs_list) for obs_list in source_observations):
                     break
-                push(m - step)  # m-1, m-2, ...
-                step += 1
-            for i in indices:
-                if i not in order:
-                    order.append(i)
-            return [i - 1 for i in order]
+                
+                for task_idx, obs_list in enumerate(source_observations):
+                    if config_count >= ws_topk:
+                        break
+                    if rank < len(obs_list):
+                        old_conf = obs_list[rank].config
+                        logger.info("Warm start configuration from task %d, rank %d, objective: %s" % 
+                                  (task_idx, rank, obs_list[rank].objectives[0]))
+                        new_conf = Configuration(self.config_space, values={
+                            name: old_conf[name] for name in self.sample_space.get_hyperparameter_names()
+                        })
+                        new_conf.origin = f"mfbo_ws:{self.source_hpo_data[task_idx].task_id}_rank{rank}"
+                        ini_list.append(new_conf)
+                        config_count += 1
+                
+                rank += 1
 
-        reorder = center_out_order(take)
-
-        ini_list = []
-        for idx in reorder:
-            old_conf = top_obs[idx].config
-            logger.info("Warm start configuration, objective: %s" % (top_obs[idx].objectives[0]))
-            new_conf = Configuration(self.config_space, values={
-                name: old_conf[name] for name in self.sample_space.get_hyperparameter_names()
-            })
-            new_conf.origin = f"mfbo_ws:{src_history.task_id}"
-            ini_list.append(new_conf)
-
-        self.ini_configs = ini_list
+            self.ini_configs = ini_list
         logger.info("Successfully warm start %d configurations with %s!" % (len(self.ini_configs), self.ws_strategy))
 
 

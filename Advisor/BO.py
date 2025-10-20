@@ -21,15 +21,15 @@ class BO(BaseAdvisor):
                  surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
                  ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
                  ep_args=None, ep_strategy='none', expert_params=[],
-                 cp_topk=50, space_history = None, cprs_strategy='none', range_config_space=None,
+                 cp_topk=50, space_history = None, cprs_strategy='none',
                  safe_flag=False, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
-                 expert_modified_space=None, **kwargs):
+                 expert_modified_space=None, enable_range_compression=False,
+                 range_compress_data_path=None, **kwargs):
         super().__init__(config_space, task_id=task_id, meta_feature=meta_feature,
                          ws_strategy=ws_strategy, ws_args=ws_args,
                          tl_args=tl_args, source_hpo_data=source_hpo_data,
                          ep_args=ep_args, ep_strategy=ep_strategy,
                          cprs_strategy=cprs_strategy, space_history=space_history, cp_topk=cp_topk,
-                         range_config_space=range_config_space,
                          seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
 
         self.safe_flag = safe_flag
@@ -47,6 +47,15 @@ class BO(BaseAdvisor):
             self.norm_y = False
 
         self.init_num = ws_args['init_num']
+        
+        # 处理范围压缩
+        if enable_range_compression:
+            logger.info("启用范围压缩功能，将自动计算压缩空间")
+            self.range_config_space = self.compute_range_compression(
+                range_compress_data_path=range_compress_data_path,
+            )
+        else:
+            logger.info("未启用范围压缩功能，使用原始搜索空间")
         
         # History 里面存的config是完整的原始空间配置
         # 取 observation 出来的时候需要根据 indices 进行变换得到压缩后的配置
@@ -76,23 +85,13 @@ class BO(BaseAdvisor):
 
         num_evaluated = len(self.history)
         if self.ws_strategy.startswith('best'):
-            logger.info(f"[迁移学习] 开始从 {len(sims)} 个相似任务中选择最佳配置...")
             for i, sim in enumerate(sims):
                 sim_obs = copy.deepcopy(self.source_hpo_data[sim[0]].observations)
                 sim_obs = sorted(sim_obs, key=lambda x: x.objectives[0])
-                
-                logger.info(f"[迁移学习] 任务 {i+1}: {self.source_hpo_data[sim[0]].task_id}")
-                logger.info(f"  - 相似度: {sim[1]:.4f}")
-                logger.info(f"  - 总观测数: {len(sim_obs)}")
-                
-                task_num = self.ws_args['topk'] if i == 0 else 1
-                print(f"  - 选择前 {task_num} 个最佳配置:")
-                
+
+                task_num = 3 if i == 0 else 1
                 for j in range(task_num):
                     config_warm_old = sim_obs[j].config
-                    logger.info(f"    配置 {j+1}: 目标值 = {sim_obs[j].objectives[0]:.6f}")
-                    logger.info(f"      参数: {dict(config_warm_old)}")
-                    
                     # 在 sample_space 里创建新 config，并逐个拷贝参数
                     # 注意这里的搜索空间是 config_space 而不是 sample_space
                     config_warm = Configuration(self.config_space, values={
@@ -101,10 +100,7 @@ class BO(BaseAdvisor):
                     config_warm.origin = self.ws_strategy + self.source_hpo_data[sim[0]].task_id
                     # 后加的更差，因为是从后往前取的，所以往前加
                     self.ini_configs = [config_warm] + self.ini_configs
-                    
-                logger.info(f"  - 当前已选择配置数: {len(self.ini_configs)}")
                 if len(self.ini_configs) + num_evaluated >= self.init_num:
-                    logger.info(f"[迁移学习] 已达到所需配置数 {self.init_num}，停止选择")
                     break
 
             while len(self.ini_configs) + num_evaluated < self.init_num:
@@ -131,7 +127,6 @@ class BO(BaseAdvisor):
         else:
 
             raise ValueError('Invalid ws_strategy: %s' % self.ws_strategy)
-
 
     """
     采样(使用ini_configs进行热启动和普通采样)
@@ -469,3 +464,46 @@ class BO(BaseAdvisor):
             new_his.append(history)
         
         return new_his        
+    
+    def compute_range_compression(self, old_data_path=None, new_data_path=None, 
+                                 range_compress_data_path=None, json_file=None):
+        """
+        计算范围压缩空间
+        
+        Args:
+            old_data_path: 历史数据路径
+            range_compress_data_path: 范围压缩数据路径
+            json_file: 配置文件路径
+            
+        Returns:
+            ConfigurationSpace: 压缩后的配置空间
+        """
+        try:
+            from space_values import haisi_huge_spaces_from_json
+            
+            if range_compress_data_path is None:
+                from config import RANGE_COMPRESS_DATA
+                range_compress_data_path = RANGE_COMPRESS_DATA
+            if json_file is None:
+                from config import HUGE_SPACE_FILE
+                json_file = HUGE_SPACE_FILE
+            
+            logger.info("开始计算范围压缩空间...")
+            old_space, new_space = haisi_huge_spaces_from_json(
+                old_data_path=range_compress_data_path,
+                json_file=json_file
+            )
+            
+            logger.info(f"范围压缩完成：原始空间参数 {len(old_space.get_hyperparameters())} 个，"
+                       f"压缩后空间参数 {len(new_space.get_hyperparameters())} 个")
+            
+            return new_space
+            
+        except ImportError as e:
+            logger.warning(f"无法导入范围压缩模块: {e}")
+            logger.info("将使用原始配置空间")
+            return self.origin_config_space
+        except Exception as e:
+            logger.error(f"计算范围压缩时出错: {e}")
+            logger.info("将使用原始配置空间")
+            return self.origin_config_space

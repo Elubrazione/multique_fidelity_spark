@@ -63,6 +63,7 @@ def build_optimizer(args, **kwargs):
             backup_flag=args.backup_flag, seed=args.seed, rand_prob=args.rand_prob, rand_mode=args.rand_mode,
             R=R, eta=eta, save_dir=args.save_dir, 
             config_modifier=kwargs['config_modifier'], expert_modified_space=kwargs['expert_modified_space'],
+            enable_range_compression=kwargs['enable_range_compression'], range_compress_data_path=kwargs['range_compress_data_path'],
         )
 
 

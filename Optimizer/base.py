@@ -20,7 +20,8 @@ class BaseOptimizer:
                  space_history = None, cprs_strategy='none', cp_args=None, range_config_space=None,
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
-                 config_modifier=None, expert_modified_space=None, expert_params=[]):
+                 config_modifier=None, expert_modified_space=None, expert_params=[],
+                 enable_range_compression=False, range_compress_data_path=None):
 
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC', 'FlexHB_SMAC']
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
@@ -127,6 +128,7 @@ class BaseOptimizer:
                                 cprs_strategy=cprs_strategy, space_history=space_history, cp_topk=cp_topk,
                                 safe_flag=False, seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                                 expert_params=expert_params,
+                                enable_range_compression=enable_range_compression, range_compress_data_path=range_compress_data_path,
                                 _logger_kwargs=self._logger_kwargs)
 
         self.timeout = per_run_time_limit

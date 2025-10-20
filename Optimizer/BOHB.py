@@ -19,7 +19,8 @@ class BOHB(BaseOptimizer):
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  backup_flag=False, save_dir='./results', meta_feature=None, fixed_initial=True,
                  R=9, eta=3, seed=42, rand_prob=0.15, rand_mode='ran', initial_configs=64,
-                 config_modifier=None, expert_modified_space=None, expert_params=[]):
+                 config_modifier=None, expert_modified_space=None, expert_params=[],
+                 enable_range_compression=False, range_compress_data_path=None):
 
         super().__init__(config_space=config_space, eval_func=eval_func, iter_num=iter_num,
                          per_run_time_limit=per_run_time_limit, source_hpo_data=source_hpo_data,
@@ -29,8 +30,8 @@ class BOHB(BaseOptimizer):
                          cprs_strategy=cprs_strategy, space_history=space_history, cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir, meta_feature=meta_feature,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                         config_modifier=config_modifier, expert_modified_space=expert_modified_space,
-                         expert_params=expert_params)
+                         expert_params=expert_params,
+                         enable_range_compression=enable_range_compression, range_compress_data_path=range_compress_data_path)
 
         self.R = R
         self.eta = eta
