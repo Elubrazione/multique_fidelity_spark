@@ -31,6 +31,8 @@ class ExecutorManager:
         self.fixed_sqls = fixed_sqls
         
         # Global setting for csv_file and csv_writer
+        if not os.path.exists(RESULT_DIR):
+            os.makedirs(RESULT_DIR)
         self.csv_path = os.path.join(RESULT_DIR, datetime.now().strftime('%Y%m%d-%H%M%S') + ".csv")
         self.csv_file = open(self.csv_path, 'a', newline='')
         self.csv_writer = csv.writer(self.csv_file)
