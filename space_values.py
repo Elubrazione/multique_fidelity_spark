@@ -9,7 +9,7 @@ from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from openbox import space as sp, logger
-from config import HUGE_SPACE_FILE, RANGE_COMPRESS_DATA, ROOT_DIR
+from config import HUGE_SPACE_FILE, RANGE_COMPRESS_DATA
 
 
 SPECIAL_MIN = {
@@ -90,16 +90,11 @@ def modify_spaces_range(space: sp.Space, new_ranges: dict):
                 print(f"参数 {name} 不是数值型 (type={type(hp)}), 跳过")
     return space
 
-def haisi_huge_spaces(space, old_data_path: str, new_data_path: str):
-    # space = get_haisi_spark_space()
-    # space = construct_huge_spaces(extra_int_params, extra_cat_params, extra_float_params, get_haisi_spark_space())
-
-    output_dir = f"{ROOT_DIR}/shap_plots"
+def haisi_huge_spaces(space, old_data_path: str):
     param_names = [hp.name for hp in space.get_hyperparameters()]
     
-    old_top, new_top = load_and_prepare_data(old_data_path, new_data_path, param_names, ratio=0.8)
-    new_space = analyze_space(old_top, new_top, param_names, output_dir, space=space)
-    # new_space = construct_huge_spaces(extra_int_params, extra_cat_params, extra_float_params, new_space)
+    old_top = load_and_prepare_data(old_data_path, param_names, ratio=0.8)
+    new_space = analyze_space(old_top, param_names, space=space)
     logger.info(space)
     logger.info(new_space)
 
@@ -225,35 +220,20 @@ def load_from_multiple_json_files(directory_path, feature_cols, recursive=True):
     logger.info(f"成功合并 {successful_files} 个文件，总共 {len(merged_df)} 条记录")
     return merged_df
 
-def load_and_prepare_data(old_path, new_path, feature_cols, ratio=0.3):
-    # 检查 old_path 是否为目录
+def load_and_prepare_data(old_path, feature_cols, ratio=0.3):
     if os.path.isdir(old_path):
         old_df = load_from_multiple_json_files(old_path, feature_cols)
     elif old_path.endswith('.json'):
         old_df = load_from_history_json(old_path, feature_cols)
     else:
-        old_df = clean_spark_columns(pd.read_csv(old_path))
-    
-    # 检查 new_path 是否为目录
-    if os.path.isdir(new_path):
-        new_df = load_from_multiple_json_files(new_path, feature_cols)
-    elif new_path.endswith('.json'):
-        new_df = load_from_history_json(new_path, feature_cols)
-    else:
-        new_df = clean_spark_columns(pd.read_csv(new_path))
-    
+        old_df = clean_spark_columns(pd.read_csv(old_path))    
     target_query_key_old = 'query_time'
-    target_query_key_new = 'query_time'
     if 'status' in old_df.columns:
         old_df = old_df[old_df['status'] == 'complete']
         target_query_key_old = 'spark_time'
-    if 'status' in new_df.columns:
-        new_df = new_df[new_df['status'] == 'complete']
-        target_query_key_new = 'spark_time'
 
     old_top = old_df.nsmallest(int(len(old_df) * ratio), target_query_key_old)
-    new_top = new_df.nsmallest(int(len(new_df) * ratio), target_query_key_new)
-    return old_top, new_top
+    return old_top
 
 def train_shap_model(df, target_col, feature_cols):
     if target_col not in df.columns:
@@ -401,7 +381,7 @@ def plot_individual_shap(shap_values, X, feature_cols, output_dir):
         fig.savefig(os.path.join(output_dir, f"shap_{param.replace('.', '_')}.png"), bbox_inches='tight')
         plt.close(fig)
 
-def analyze_space(old_top, new_top, feature_cols, output_dir, space=None, return_space=True, use_old=True):
+def analyze_space(old_top, feature_cols, space=None, return_space=True):
     model, explainer, shap_values, X, feature_cols = train_shap_model(old_top, 'spark_time', feature_cols)
     shap_vals_array = shap_values.values
     logger.info("数值型参数个数: %d, 参数类型: %s" % (len(feature_cols), str(feature_cols)))
@@ -412,11 +392,7 @@ def analyze_space(old_top, new_top, feature_cols, output_dir, space=None, return
 
     shap_based_ranges = get_shap_based_ranges(shap_values, X, feature_cols, shap_vals_array)
 
-    if use_old:
-        X_new = old_top[feature_cols]
-    else:
-        # todo: modify feature_col since columns maybe different in new_top
-        X_new = new_top[feature_cols]
+    X_new = old_top[feature_cols]
     shap_values_new = explainer(X_new)
     shap_vals_new_array = shap_values_new.values
     new_data_ranges = get_shap_based_ranges(shap_values_new, X_new, feature_cols, shap_vals_new_array)
@@ -428,7 +404,7 @@ def analyze_space(old_top, new_top, feature_cols, output_dir, space=None, return
         space = copy.deepcopy(space)
     print_combined_space_table_numeric(space, shap_based_ranges, new_data_ranges)
 
-    logger.info("\n根据 [%s] 表现好的结果构建建议搜索空间" % ("两节点" if use_old else "三节点"))
+    logger.info("\n根据表现好的结果构建建议搜索空间")
     logger.info(f"{'参数':<60} {'原搜索空间':<25} {'建议新空间':<25}")
     logger.info("=" * 110)
 
@@ -502,12 +478,12 @@ def load_space_from_json(json_file=None):
     return space
 
 
-def haisi_huge_spaces_from_json(old_data_path=None, new_data_path=None, json_file=None):    
+def haisi_huge_spaces_from_json(old_data_path=None, json_file=None):    
     if old_data_path is None:
         old_data_path = RANGE_COMPRESS_DATA
     
     old_space = load_space_from_json(json_file)
-    new_space = haisi_huge_spaces(old_space, old_data_path=old_data_path, new_data_path=new_data_path)
+    new_space = haisi_huge_spaces(old_space, old_data_path=old_data_path)
 
     return old_space, new_space
 

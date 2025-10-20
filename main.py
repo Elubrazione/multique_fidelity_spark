@@ -68,22 +68,9 @@ def modifier(config):
     return config
 
 
-# 加载基础搜索空间
 base_space = load_space_from_json(HUGE_SPACE_FILE)
-
-if not args.disable_range_compress:
-    logger.info(f"启用范围压缩功能，将使用历史数据进行范围压缩")
-    old_space, new_space = haisi_huge_spaces_from_json(
-        old_data_path=RANGE_COMPRESS_DATA,
-        new_data_path=FILE_SQL_SEGMENTATION,
-        json_file=HUGE_SPACE_FILE
-    )
-    logger.info(f"范围压缩完成：原始空间参数 {len(old_space.get_hyperparameters())} 个，压缩后空间参数 {len(new_space.get_hyperparameters())} 个")
-else:
-    logger.info(f"禁用范围压缩功能，使用原始搜索空间")
-    old_space = base_space
-    new_space = base_space
-    logger.info(f"使用原始搜索空间：{len(base_space.get_hyperparameters())} 个参数")
+old_space = base_space
+logger.info(f"使用原始搜索空间：{len(base_space.get_hyperparameters())} 个参数")
 
 fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_details(
     percentile=args.timeout, debug=False,
@@ -98,8 +85,7 @@ if args.enable_os_tuning:
     logger.info(f"OS配置空间加载成功，包含 {len(os_space.get_hyperparameters())} 个参数")
 
     old_space = parse_combined_space(old_space, os_space)
-    new_space = parse_combined_space(new_space, os_space)
-    logger.info(f"OS参数拼接完成：原始空间 {len(old_space.get_hyperparameters())} 个参数，压缩空间 {len(new_space.get_hyperparameters())} 个参数")
+    logger.info(f"OS参数拼接完成：原始空间 {len(old_space.get_hyperparameters())} 个参数")
 else:
     logger.info("OS参数调优功能已禁用")
 
@@ -136,12 +122,10 @@ cp_args = {
 
 
 config_space = old_space
-range_config_space = new_space if not args.disable_range_compress else old_space
-logger.info(f"优化器配置：原始空间 {len(config_space.get_hyperparameters())} 个参数，压缩空间 {len(range_config_space.get_hyperparameters())} 个参数")
+logger.info(f"优化器配置：原始空间 {len(config_space.get_hyperparameters())} 个参数")
 
 opt_kwargs = {
     'config_space': config_space,
-    'range_config_space': range_config_space,
     'eval_func': executor,
     'target': args.target,
     'task': args.task,
@@ -152,6 +136,8 @@ opt_kwargs = {
     'scene': "spark",
     'config_modifier': modifier,
     'expert_modified_space': None,
+    'enable_range_compression': not args.disable_range_compress,
+    'range_compress_data_path': RANGE_COMPRESS_DATA,
 }
 optimizer = build_optimizer(args, **opt_kwargs)
 
