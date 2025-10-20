@@ -1,6 +1,7 @@
 import re
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from openbox import logger
 from config import FILE_TIMEOUT_CSV, DATABASE, DATA_DIR
 import os, subprocess, paramiko
@@ -155,3 +156,81 @@ def parse_spark_log(log_dir, queries, suffix_type='log'):
 
     sorted_results = dict(sorted(results.items(), key=lambda x: custom_sort(x[0])))
     return cost, sorted_results
+
+def extract_performance_from_logs(log_dir, output_path):
+    results = {}
+    timestamps = []
+
+    time_pattern = re.compile(r'Time taken: ([\d.]+) seconds')
+    query_pattern = re.compile(r'(q\d+[a-z]?)')  # 匹配 q1, q1a, q1b 格式
+    datetime_pattern = re.compile(r'(\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})')
+
+    for filename in os.listdir(log_dir):
+        if filename.endswith('.log'):
+            query_match = query_pattern.search(filename)
+            if query_match:
+                query_name = query_match.group(1)
+                results[query_name] = np.Inf
+                with open(os.path.join(log_dir, filename), 'r') as f:
+                    for line in f:
+                        time_match = time_pattern.search(line)
+                        if time_match:
+                            execution_time = float(time_match.group(1))
+                            results[query_name] = execution_time
+
+                        datetime_match = datetime_pattern.search(line)
+                        if datetime_match:
+                            timestamp = datetime.strptime(datetime_match.group(1), '%d/%m/%y %H:%M:%S')
+                            timestamps.append(timestamp)
+
+    with open(output_path, 'w') as out_file:
+        if timestamps:
+            earliest: datetime = min(timestamps)
+            latest: datetime = max(timestamps)
+            time_diff = latest - earliest
+            hours, remainder = divmod(time_diff.total_seconds(), 3600)
+            minutes, seconds = divmod(remainder, 60)
+
+            out_file.write(f"start: {earliest.strftime('%d/%m/%y %H:%M:%S')}\n")
+            out_file.write(f"end: {latest.strftime('%d/%m/%y %H:%M:%S')}\n")
+            out_file.write(f"cost: {int(hours)}h {int(minutes)}m {int(seconds)}s\n\n")
+
+        sorted_results = dict(sorted(results.items(), key=lambda x: custom_sort(x[0])))
+        cost = 0
+        for _, (k, v) in enumerate(sorted_results.items()):
+            cost += v
+            out_file.write(f"{k}\t{v}\n")
+
+        out_file.write(f'\ntotal: {cost}\n')
+
+    print(f"Results saved to {output_path}")
+
+    times = list(sorted_results.values())
+    mean = np.mean(times)
+    median = np.median(times)
+    p90 = np.percentile(times, 90)
+    p99 = np.percentile(times, 99)
+
+    with open(output_path, 'a') as out_file:
+        out_file.write("\n=== Statistics ===\n")
+        out_file.write(f"Mean: {mean:.2f} s\n")
+        out_file.write(f"Median: {median:.2f} s\n")
+        out_file.write(f"P90: {p90:.2f} s\n")
+        out_file.write(f"P99: {p99:.2f} s\n")
+
+
+    outliers_p90 = {k: v for k, v in sorted_results.items() if v > p90}
+    outliers_p99 = {k: v for k, v in sorted_results.items() if v > p99}
+
+    with open(output_path, 'a') as out_file:
+        out_file.write("\n=== Long Tail Queries (P90) ===\n")
+        for k, v in outliers_p90.items():
+            out_file.write(f"{k}\t{v}\n")
+
+        out_file.write("\n=== Severe Long Tail Queries (P99) ===\n")
+        for k, v in outliers_p99.items():
+            out_file.write(f"{k}\t{v}\n")
+
+if __name__ == '__main__':
+    extract_performance_from_logs(log_dir=f"/root/codes/multique_fidelity_spark/exps/data_volume_correlation/20251019_163750/config_1/0.03", 
+    output_path=f"/root/codes/multique_fidelity_spark/exps/data_volume_correlation/20251019_163750/config_1/performance_0.03.txt")

@@ -236,7 +236,7 @@ def main():
                 'config_id': config_idx,
                 'fidelity': fidelity,
                 'database': fidelity_mapping[fidelity_str],
-                'config': config.get_dictionary(),
+                'config': config.get_dictionary() if hasattr(config, 'get_dictionary') else config,
                 'objective': result['objective'],
                 'elapsed_time': result['elapsed_time'],
                 'timeout': result['timeout'],
