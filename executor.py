@@ -217,7 +217,11 @@ class SparkTPCDSExecutor:
         else:
             logger.info(f"[{self.server}] No OS parameters found in configuration")
 
-        spark_params = {k: v for k, v in config.get_dictionary().items() if k not in os_params}
+        if hasattr(config, 'get_dictionary'):
+            config_dict = config.get_dictionary()
+        else:
+            config_dict = config
+        spark_params = {k: v for k, v in config_dict.items() if k not in os_params}
         logger.info(f"[{self.server}] Separated parameters - Spark: {len(spark_params)}")
 
         elapsed_time = {sql: np.Inf for sql in queries}
@@ -293,11 +297,24 @@ class SparkTPCDSExecutor:
                     logger.error(f"[Error reading log {remote_path}] {stderr}")
                     continue
                 lines = result.splitlines()
+                
+                # Extract all Time taken values and sum them
+                total_execution_time = 0.0
+                time_taken_count = 0
                 for line in lines:
                     time_match = time_pattern.search(line)
                     if time_match:
                         execution_time = float(time_match.group(1))
-                        results[i] = execution_time
+                        total_execution_time += execution_time
+                        time_taken_count += 1
+                
+                # If we found any Time taken values, use the sum; otherwise keep np.Inf
+                if time_taken_count > 0:
+                    results[i] = total_execution_time
+                    logger.debug(f"[{self.server}] Query {i}: Found {time_taken_count} Time taken entries, total: {total_execution_time}")
+                else:
+                    logger.warning(f"[{self.server}] Query {i}: No Time taken entries found in log")
+                
                 cost += results[i]
         except Exception as e:
             logger.error(f"[parse_spark_log] Error reading remote logs: {e}")
@@ -498,8 +515,12 @@ class OsExecutor:
             "tx_ring_buffer": "ethtool -G {iface} tx {value}"
         }
     
-    def extract_os_params(self, config: Configuration) -> Dict[str, Any]:
-        config_dict = config.get_dictionary()
+    def extract_os_params(self, config) -> Dict[str, Any]:
+        # 处理config可能是dict或Configuration对象的情况
+        if hasattr(config, 'get_dictionary'):
+            config_dict = config.get_dictionary()
+        else:
+            config_dict = config
         os_params = {}
         
         for param_name in self.os_params_config.keys():

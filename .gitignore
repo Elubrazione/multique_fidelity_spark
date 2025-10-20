@@ -5,4 +5,5 @@ results/results/*
 exps/**/*.log
 exps/**/*.csv
 exps/**/*.json
+exps/**/*.txt
 log/*
