@@ -20,13 +20,15 @@ class ExecutorManager:
     def __init__(self, sqls: dict, timeout: dict, config_space,
                  spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=LIST_SPARK_NODES,
                  servers=LIST_SPARK_SERVER, usernames=LIST_SPARK_USERNAME, passwords=LIST_SPARK_PASSWORD,
-                 enable_os_tuning=False):
+                 enable_os_tuning=False, fidelity_database_mapping=None, fixed_sqls=None):
         self.sqls = sqls
         self.timeout = timeout
         self.config_space = config_space
         self.child_num = len(spark_nodes)
         self.executor_queue = Queue()
         self.enable_os_tuning = enable_os_tuning
+        self.fidelity_database_mapping = fidelity_database_mapping or {}
+        self.fixed_sqls = fixed_sqls
         
         # Global setting for csv_file and csv_writer
         self.csv_path = os.path.join(RESULT_DIR, datetime.now().strftime('%Y%m%d-%H%M%S') + ".csv")
@@ -61,7 +63,9 @@ class ExecutorManager:
                     write_queue=self.write_queue, all_queries=self.all_queries,
                     spark_sql=spark_sql, spark_nodes=spark_nodes[idx],
                     server=servers[idx], username=usernames[idx], password=passwords[idx],
-                    enable_os_tuning=self.enable_os_tuning
+                    enable_os_tuning=self.enable_os_tuning,
+                    fidelity_database_mapping=self.fidelity_database_mapping,
+                    fixed_sqls=self.fixed_sqls
                 )
             )
             
@@ -124,7 +128,8 @@ class SparkTPCDSExecutor:
     def __init__(self, sqls: dict, timeout: dict, write_queue: Queue, all_queries=None,
                  suffix_type='log', spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=SPARK_NODES,
                  server=SPARK_SERVER_NODE, username=SPARK_USERNAME, password=SPARK_PASSWORD,
-                 enable_os_tuning=False, config_space=None):
+                 enable_os_tuning=False, config_space=None,
+                 fidelity_database_mapping=None, fixed_sqls=None):
         self.sqls = sqls
         self.timeout = timeout
         
@@ -140,6 +145,12 @@ class SparkTPCDSExecutor:
         self.tune_ssh = TuneSSH(server_ip=server, server_user=username, server_passwd=password)
         self.all_queries = all_queries
         self._node_ssh_cache = {}   # cache for per-node ssh connections when OS tuning is disabled
+        
+        # Map fidelity to database
+        self.fidelity_database_mapping = fidelity_database_mapping or {}
+        
+        # fixed SQL set (when using database fidelity)
+        self.fixed_sqls = fixed_sqls if fixed_sqls is not None else self.get_sqls_by_fidelity(resource=1.0)
         
         self.all_os_executors = {}
         if self.enable_os_tuning:
@@ -161,6 +172,9 @@ class SparkTPCDSExecutor:
         return self.run_spark_job(res_dir, config, resource_ratio)
     
     def get_sqls_by_fidelity(self, resource, use_delta=False):
+        if self.fidelity_database_mapping and resource in self.fidelity_database_mapping:
+            logger.info(f"[{self.server}] Using fixed SQL set for fidelity {resource}: {len(self.fixed_sqls)} queries")
+            return self.fixed_sqls
         assert resource in self.sqls.keys()
         original_sqls = self.sqls[resource]
         if use_delta:
@@ -168,6 +182,15 @@ class SparkTPCDSExecutor:
                 if k == resource: break
                 original_sqls = [i for i in original_sqls if i not in v]
         return original_sqls
+    
+    def get_database_by_fidelity(self, fidelity):
+        if self.fidelity_database_mapping and fidelity in self.fidelity_database_mapping:
+            database = self.fidelity_database_mapping[fidelity]
+            logger.info(f"[{self.server}] Using mapped database for fidelity {fidelity}: {database}")
+            return database
+        
+        logger.info(f"[{self.server}] Using default database for fidelity {fidelity}: {DATABASE}")
+        return DATABASE
 
     def run_spark_job(self, res_dir, config: dict, resource):
         logger.info(res_dir)
@@ -199,17 +222,20 @@ class SparkTPCDSExecutor:
 
         elapsed_time = {sql: np.Inf for sql in queries}
         total_status = True
+        executed_queries = []  # 记录实际执行的查询
+        
         for sql in queries:
             cur_start_time = time.time()
-            status = self._run_remote_job(sql=sql, config=spark_params, res_dir=res_dir)
+            status = self._run_remote_job(sql=sql, config=spark_params, res_dir=res_dir, fidelity=resource)
             elapsed_time[sql] = time.time() - cur_start_time
+            executed_queries.append(sql)
             if status != "success":
                 total_status = False
                 break
 
         total_time, qtime_details = self.parse_spark_log_on_remote(
             remote_log_dir=res_dir,
-            queries=queries,
+            queries=executed_queries,
             status=total_status
         )
         elapsed_total_time = sum([v for v in elapsed_time.values()])
@@ -236,16 +262,19 @@ class SparkTPCDSExecutor:
 
         return results
 
-    def _run_remote_job(self, sql, config, res_dir):
+    def _run_remote_job(self, sql, config, res_dir, fidelity=None):
+        database = self.get_database_by_fidelity(fidelity) if fidelity is not None else DATABASE
+        
         spark_cmd = [
             self.spark_sql,
             "--master", "yarn",
-            "--database", DATABASE,
+            "--database", database,
             *convert_to_spark_params(config),
             "-f", f"{DATA_DIR}/{sql}.sql"
         ]
         remote_log_path = f"{res_dir}/{sql}.log"
         full_cmd = f"{' '.join(spark_cmd)} > {remote_log_path} 2>&1"
+        logger.info(f"[{self.server}] Running Spark command: {full_cmd}")
         timeout_sec = self.timeout.get(sql, None)
         return self._execute_command(full_cmd, timeout_sec=timeout_sec)["status"]
 

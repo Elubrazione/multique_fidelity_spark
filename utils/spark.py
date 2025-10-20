@@ -42,7 +42,7 @@ def custom_sort(key):
 
 def analyze_timeout_and_get_fidelity_details(file_path=FILE_TIMEOUT_CSV, percentile=100,
                                              ratio_list=[], round_num=5, debug=False, add_on_ratio=1.5):
-    elapsed_timeout_dicts = analyze_sqls_timeout_from_csv(file_path=file_path, percentile=percentile)
+    elapsed_timeout_dicts = analyze_sqls_timeout_from_csv(file_path=file_path, percentile=percentile, add_on_ratio=add_on_ratio)
 
     fidelity_details = {}
     excluded_sqls = set()
@@ -63,7 +63,7 @@ def analyze_timeout_and_get_fidelity_details(file_path=FILE_TIMEOUT_CSV, percent
     logger.info(fidelity_details)
     return fidelity_details, elapsed_timeout_dicts
 
-def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33):
+def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33, add_on_ratio=1.5):
     df = pd.read_csv(file_path)
     df = df[df['status'] == 'complete']
     et_columns = [col for col in df.columns if col.startswith("et_q")]
@@ -74,6 +74,7 @@ def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33):
         if len(values) > 0:
             clean_key = col.replace('et_', '', 1)
             et_quantiles[clean_key] = np.percentile(values, percentile)
+    et_quantiles = {k: v * add_on_ratio + v for k, v in et_quantiles.items()}
     return et_quantiles
 
 def off_line_greedy_selection(time_dicts: dict, ratio=1, excluded_sqls=None):
