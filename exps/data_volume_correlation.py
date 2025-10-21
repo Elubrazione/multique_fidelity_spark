@@ -84,11 +84,15 @@ def sample_configurations(config_space, num_samples=100, seed=42):
     config_space.seed(seed)
     configs = []
     
-    for i in range(num_samples):
+    i = 0
+    while len(configs) < num_samples:        
         config = config_space.sample_configuration()
-        configs.append(config)
-        logger.info(f"sample config {i+1}/{num_samples}: {config}")
-    
+        if config not in configs:
+            configs.append(config)
+            logger.info(f"sample config {i+1}/{num_samples}: {config}")
+            i += 1
+        else:
+            logger.info(f"duplicate config found, resampling...")
     return configs
 
 def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_seed=None):
