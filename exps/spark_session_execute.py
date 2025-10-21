@@ -59,6 +59,9 @@ def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_queries=False,
             
         logger.info(f"  execute query {i+1}/{len(queries)}: {query[:50]}...")
         
+        for node in SPARK_NODES:
+            clear_cache_on_remote(node)
+
         query_start_time = time.time()
         try:
             result = spark.sql(query)
@@ -193,8 +196,8 @@ def main():
                 .config("spark.task.cpus", "2") \
                 .getOrCreate()
 
-            for node in SPARK_NODES:
-                clear_cache_on_remote(node)
+            # for node in SPARK_NODES:
+            #    clear_cache_on_remote(node)
 
             # Only shuffle if more than 1 run, and not on the last run
             if runs > 1 and run_index < runs - 1:
@@ -212,7 +215,7 @@ def main():
             overall_start_time = time.time()
             results = []
 
-            for sql_file in sql_files_order:
+            for _idx, sql_file in enumerate(sql_files_order):
                 sql_path = os.path.join(base_dir, sql_file)
 
                 try:
@@ -233,10 +236,10 @@ def main():
                                                    shuffle_seed=query_shuffle_seed)
                     results.append(result)
 
-                    logger.info(f"  {sql_file} completed, total time: {result['total_elapsed_time']:.2f}s")
+                    logger.info(f"  {_idx+1}/{len(sql_files_order)}: {sql_file} completed, total time: {result['total_elapsed_time']:.2f}s")
 
                 except Exception as e:
-                    logger.error(f"  error when processing {sql_file}: {str(e)}")
+                    logger.error(f"  {_idx+1}/{len(sql_files_order)}: error when processing {sql_file}: {str(e)}")
                     results.append({
                         "sql_file": sql_file,
                         "total_elapsed_time": 0,
