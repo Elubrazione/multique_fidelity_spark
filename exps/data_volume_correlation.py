@@ -1,6 +1,9 @@
 """
-sample configs and evaluate performance script
-validate random configs' performance under different data scales
+Data volume correlation experiment using PySpark Session execution
+Sample configs and evaluate performance under different data scales using single SparkSession per SQL file
+
+Usage:
+python data_volume_correlation_new.py --num_samples 10 --seed 42 --test_mode
 """
 
 import argparse
@@ -8,13 +11,17 @@ import os
 import json
 import numpy as np
 import pandas as pd
+import time
+import random
+import paramiko
 from datetime import datetime
 from openbox import logger
+from pyspark.sql import SparkSession
+from ConfigSpace import ConfigurationSpace
 
-from executor import ExecutorManager
 from space_values import load_space_from_json
-from utils.spark import get_full_queries_tasks, analyze_sqls_timeout_from_csv
-from config import HUGE_SPACE_FILE
+from utils.spark import get_full_queries_tasks, clear_cache_on_remote, custom_sort
+from config import HUGE_SPACE_FILE, SPARK_NODES, DATA_DIR
 
 
 def setup_openbox_logging(experiment_dir):
@@ -24,26 +31,30 @@ def setup_openbox_logging(experiment_dir):
     }
     logger.init(**logger_kwargs)
 
-
-def create_fidelity_database_mapping():
-    return {
+def create_fidelity_database_mapping(test_mode=False):
+    database_mapping = {
         0.03: "tpcds_30g",
-        0.1: "tpcds_100g", 
-        0.3: "tpcds_300g",
-        0.6: "tpcds_600g",
-        1.0: "tpcds_1000g"
+        0.1: "tpcds_100g"
     }
+    if not test_mode:
+        database_mapping.update({
+            0.3: "tpcds_300g",
+            0.6: "tpcds_600g",
+            1.0: "tpcds_1000g"
+        })
+    return database_mapping
 
-
-def create_fixed_sqls():
-    return get_full_queries_tasks()
-
+def create_fixed_sqls(sql_dir, test_mode=False):
+    queries = get_full_queries_tasks(sql_dir)
+    if test_mode:
+        return queries[: 2]
+    return queries
 
 def filter_expert_config_space(original_config_space):
     import json
     from ConfigSpace import ConfigurationSpace
 
-    expert_space_path = "/root/codes/multique_fidelity_spark/configs/config_space/expert_space.json"
+    expert_space_path = "./configs/config_space/expert_space.json"
     with open(expert_space_path, 'r') as f:
         expert_params = json.load(f)
 
@@ -68,9 +79,9 @@ def filter_expert_config_space(original_config_space):
     logger.info(f"expert config space created, total {expert_count} params")
     return expert_config_space
 
-
 def sample_configurations(config_space, num_samples=100, seed=42):
     np.random.seed(seed)
+    config_space.seed(seed)
     configs = []
     
     for i in range(num_samples):
@@ -80,43 +91,200 @@ def sample_configurations(config_space, num_samples=100, seed=42):
     
     return configs
 
+def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_seed=None):
+    logger.info(f"execute sql file: {sql_file}")
+    
+    queries = [q.strip() for q in sql_content.split(';') if q.strip()]
+    logger.info(f"  found {len(queries)} queries")
+        
+    query_times = []
+    total_start_time = time.time()
+    
+    for i, query in enumerate(queries):
+        if not query:
+            continue 
+        logger.info(f"  execute query {i+1}/{len(queries)}: {query[:50]}...")
+        
+        for node in SPARK_NODES:
+            clear_cache_on_remote(node)
 
-def evaluate_config_on_fidelity(executor, config, fidelity, config_idx, experiment_dir):
+        query_start_time = time.time()
+        try:
+            result = spark.sql(query)
+            logger.info(f"      select query...")
+            collected_data = result.collect()
+            logger.info(f"      query return {len(collected_data)} rows")
+            
+            if len(collected_data) > 0:
+                logger.debug(f"      all collected data:")
+                for j, row in enumerate(collected_data):
+                    logger.debug(f"        row{j+1}: {row}")
+            else:
+                logger.debug(f"      results are empty")
+            
+            query_elapsed = time.time() - query_start_time
+            query_times.append({
+                "query_index": i,
+                "query": sql_file[: -4] if sql_file.endswith('.sql') else sql_file + "_" + str(i),
+                "elapsed_time": query_elapsed,
+                "status": "success"
+            })
+            
+            logger.info(f"      query {i+1} completed, time: {query_elapsed:.2f}s")
+            spark.catalog.clearCache()
+            
+        except Exception as e:
+            query_elapsed = time.time() - query_start_time
+            query_times.append({
+                "query_index": i,
+                "query": sql_file[: -4] if sql_file.endswith('.sql') else sql_file + "_" + str(i),
+                "elapsed_time": query_elapsed,
+                "status": "error",
+                "error": str(e)
+            })
+            
+            logger.error(f"      query {i+1} failed: {str(e)}")
+            break
+    
+    total_elapsed = time.time() - total_start_time
+    
+    return {
+        "sql_file": sql_file,
+        "total_elapsed_time": total_elapsed,
+        "query_count": len(query_times),
+        "queries": query_times,
+        "status": "success" if all(q["status"] == "success" for q in query_times) else "error"
+    }
+
+def create_spark_session(config, app_name, database=None):
+    memory_params = {
+        'spark.executor.memory': 'g',
+        'spark.driver.memory': 'g',
+        'spark.executor.memoryOverhead': 'm',
+        'spark.driver.maxResultSize': 'm',
+        'spark.sql.autoBroadcastJoinThreshold': 'm'     
+    }
+    
+    spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
+    if hasattr(config, 'get_dictionary'):
+        config_dict = config.get_dictionary()
+    else:
+        config_dict = config
+    for key, value in config_dict.items():
+        if key.startswith('spark.'):
+            spark_builder = spark_builder.config(key, str(value) + memory_params.get(key, ''))
+            logger.debug(f"set spark config: {key} = {value}")
+    spark = spark_builder.getOrCreate()
+    if database:
+        spark.sql(f"USE {database}")
+        logger.info(f"database set to: {database}")
+    return spark
+
+def evaluate_config_on_fidelity(config, fidelity, database, sql_files, 
+                                config_idx, experiment_dir, sql_dir=DATA_DIR):
     try:
-        logger.info(f"evaluate config {config_idx} on fidelity {fidelity}")
+        logger.info(f"evaluate config {config_idx} on fidelity {fidelity} (database: {database})")
         
         config_dir = f"{experiment_dir}/config_{config_idx}"
         fidelity_dir = f"{config_dir}/{fidelity}"
+        os.makedirs(fidelity_dir, exist_ok=True)
         
-        result = executor(config, fidelity, fidelity_dir)
+        spark = create_spark_session(config, app_name=f"DataVolumeCorrelation_{config_idx}_{fidelity}")
+        logger.info("SparkSession created")
         
-        if result and 'result' in result:
-            objective = result['result']['objective']
-            elapsed_time = result.get('elapsed_time', 0)
-            timeout_flag = result.get('timeout', False)
+        overall_start_time = time.time()
+        results = []
+        
+        for sql_file in sql_files:
+            sql_path = os.path.join(sql_dir, sql_file + '.sql')
             
-            return {
-                'objective': objective,
-                'elapsed_time': elapsed_time,
-                'timeout': timeout_flag,
-                'success': True
-            }
-        else:
-            return {
-                'objective': float('inf'),
-                'elapsed_time': 0,
-                'timeout': True,
-                'success': False
-            }
+            try:
+                with open(sql_path, 'r') as f:
+                    sql_content = f.read()
+                
+                new_spark = spark.newSession()
+                new_spark.sql(f"USE {database}")
+                
+                result = execute_sql_with_timing(new_spark, sql_content, sql_file)
+                results.append(result)
+                logger.info(f"  {sql_file} completed, total time: {result['total_elapsed_time']:.2f}s")
+                
+            except Exception as e:
+                logger.error(f"  error when processing {sql_file}: {str(e)}")
+                results.append({
+                    "sql_file": sql_file,
+                    "total_elapsed_time": 0,
+                    "query_count": 0,
+                    "queries": [],
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        overall_elapsed_time = time.time() - overall_start_time
+        
+        # Calculate total Spark execution time
+        successful_results = [r for r in results if r["status"] == "success"]
+        total_spark_time = 0
+        for r in successful_results:
+            for query in r.get('queries', []):
+                if query.get('status') == 'success':
+                    total_spark_time += query.get('elapsed_time', 0)
+        
+        overhead = overall_elapsed_time - total_spark_time
+        
+        # Calculate objective (total execution time)
+        objective = total_spark_time if successful_results else float('inf')
+        
+        # Save detailed results
+        detailed_results = {
+            "summary": {
+                "total_files": len(sql_files),
+                "successful_files": len(successful_results),
+                "failed_files": len(results) - len(successful_results),
+                "overall_elapsed_time": overall_elapsed_time,
+                "total_spark_time": total_spark_time,
+                "overhead": overhead,
+                "overhead_percentage": overhead/overall_elapsed_time*100 if overall_elapsed_time > 0 else 0,
+                "config_idx": config_idx,
+                "fidelity": fidelity,
+                "database": database
+            },
+            "results": results
+        }
+        
+        # Save results to file
+        result_file = os.path.join(fidelity_dir, "execution_results.json")
+        with open(result_file, 'w', encoding='utf-8') as f:
+            json.dump(detailed_results, f, indent=2, ensure_ascii=False)
+        
+        spark.stop()
+        logger.info("SparkSession closed")
+        
+        return {
+            'objective': objective,
+            'elapsed_time': overall_elapsed_time,
+            'spark_time': total_spark_time,
+            'overhead': overhead,
+            'timeout': False,
+            'success': len(successful_results) == len(sql_files),
+            'successful_files': len(successful_results),
+            'total_files': len(sql_files)
+        }
             
     except Exception as e:
-        logger.error(f"评估配置时出错: {e}")
+        logger.error(f"error while evaluating config: {e}")
+        if 'spark' in locals():
+            spark.stop()
         return {
             'objective': float('inf'),
             'elapsed_time': 0,
+            'spark_time': 0,
+            'overhead': 0,
             'timeout': True,
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'successful_files': 0,
+            'total_files': len(sql_files)
         }
 
 
@@ -137,7 +305,9 @@ def save_results(results, output_dir):
         'overall_stats': {
             'success_rate': df['success'].mean(),
             'avg_objective': df[df['success']]['objective'].mean(),
-            'avg_elapsed_time': df['elapsed_time'].mean()
+            'avg_elapsed_time': df['elapsed_time'].mean(),
+            'avg_spark_time': df[df['success']]['spark_time'].mean(),
+            'avg_overhead': df['overhead'].mean()
         }
     }
     
@@ -147,42 +317,46 @@ def save_results(results, output_dir):
             'count': len(fidelity_data),
             'success_rate': fidelity_data['success'].mean(),
             'avg_objective': fidelity_data[fidelity_data['success']]['objective'].mean(),
-            'avg_elapsed_time': fidelity_data['elapsed_time'].mean()
+            'avg_elapsed_time': fidelity_data['elapsed_time'].mean(),
+            'avg_spark_time': fidelity_data[fidelity_data['success']]['spark_time'].mean(),
+            'avg_overhead': fidelity_data['overhead'].mean()
         }
     
     stats_path = os.path.join(output_dir, 'validation_statistics.json')
     with open(stats_path, 'w') as f:
         json.dump(stats, f, indent=2)
-    logger.info(f": {stats_path}")
+    logger.info(f"save statistics to: {stats_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='sample configs and evaluate performance')
+    parser = argparse.ArgumentParser(description='Data volume correlation experiment using PySpark Session')
     parser.add_argument('--num_samples', type=int, default=100, help='sample configs number')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
-    parser.add_argument('--test_mode', action='store_true', help='test mode, only evaluate少量配置')
+    parser.add_argument('--test_mode', type=bool, default=False, help='test mode, only evaluate a few configs')
+    parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
     
     args = parser.parse_args()
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    experiment_dir = f"/root/codes/multique_fidelity_spark/exps/data_volume_correlation/{timestamp}"
+    experiment_dir = f"./exps/data_volume_correlation/{timestamp}"
     os.makedirs(experiment_dir, exist_ok=True)
     
     setup_openbox_logging(experiment_dir)
     
     logger.info("=" * 60)
-    logger.info("sample configs and evaluate performance experiment starts")
+    logger.info("Data volume correlation experiment using PySpark Session starts")
     logger.info("=" * 60)
     logger.info(f"sample configs number: {args.num_samples}")
     logger.info(f"random seed: {args.seed}")
     logger.info(f"experiment directory: {experiment_dir}")
+    logger.info(f"SQL directory: {args.sql_dir}")
     
     if args.test_mode:
-        args.num_samples = 1
+        args.num_samples = 2
         logger.info(f"test mode: only evaluate {args.num_samples} configs")
     
-    fidelity_mapping = create_fidelity_database_mapping()
-    fixed_sqls = create_fixed_sqls()
+    fidelity_mapping = create_fidelity_database_mapping(args.test_mode)
+    fixed_sqls = create_fixed_sqls(args.sql_dir, args.test_mode)
     
     logger.info(f"fidelity mapping: {fidelity_mapping}")
     logger.info(f"fixed sqls: {len(fixed_sqls)} queries")
@@ -197,23 +371,6 @@ def main():
     configs = sample_configurations(config_space, args.num_samples, args.seed)
     logger.info(f"sample configs done, total {len(configs)} configs")
     
-    fidelity_details = {}
-    elapsed_timeout_dicts = analyze_sqls_timeout_from_csv(add_on_ratio=2.5)
-    
-    for fidelity in fidelity_mapping.keys():
-        fidelity_details[fidelity] = fixed_sqls
-    
-    logger.info("create executor...")
-    executor = ExecutorManager(
-        sqls=fidelity_details,
-        timeout=elapsed_timeout_dicts,
-        config_space=config_space,
-        enable_os_tuning=False,
-        fidelity_database_mapping=fidelity_mapping,
-        fixed_sqls=fixed_sqls
-    )
-    logger.info("executor created successfully")
-    
     results = []
     total_evaluations = len(configs) * len(fidelity_mapping)
     current_evaluation = 0
@@ -223,24 +380,31 @@ def main():
     
     for config_idx, config in enumerate(configs):
         logger.info(f"evaluate config {config_idx + 1}/{len(configs)}")
+        logger.info(f"  config: {config}")
         
         for fidelity_str in fidelity_mapping.keys():
-            fidelity = round(float(fidelity_str), 5)
+            fidelity = float(fidelity_str)
+            database = fidelity_mapping[fidelity_str]
             current_evaluation += 1
             
-            logger.info(f"   evaluation progress: {current_evaluation}/{total_evaluations} - Fidelity: {fidelity}")
+            logger.info(f"   evaluation progress: {current_evaluation}/{total_evaluations} - Fidelity: {fidelity}, Database: {database}")
             
-            result = evaluate_config_on_fidelity(executor, config, fidelity, config_idx + 1, experiment_dir)
+            result = evaluate_config_on_fidelity(config, fidelity, database, fixed_sqls, 
+                                                 config_idx + 1, experiment_dir, args.sql_dir)
             
             result_record = {
                 'config_id': config_idx,
                 'fidelity': fidelity,
-                'database': fidelity_mapping[fidelity_str],
+                'database': database,
                 'config': config.get_dictionary() if hasattr(config, 'get_dictionary') else config,
                 'objective': result['objective'],
                 'elapsed_time': result['elapsed_time'],
+                'spark_time': result['spark_time'],
+                'overhead': result['overhead'],
                 'timeout': result['timeout'],
-                'success': result['success']
+                'success': result['success'],
+                'successful_files': result['successful_files'],
+                'total_files': result['total_files']
             }
             
             if 'error' in result:
@@ -250,6 +414,8 @@ def main():
             
             logger.info(f"result record: objective={result['objective']:.2f}, "
                        f"elapsed_time={result['elapsed_time']:.2f}s, "
+                       f"spark_time={result['spark_time']:.2f}s, "
+                       f"overhead={result['overhead']:.2f}s, "
                        f"success={result['success']}")
     
     logger.info("=" * 60)
@@ -262,6 +428,8 @@ def main():
     df = pd.DataFrame(results)
     
     logger.info("=" * 60)
+    logger.info("Final Results Summary:")
+    logger.info("=" * 60)
     for fidelity in sorted(df['fidelity'].unique()):
         fidelity_data = df[df['fidelity'] == fidelity]
         valid_fidelity_data = fidelity_data[fidelity_data['objective'] != float('inf')]
@@ -273,16 +441,23 @@ def main():
             avg_obj_str = f"{avg_objective:.2f}"
             avg_elapsed_valid = valid_fidelity_data['elapsed_time'].mean()
             avg_elapsed_valid_str = f"{avg_elapsed_valid:.2f}"
+            avg_spark_time = valid_fidelity_data['spark_time'].mean()
+            avg_spark_time_str = f"{avg_spark_time:.2f}"
+            avg_overhead = valid_fidelity_data['overhead'].mean()
+            avg_overhead_str = f"{avg_overhead:.2f}"
         else:
             avg_obj_str = "N/A"
             avg_elapsed_valid_str = "N/A"
+            avg_spark_time_str = "N/A"
+            avg_overhead_str = "N/A"
         
-        logger.info(f"  Fidelity {fidelity}:")
+        logger.info(f"  Fidelity {fidelity} ({fidelity_mapping[fidelity]}):")
         logger.info(f"    success rate: {success_rate:.2%} ({len(valid_fidelity_data)}/{len(fidelity_data)})")
-        logger.info(f"    valid results: {len(valid_fidelity_data)} - avg objective: {avg_obj_str}, avg elapsed: {avg_elapsed_valid_str}s")
+        logger.info(f"    valid results: {len(valid_fidelity_data)} - avg objective: {avg_obj_str}s")
+        logger.info(f"    avg elapsed: {avg_elapsed_valid_str}s, avg spark time: {avg_spark_time_str}s, avg overhead: {avg_overhead_str}s")
     
     logger.info("=" * 60)
-    logger.info("sample configs and evaluate performance experiment done")
+    logger.info("Data volume correlation experiment using PySpark Session completed")
     logger.info(f"results saved to: {experiment_dir}")
     logger.info(f"logs saved to: {experiment_dir}")
     logger.info("=" * 60)
