@@ -115,7 +115,7 @@ def run_spark(config, sql, result_dir):
 def get_full_queries_tasks(query_dir=f"{DATA_DIR}/"):
     queries = os.listdir(query_dir)
     queries = sorted(
-        [q.rstrip('.sql') for q in queries if q.startswith('q') and q.endswith('.sql')],
+        [q[: -4] for q in queries if q.endswith('.sql')],
         key=lambda x: custom_sort(x)
     )
     return queries
@@ -128,16 +128,16 @@ def clear_cache_on_remote(server, username = "root", password = "root"):
         stdin, stdout, stderr = client.exec_command("echo 3 > /proc/sys/vm/drop_caches")
         error = stderr.read().decode()
         if error:
-            print(f"[{server}] Error: {error}")
+            logger.error(f"[{server}] Error: {error}")
         else:
-            print(f"[{server}] Cache cleared successfully.")
+            logger.info(f"[{server}] Cache cleared successfully.")
 
         stdin, stdout, stderr = client.exec_command("free -g")
-        print(f"[{server}] Memory status:\n{stdout.read().decode()}")
+        logger.info(f"[{server}] Memory status:\n{stdout.read().decode()}")
 
         client.close()
     except Exception as e:
-        print(f"[{server}] Error: {e}")
+        logger.error(f"[{server}] Error: {e}")
 
 def parse_spark_log(log_dir, queries, suffix_type='log'):
     results = {}
