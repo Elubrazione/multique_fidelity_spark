@@ -2,8 +2,7 @@ __pycache__
 
 results/details/*
 results/results/*
-exps/**/*.log
-exps/**/*.csv
-exps/**/*.json
-exps/**/*.txt
+exps/spark_session_execute/*
+exps/default_perf/*
+exps/data_volume_correlation/**/*.log
 log/*

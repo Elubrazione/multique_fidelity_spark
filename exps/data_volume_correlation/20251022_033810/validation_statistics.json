@@ -1,0 +1,44 @@
+{
+  "total_configs": 4,
+  "fidelity_stats": {
+    "0.03": {
+      "count": 1,
+      "success_rate": 1.0,
+      "avg_objective": 1891.9306893348694,
+      "avg_elapsed_time": 2356.455318927765,
+      "avg_spark_time": 1891.9306893348694,
+      "avg_overhead": 464.5246295928955
+    },
+    "0.1": {
+      "count": 1,
+      "success_rate": 0.0,
+      "avg_objective": NaN,
+      "avg_elapsed_time": 3950.9592986106873,
+      "avg_spark_time": NaN,
+      "avg_overhead": 568.0244472026825
+    },
+    "0.3": {
+      "count": 1,
+      "success_rate": 1.0,
+      "avg_objective": 5113.250802755356,
+      "avg_elapsed_time": 5636.247579097748,
+      "avg_spark_time": 5113.250802755356,
+      "avg_overhead": 522.996776342392
+    },
+    "0.6": {
+      "count": 1,
+      "success_rate": 1.0,
+      "avg_objective": 13663.50978899002,
+      "avg_elapsed_time": 14283.25229382515,
+      "avg_spark_time": 13663.50978899002,
+      "avg_overhead": 619.7425048351288
+    }
+  },
+  "overall_stats": {
+    "success_rate": 0.75,
+    "avg_objective": 6889.563760360082,
+    "avg_elapsed_time": 6556.728622615337,
+    "avg_spark_time": 6889.563760360082,
+    "avg_overhead": 543.8220894932747
+  }
+}
