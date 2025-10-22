@@ -458,7 +458,7 @@ def main():
     parser = argparse.ArgumentParser(description='Data volume correlation experiment using PySpark Session')
     parser.add_argument('--num_samples', type=int, default=100, help='sample configs number')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
-    parser.add_argument('--test_mode', type=bool, default=False, help='test mode, only evaluate a few configs')
+    parser.add_argument('--test_mode', action='store_true', default=False, help='test mode, only evaluate a few configs')
     parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
     parser.add_argument('--resume', action='store_true', help='resume from latest experiment directory')
     
