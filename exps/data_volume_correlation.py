@@ -50,6 +50,125 @@ def create_fixed_sqls(sql_dir, test_mode=False):
         return queries[: 2]
     return queries
 
+def find_latest_experiment_dir():
+    """find the latest experiment directory"""
+    base_dir = "./exps/data_volume_correlation"
+    if not os.path.exists(base_dir):
+        return None
+    
+    experiment_dirs = []
+    for item in os.listdir(base_dir):
+        item_path = os.path.join(base_dir, item)
+        if os.path.isdir(item_path) and item.startswith('20'):  # match the timestamp format
+            experiment_dirs.append(item_path)
+    
+    if not experiment_dirs:
+        return None
+    
+    # sort by modification time, return the latest
+    latest_dir = max(experiment_dirs, key=os.path.getmtime)
+    logger.info(f"found latest experiment directory: {latest_dir}")
+    return latest_dir
+
+def detect_completed_evaluations(experiment_dir, fidelity_mapping):
+    """detect the completed configurations and fidelity combinations"""
+    if not experiment_dir or not os.path.exists(experiment_dir):
+        return set()
+    
+    completed = set()
+    
+    for item in os.listdir(experiment_dir):
+        if item.startswith('config_'):
+            config_path = os.path.join(experiment_dir, item)
+            if not os.path.isdir(config_path):
+                continue
+
+            try:
+                config_idx = int(item.split('_')[1])
+            except (IndexError, ValueError):
+                continue
+
+            for fidelity_item in os.listdir(config_path):
+                fidelity_path = os.path.join(config_path, fidelity_item)
+                if not os.path.isdir(fidelity_path):
+                    continue
+                
+                # check if there is a execution_results.json file
+                result_file = os.path.join(fidelity_path, "execution_results.json")
+                if os.path.exists(result_file):                      
+                    fidelity = float(fidelity_item)
+                    completed.add((config_idx, fidelity))
+                    logger.info(f"detected completed evaluation: config_{config_idx}, fidelity_{fidelity}")
+    
+    logger.info(f"total completed evaluations: {len(completed)}")
+    return completed
+
+def rebuild_results_from_execution_files(experiment_dir, fidelity_mapping):
+    """rebuild results list from existing execution_results.json files"""
+    results = []
+    
+    if not experiment_dir or not os.path.exists(experiment_dir):
+        return results
+    
+    # traverse config directories
+    for item in os.listdir(experiment_dir):
+        if item.startswith('config_'):
+            config_path = os.path.join(experiment_dir, item)
+            if not os.path.isdir(config_path):
+                continue
+            
+            try:
+                config_idx = int(item.split('_')[1])
+            except (IndexError, ValueError):
+                continue
+            
+            # traverse fidelity directories
+            for fidelity_item in os.listdir(config_path):
+                fidelity_path = os.path.join(config_path, fidelity_item)
+                if not os.path.isdir(fidelity_path):
+                    continue
+                
+                result_file = os.path.join(fidelity_path, "execution_results.json")
+                if os.path.exists(result_file):
+                    try:
+                        with open(result_file, 'r') as f:
+                            result_data = json.load(f)
+                        
+                        # extract summary information
+                        summary = result_data.get('summary', {})
+                        fidelity = float(fidelity_item)
+                        # try to get database from summary first, fallback to fidelity_mapping
+                        database = summary.get('database', fidelity_mapping.get(str(fidelity), f"unknown_{fidelity_item}"))
+                        
+                        # calculate objective (total spark time)
+                        total_spark_time = summary.get('total_spark_time', 0)
+                        objective = total_spark_time if summary.get('successful_files', 0) > 0 else float('inf')
+                        
+                        # create result record
+                        result_record = {
+                            'config_id': config_idx - 1,  # convert to 0-based index
+                            'fidelity': fidelity,
+                            'database': database,
+                            'config': summary.get('config', {}),  # extract config from summary
+                            'objective': objective,
+                            'elapsed_time': summary.get('overall_elapsed_time', 0),
+                            'spark_time': total_spark_time,
+                            'overhead': summary.get('overhead', 0),
+                            'timeout': False,
+                            'success': summary.get('successful_files', 0) == summary.get('total_files', 0),
+                            'successful_files': summary.get('successful_files', 0),
+                            'total_files': summary.get('total_files', 0)
+                        }
+                        
+                        results.append(result_record)
+                        logger.info(f"rebuilt result: config_{config_idx}, fidelity_{fidelity}, objective={objective:.2f}")
+                        
+                    except (json.JSONDecodeError, KeyError, ValueError) as e:
+                        logger.warning(f"failed to rebuild result from {result_file}: {e}")
+                        continue
+    
+    return results
+
 def filter_expert_config_space(original_config_space):
     import json
     from ConfigSpace import ConfigurationSpace
@@ -251,7 +370,8 @@ def evaluate_config_on_fidelity(config, fidelity, database, sql_files,
                 "overhead_percentage": overhead/overall_elapsed_time*100 if overall_elapsed_time > 0 else 0,
                 "config_idx": config_idx,
                 "fidelity": fidelity,
-                "database": database
+                "database": database,
+                "config": config.get_dictionary() if hasattr(config, 'get_dictionary') else config
             },
             "results": results
         }
@@ -338,12 +458,23 @@ def main():
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--test_mode', type=bool, default=False, help='test mode, only evaluate a few configs')
     parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
+    parser.add_argument('--resume', action='store_true', help='resume from latest experiment directory')
     
     args = parser.parse_args()
     
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    experiment_dir = f"./exps/data_volume_correlation/{timestamp}"
-    os.makedirs(experiment_dir, exist_ok=True)
+    if args.resume:
+        experiment_dir = find_latest_experiment_dir()
+        if experiment_dir:
+            logger.info(f"resuming from existing experiment directory: {experiment_dir}")
+        else:
+            logger.info("no existing experiment directory found, creating new one")
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            experiment_dir = f"./exps/data_volume_correlation/{timestamp}"
+            os.makedirs(experiment_dir, exist_ok=True)
+    else:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        experiment_dir = f"./exps/data_volume_correlation/{timestamp}"
+        os.makedirs(experiment_dir, exist_ok=True)
     
     setup_openbox_logging(experiment_dir)
     
@@ -365,6 +496,9 @@ def main():
     logger.info(f"fidelity mapping: {fidelity_mapping}")
     logger.info(f"fixed sqls: {len(fixed_sqls)} queries")
     
+    # detect the completed configurations and fidelity combinations
+    completed_evaluations = detect_completed_evaluations(experiment_dir, fidelity_mapping)
+    
     original_config_space = load_space_from_json(HUGE_SPACE_FILE)
     logger.info(f"original config space loaded, total {len(original_config_space.get_hyperparameters())} params")
     
@@ -375,12 +509,36 @@ def main():
     configs = sample_configurations(config_space, args.num_samples, args.seed)
     logger.info(f"sample configs done, total {len(configs)} configs")
     
+    # load the existing results
     results = []
+    existing_results_file = os.path.join(experiment_dir, 'config_validation_results.json')
+    if os.path.exists(existing_results_file):
+        try:
+            with open(existing_results_file, 'r') as f:
+                results = json.load(f)
+            logger.info(f"loaded {len(results)} existing results from previous run")
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"failed to load existing results: {e}")
+            results = []
+    else:
+        # if no config_validation_results.json exists, rebuild results from execution_results.json files
+        logger.info("no config_validation_results.json found, rebuilding results from execution_results.json files")
+        results = rebuild_results_from_execution_files(experiment_dir, fidelity_mapping)
+        logger.info(f"rebuilt {len(results)} results from execution files")
+        
+        # save the rebuilt results to avoid rebuilding next time
+        if results:
+            save_results(results, experiment_dir)
+            logger.info("saved rebuilt results to config_validation_results.json, csv and statistics")
+    
     total_evaluations = len(configs) * len(fidelity_mapping)
-    current_evaluation = 0
+    remaining_evaluations = total_evaluations - len(completed_evaluations)
+    current_evaluation = len(completed_evaluations)
     
     logger.info("begin to evaluate configs...")
     logger.info(f"total evaluations: {total_evaluations}")
+    logger.info(f"completed evaluations: {len(completed_evaluations)}")
+    logger.info(f"remaining evaluations: {remaining_evaluations}")
     
     for config_idx, config in enumerate(configs):
         logger.info(f"evaluate config {config_idx + 1}/{len(configs)}")
@@ -389,6 +547,12 @@ def main():
         for fidelity_str in fidelity_mapping.keys():
             fidelity = float(fidelity_str)
             database = fidelity_mapping[fidelity_str]
+            
+            # check if the evaluation is completed
+            if (config_idx + 1, fidelity) in completed_evaluations:
+                logger.info(f"  skip completed evaluation: config_{config_idx + 1}, fidelity_{fidelity}")
+                continue
+            
             current_evaluation += 1
             
             logger.info(f"   evaluation progress: {current_evaluation}/{total_evaluations} - Fidelity: {fidelity}, Database: {database}")
@@ -415,6 +579,9 @@ def main():
                 result_record['error'] = result['error']
             
             results.append(result_record)
+            
+            # save the results to avoid losing data when interrupted
+            save_results(results, experiment_dir)
             
             logger.info(f"result record: objective={result['objective']:.2f}, "
                        f"elapsed_time={result['elapsed_time']:.2f}s, "
