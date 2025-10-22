@@ -195,9 +195,7 @@ def main():
                 .config("spark.sql.sources.parallelPartitionDiscovery.parallelism", "85") \
                 .config("spark.task.cpus", "2") \
                 .getOrCreate()
-
-            # for node in SPARK_NODES:
-            #    clear_cache_on_remote(node)
+            logger.info("SparkSession created")
 
             # Only shuffle if more than 1 run, and not on the last run
             if runs > 1 and run_index < runs - 1:
@@ -255,7 +253,10 @@ def main():
             successful_results = [r for r in results if r["status"] == "success"]
             total_spark_time = 0
             for r in successful_results:
-                total_spark_time += r['total_elapsed_time']
+                # accumulate the elapsed time of each query in each SQL file
+                for query in r.get('queries', []):
+                    if query.get('status') == 'success':
+                        total_spark_time += query.get('elapsed_time', 0)
             logger.info(f"Spark execution time total: {total_spark_time:.2f}s")
 
             overhead = overall_elapsed_time - total_spark_time
