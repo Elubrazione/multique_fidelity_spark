@@ -279,7 +279,7 @@ def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_seed=None):
         "status": "success" if all(q["status"] == "success" for q in query_times) else "error"
     }
 
-def create_spark_session(config, app_name, database=None):
+def create_spark_session(config, app_name, database=None) -> SparkSession:
     memory_params = {
         'spark.executor.memory': 'g',
         'spark.driver.memory': 'g',
@@ -314,6 +314,8 @@ def evaluate_config_on_fidelity(config, fidelity, database, sql_files,
         
         spark = create_spark_session(config, app_name=f"DataVolumeCorrelation_{config_idx}_{fidelity}")
         logger.info("SparkSession created")
+        logger.info(f"Master: {spark.conf.get('spark.master')}")
+        logger.info(f"App ID: {spark.sparkContext.applicationId}")
         
         overall_start_time = time.time()
         results = []
