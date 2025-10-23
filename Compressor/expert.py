@@ -2,16 +2,20 @@
 Expert-based compression using domain knowledge.
 """
 
-import json
 from typing import List, Optional, Tuple
 from openbox import logger
 from ConfigSpace import ConfigurationSpace
 
-from .base import BaseCompressor
+from .dimension import DimensionCompressor
 
 
-class ExpertCompressor(BaseCompressor):
-    """Compressor that uses expert knowledge to select important parameters."""
+class ExpertCompressor(DimensionCompressor):
+    """
+    Expert compressor that inherits from DimensionCompressor.
+    
+    This is a convenience class that automatically sets the strategy to 'expert'
+    and provides a simplified interface for expert-based compression.
+    """
     
     def __init__(self, config_space: ConfigurationSpace, 
                 expert_params: Optional[List[str]] = None,
@@ -25,59 +29,28 @@ class ExpertCompressor(BaseCompressor):
             expert_params: List of expert parameter names
             expert_config_file: Path to expert configuration file
         """
-        super().__init__(config_space, **kwargs)
-        self.expert_params = expert_params or []
-        self.expert_config_file = expert_config_file
-        self.compressed_space = None
-        self.selected_indices = None
+        # Initialize with expert strategy
+        super().__init__(
+            config_space=config_space,
+            strategy='expert',
+            topk=len(expert_params) if expert_params else 0,  # Set topk based on expert params
+            expert_params=expert_params,
+            expert_config_file=expert_config_file,
+            **kwargs
+        )
         
-    def compress(self) -> Tuple[ConfigurationSpace, List[int]]:
+    def compress(self, space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, List[int]]:
         """
         Perform expert-based compression.
         
+        Args:
+            space_history: Not used in expert compression, but kept for interface compatibility
+            
         Returns:
             Tuple of (compressed_space, selected_indices)
         """
-        if not self.expert_params:
-            self.expert_params = self._load_expert_params()
-            
-        # Get indices for expert parameters with validation
-        expert_indices, valid_params = self._get_expert_indices_with_validation(
-            self.expert_params, return_valid_params=True
-        )
-        
-        if not expert_indices:
-            reason = "No expert parameters available" if not self.expert_params else "No valid expert parameters found"
-            return self._use_original_space(reason)
-            
-        self.selected_indices = sorted(expert_indices)
-        self.compressed_space = self._create_compressed_space(self.selected_indices)
-        logger.info(f"Expert compression: selected {len(self.selected_indices)} parameters")
-
-        self._set_compression_info(
-            strategy='expert',
-            selected_params=valid_params,
-            config_file=self.expert_config_file
-        )
-        
-        return self.compressed_space, self.selected_indices
-    
-    def _load_expert_params(self) -> List[str]:
-        """Load expert parameters from configuration file."""
-        try:
-            with open(self.expert_config_file, "r") as f:
-                expert_params = json.load(f)                
-            return expert_params
-            
-        except FileNotFoundError:
-            logger.warning(f"Expert config file not found: {self.expert_config_file}")
-            return []
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing expert config file: {e}")
-            return []
-        except Exception as e:
-            logger.error(f"Error loading expert parameters: {e}")
-            return []
+        # Expert compression doesn't use space_history, but we keep the parameter for compatibility
+        return super().compress(space_history)
     
     def get_expert_space(self, expert_modified_space: Optional[ConfigurationSpace] = None) -> ConfigurationSpace:
         """
