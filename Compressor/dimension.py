@@ -188,7 +188,11 @@ class DimensionCompressor(BaseCompressor):
         for idx, (X, y) in enumerate(space_history):
             if not idx:
                 logger.info(f"Processing space_history[0] objectives: {np.array(y)}")
-            hist_x.append(convert_configurations_to_array(X))
+            # X should be a single Configuration object, wrap it in a list
+            if hasattr(X, 'get_array'):
+                hist_x.append(convert_configurations_to_array([X]))
+            else:
+                hist_x.append(convert_configurations_to_array(X))
             hist_y.append(np.array(y))
             
         return hist_x, hist_y
