@@ -118,20 +118,30 @@ class BaseCompressor(ABC):
         self.selected_indices = list(range(len(self.origin_config_space)))
         self.compressed_space = copy.deepcopy(self.origin_config_space)
         
-        self._set_compression_info(strategy='none', reason=reason)
+        self._set_compression_info(self.compressed_space, self.selected_indices, reason=reason)
         return self.compressed_space, self.selected_indices
     
-    def _set_compression_info(self, strategy: str, **kwargs):
+    def _set_compression_info(self, compressed_space: ConfigurationSpace, 
+                            selected_indices: List[int], 
+                            space_history: Optional[List] = None,
+                            **kwargs):
         """
         Set compression information with common fields.
         
         Args:
-            strategy: Compression strategy name
+            compressed_space: The compressed configuration space
+            selected_indices: Indices of selected hyperparameters
+            space_history: Historical data used for compression
             **kwargs: Additional compression-specific information
         """
         self.compression_info = {
-            'strategy': strategy,
-            'num_params': len(self.selected_indices) if hasattr(self, 'selected_indices') else 0,
+            'strategy': getattr(self, 'strategy', 'none'),
+            'original_params': len(self.origin_config_space.get_hyperparameters()),
+            'compressed_params': len(compressed_space.get_hyperparameters()),
+            'selected_indices': selected_indices,
+            'selected_param_names': self._get_hyperparameter_names(selected_indices),
+            'compression_ratio': len(selected_indices) / len(self.origin_config_space.get_hyperparameters()),
+            'space_history_size': len(space_history) if space_history else 0,
             **kwargs
         }
     
