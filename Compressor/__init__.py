@@ -19,6 +19,4 @@ __all__ = [
     'DimensionCompressor', 
     'RangeCompressor',
     'ExpertCompressor',
-    'SpaceAnalyzer',
-    'CompressionManager'
 ]
