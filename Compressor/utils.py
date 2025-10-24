@@ -58,12 +58,9 @@ def create_space_from_ranges(original_space: ConfigurationSpace, compressed_rang
     for param_name, (min_val, max_val) in compressed_ranges.items():
         try:
             hp = compressed_space.get_hyperparameter(param_name)
-            
             if hasattr(hp, 'lower') and hasattr(hp, 'upper'):
-                # Update numeric hyperparameter
                 _update_numeric_hp(hp, min_val, max_val)
                 logger.info(f"Compressed {param_name}: [{hp.lower}, {hp.upper}]")
-                
         except Exception as e:
             logger.warning(f"Failed to compress parameter {param_name}: {e}")
             
@@ -79,12 +76,6 @@ def load_performance_data(data_path: str) -> pd.DataFrame:
     except Exception as e:
         logger.error(f"Failed to load data from {data_path}: {e}")
         return None
-
-def get_top_performing_data(data: pd.DataFrame, target_column: str, top_ratio: float) -> pd.DataFrame:
-    # Sort by target column (lower is better for spark_time)
-    sorted_data = data.sort_values(target_column)
-    top_count = int(len(sorted_data) * top_ratio)
-    return sorted_data.head(top_count)
 
 def prepare_historical_data(space_history: List) -> Tuple[List, List]:
     hist_x = []
@@ -136,7 +127,7 @@ def _update_numeric_hp(hp, min_val: float, max_val: float) -> None:
             hp.default_value = (hp.lower + hp.upper) / 2
 
 
-def get_range_by_std_filter(data: List[float], sigma: float = 2.0) -> Tuple[float, float]:
+def _filter_range_by_std(data: List[float], sigma: float = 2.0) -> Tuple[float, float]:
     """Get range based on standard deviation filtering."""
     data_array = np.array(data)
     mean = np.mean(data_array)
@@ -243,9 +234,9 @@ def compute_shap_based_ranges(shap_values, X, feature_cols, shap_vals_array, sig
         beneficial_values = values[shap_effect < 0]
         
         if len(beneficial_values) > 0:
-            min_val, max_val = get_range_by_std_filter(beneficial_values, sigma)
+            min_val, max_val = _filter_range_by_std(beneficial_values, sigma)
         else:
-            min_val, max_val = get_range_by_std_filter(values, sigma)
+            min_val, max_val = _filter_range_by_std(values, sigma)
         
         shap_based_ranges[param] = (min_val, max_val)
     return shap_based_ranges
@@ -257,7 +248,8 @@ def analyze_with_shap(data: pd.DataFrame, numeric_params: List[str],
     """Analyze data and compute compressed space using SHAP analysis."""
     try:
         # Prepare data
-        top_data = get_top_performing_data(data, target_column, top_ratio)
+        sorted_data = data.sort_values(target_column)
+        top_data = sorted_data.head(int(len(sorted_data) * top_ratio))
         X = top_data[numeric_params]
         y = top_data[target_column]
         
@@ -274,19 +266,15 @@ def analyze_with_shap(data: pd.DataFrame, numeric_params: List[str],
         compressed_ranges = compute_shap_based_ranges(
             shap_values, X, numeric_params, shap_vals_array, sigma
         )
-        
         # Create compressed space
         compressed_space = create_space_from_ranges(original_space, compressed_ranges)
-        
         return compressed_space
-        
     except ImportError as e:
         logger.error(f"Required libraries not available for SHAP analysis: {e}")
         return original_space
     except Exception as e:
         logger.error(f"Error in SHAP analysis: {e}")
         return original_space
-
 
 def filter_numeric_params(space: ConfigurationSpace) -> List[str]:
     """Get list of numeric parameter names from configuration space."""
