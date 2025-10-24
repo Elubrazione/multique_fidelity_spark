@@ -5,9 +5,9 @@ import numpy as np
 from typing import List, Optional, Tuple
 from openbox import logger
 from ConfigSpace import ConfigurationSpace
-from openbox.utils.config_space.util import convert_configurations_to_array
 
 from .base import BaseCompressor
+from .utils import prepare_historical_data, load_expert_params
 
 
 class DimensionCompressor(BaseCompressor):
@@ -17,7 +17,7 @@ class DimensionCompressor(BaseCompressor):
                 strategy: str = 'none', 
                 topk: int = 35,
                 expert_params: Optional[List[str]] = None,
-                expert_config_file: str = "configs/config_space/expert_space.json",
+                expert_config_file: str = "config_space/expert_space.json",
                 **kwargs):
         """
         Initialize dimension compressor.
@@ -35,8 +35,6 @@ class DimensionCompressor(BaseCompressor):
         self.expert_params = expert_params or []
         self.expert_config_file = expert_config_file
         self.selected_indices = None
-        self.compressed_space = None
-        self.compression_info = None
 
 
     def compress(self, space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, List[int]]:
@@ -51,6 +49,13 @@ class DimensionCompressor(BaseCompressor):
         """
         if self.strategy == 'none':
             return self._use_original_space("No dimension compression strategy specified")
+        
+        # Check cache first
+        if (self.compressed_space is not None and
+            self.selected_indices is not None and
+            self.compression_info != {}):
+            logger.info("Using existing compression results (no changes detected)")
+            return self.compressed_space, self.selected_indices
         
         # Perform compression using strategy-specific implementation
         # don't set compression_info here, set it in the expert and algorithm compression methods
@@ -96,7 +101,7 @@ class DimensionCompressor(BaseCompressor):
         if params_changed:
             self.compressed_space = None
             self.selected_indices = None
-            self.compression_info = None
+            self.compression_info = {}
             logger.info(f"Parameters changed, clearing cache. New strategy={self.strategy}, topk={self.topk}")
             return self.compress(space_history)
         else:
@@ -107,7 +112,7 @@ class DimensionCompressor(BaseCompressor):
     def _expert_compression(self) -> Tuple[ConfigurationSpace, List[int]]:
         """Perform expert-based compression using expert parameters."""
         if not self.expert_params:
-            self.expert_params = self._load_expert_params()
+            self.expert_params = load_expert_params(self.expert_config_file)
             
         # Get indices for expert parameters with validation
         expert_indices, valid_params = self._get_expert_indices_with_validation(
@@ -148,7 +153,7 @@ class DimensionCompressor(BaseCompressor):
         if space_history is None:
             return self._use_original_space("No space history provided")
             
-        hist_x, hist_y = self._prepare_historical_data(space_history)
+        hist_x, hist_y = prepare_historical_data(space_history)
         if not hist_x or not hist_y:
             return self._use_original_space("Invalid space history data")
         
@@ -180,23 +185,6 @@ class DimensionCompressor(BaseCompressor):
         return list(range(min(self.topk, len(self.origin_config_space.get_hyperparameters()))))
 
 
-    def _prepare_historical_data(self, space_history: List) -> Tuple[List, List]:
-        """Prepare historical data for compression analysis."""
-        hist_x = []
-        hist_y = []
-        
-        for idx, (X, y) in enumerate(space_history):
-            if not idx:
-                logger.info(f"Processing space_history[0] objectives: {np.array(y)}")
-            # X should be a single Configuration object, wrap it in a list
-            if hasattr(X, 'get_array'):
-                hist_x.append(convert_configurations_to_array([X]))
-            else:
-                hist_x.append(convert_configurations_to_array(X))
-            hist_y.append(np.array(y))
-            
-        return hist_x, hist_y
-    
     def _combine_with_expert_params(self, algorithm_indices: List[int]) -> List[int]:
         """Combine algorithm-selected indices with expert parameters."""
         if not self.expert_params:
@@ -228,24 +216,3 @@ class DimensionCompressor(BaseCompressor):
 
         self._set_compression_info(compressed_space, selected_indices, space_history)
         logger.info(f"Dimension compression completed: {len(selected_indices)} parameters selected")
-    
-    def _load_expert_params(self) -> List[str]:
-        """Load expert parameters from configuration file."""
-        import json
-        expert_config_file = getattr(self, 'expert_config_file', "configs/config_space/expert_space.json")
-        
-        try:
-            with open(expert_config_file, "r") as f:
-                expert_params = json.load(f)                
-            return expert_params
-            
-        except FileNotFoundError:
-            logger.warning(f"Expert config file not found: {expert_config_file}")
-            return []
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing expert config file: {e}")
-            return []
-        except Exception as e:
-            logger.error(f"Error loading expert parameters: {e}")
-            return []
-    
