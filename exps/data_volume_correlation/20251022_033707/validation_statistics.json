@@ -1,44 +1,52 @@
 {
-  "total_configs": 4,
+  "total_configs": 39,
   "fidelity_stats": {
     "0.03": {
-      "count": 1,
+      "count": 8,
       "success_rate": 1.0,
-      "avg_objective": 1441.7983112335205,
-      "avg_elapsed_time": 2518.0633504390717,
-      "avg_spark_time": 1441.7983112335205,
-      "avg_overhead": 1076.2650392055511
+      "avg_objective": 1414.5650141835213,
+      "avg_elapsed_time": 2517.5670235157013,
+      "avg_spark_time": 1414.5650141835213,
+      "avg_overhead": 1103.00200933218
     },
     "0.1": {
-      "count": 1,
-      "success_rate": 1.0,
-      "avg_objective": 2769.233903646469,
-      "avg_elapsed_time": 3880.52876830101,
-      "avg_spark_time": 2769.233903646469,
-      "avg_overhead": 1111.294864654541
+      "count": 8,
+      "success_rate": 0.875,
+      "avg_objective": 2564.539021730423,
+      "avg_elapsed_time": 3652.518843650818,
+      "avg_spark_time": 2564.539021730423,
+      "avg_overhead": 1136.950276941061
     },
     "0.3": {
-      "count": 1,
+      "count": 8,
       "success_rate": 1.0,
-      "avg_objective": 4600.049300432205,
-      "avg_elapsed_time": 5802.216125011444,
-      "avg_spark_time": 4600.049300432205,
-      "avg_overhead": 1202.166824579239
+      "avg_objective": 4741.310259580612,
+      "avg_elapsed_time": 5969.106368094683,
+      "avg_spark_time": 4741.310259580612,
+      "avg_overhead": 1227.7961085140705
     },
     "0.6": {
-      "count": 1,
+      "count": 8,
       "success_rate": 1.0,
-      "avg_objective": 9972.357688188553,
-      "avg_elapsed_time": 11250.111896514893,
-      "avg_spark_time": 9972.357688188553,
-      "avg_overhead": 1277.7542083263397
+      "avg_objective": 8887.384624272585,
+      "avg_elapsed_time": 10201.455856651068,
+      "avg_spark_time": 8887.384624272585,
+      "avg_overhead": 1314.0712323784828
+    },
+    "1.0": {
+      "count": 7,
+      "success_rate": 1.0,
+      "avg_objective": 10647.97019474847,
+      "avg_elapsed_time": 12177.406267029899,
+      "avg_spark_time": 10647.97019474847,
+      "avg_overhead": 1529.4360722814288
     }
   },
   "overall_stats": {
-    "success_rate": 1.0,
-    "avg_objective": 4695.859800875187,
-    "avg_elapsed_time": 5862.730035066605,
-    "avg_spark_time": 4695.859800875187,
-    "avg_overhead": 1166.8702341914177
+    "success_rate": 0.9743589743589743,
+    "avg_objective": 5600.885360517,
+    "avg_elapsed_time": 6768.385348833524,
+    "avg_spark_time": 5600.885360517,
+    "avg_overhead": 1255.400244187086
   }
 }
