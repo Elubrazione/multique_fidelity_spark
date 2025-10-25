@@ -1,5 +1,4 @@
 asttokens==3.0.0
-atune_collector==1.2.0
 bcrypt==4.3.0
 Brotli
 catboost
