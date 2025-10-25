@@ -60,7 +60,10 @@ def find_latest_experiment_dir():
     for item in os.listdir(base_dir):
         item_path = os.path.join(base_dir, item)
         if os.path.isdir(item_path) and item.startswith('20'):  # match the timestamp format
-            experiment_dirs.append(item_path)
+            all_inner_items = os.listdir(item_path)
+            # filter experiments that contain .log files (current experiment runs)
+            if any(inner_item.endswith('.log') for inner_item in all_inner_items):
+                experiment_dirs.append(item_path)
     
     if not experiment_dirs:
         return None
@@ -461,7 +464,7 @@ def main():
     parser.add_argument('--test_mode', action='store_true', default=False, help='test mode, only evaluate a few configs')
     parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
     parser.add_argument('--resume', action='store_true', help='resume from latest experiment directory')
-    
+    paser.add_argument('--history', type=str, default=None, help='path to existing configs history file to load')
     args = parser.parse_args()
     
     if args.resume:
@@ -487,6 +490,8 @@ def main():
     logger.info(f"random seed: {args.seed}")
     logger.info(f"experiment directory: {experiment_dir}")
     logger.info(f"SQL directory: {args.sql_dir}")
+    logger.info(f"resume mode: {args.resume}")
+    logger.info(f"history file: {args.history}")
     
     if args.test_mode:
         args.num_samples = 2
@@ -508,8 +513,22 @@ def main():
     logger.info(f"expert config space created, total {len(config_space.get_hyperparameters())} params")
     
     logger.info("begin to sample configs...")
-    configs = sample_configurations(config_space, args.num_samples, args.seed)
-    logger.info(f"sample configs done, total {len(configs)} configs")
+    if args.history:
+        logger.info(f"load existing configs from history file: {args.history}")
+        with open(args.history, 'r') as f:
+            existing_configs_data = json.load(f)
+        existing_configs = []
+        for config_data in existing_configs_data:
+            config = config_space.sample_configuration()
+            for key, value in config_data.items():
+                if key in config_space.get_hyperparameter_names():
+                    config[key] = value
+            existing_configs.append(config)
+        configs = existing_configs[:]
+        logger.info(f"loaded {len(configs)} configs from history")
+    else:
+        configs = sample_configurations(config_space, args.num_samples, args.seed)
+        logger.info(f"sample configs done, total {len(configs)} configs")
     
     # load the existing results
     results = []
@@ -533,7 +552,8 @@ def main():
             save_results(results, experiment_dir)
             logger.info("saved rebuilt results to config_validation_results.json, csv and statistics")
     
-    total_evaluations = len(configs) * len(fidelity_mapping)
+    total_evaluations = len(configs) * len(fidelity_mapping) + len(completed_evaluations) if args.history else 0
+    config_idx_offset = len(completed_evaluations) // len(fidelity_mapping) if args.history else 0
     remaining_evaluations = total_evaluations - len(completed_evaluations)
     current_evaluation = len(completed_evaluations)
     
@@ -541,8 +561,10 @@ def main():
     logger.info(f"total evaluations: {total_evaluations}")
     logger.info(f"completed evaluations: {len(completed_evaluations)}")
     logger.info(f"remaining evaluations: {remaining_evaluations}")
+    logger.info(f"config index offset: {config_idx_offset}")
     
     for config_idx, config in enumerate(configs):
+        config_idx += config_idx_offset  # adjust index if resuming from history
         logger.info(f"evaluate config {config_idx + 1}/{len(configs)}")
         logger.info(f"  config: {config}")
         
