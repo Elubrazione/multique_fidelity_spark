@@ -1,0 +1,1476 @@
+{
+  "summary": {
+    "total_files": 103,
+    "successful_files": 103,
+    "failed_files": 0,
+    "overall_elapsed_time": 2413.8808472156525,
+    "total_spark_time": 1886.444115638733,
+    "overhead": 527.4367315769196,
+    "overhead_percentage": 21.85015603339758,
+    "config_idx": 4,
+    "fidelity": 0.3,
+    "database": "tpcds_300g",
+    "config": {
+      "spark.default.parallelism": 701,
+      "spark.driver.cores": 3,
+      "spark.driver.maxResultSize": 4034,
+      "spark.driver.memory": 96,
+      "spark.executor.cores": 31,
+      "spark.executor.instances": 22,
+      "spark.executor.memory": 108,
+      "spark.executor.memoryOverhead": 18910,
+      "spark.locality.wait": 0,
+      "spark.network.timeout": 5976,
+      "spark.scheduler.minRegisteredResourcesRatio": 0.8,
+      "spark.sql.autoBroadcastJoinThreshold": 332,
+      "spark.sql.broadcastTimeout": 11844,
+      "spark.sql.shuffle.partitions": 398,
+      "spark.sql.sources.parallelPartitionDiscovery.parallelism": 168,
+      "spark.task.cpus": 3
+    }
+  },
+  "results": [
+    {
+      "sql_file": "q10",
+      "total_elapsed_time": 26.98762035369873,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q10_0",
+          "elapsed_time": 20.896233558654785,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q11",
+      "total_elapsed_time": 6.858410358428955,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q11_0",
+          "elapsed_time": 2.3833420276641846,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q12",
+      "total_elapsed_time": 4.681502342224121,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q12_0",
+          "elapsed_time": 0.3621184825897217,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q13",
+      "total_elapsed_time": 15.70230221748352,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q13_0",
+          "elapsed_time": 11.504449367523193,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q14a",
+      "total_elapsed_time": 11.997469663619995,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q14a_0",
+          "elapsed_time": 7.27065372467041,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q14b",
+      "total_elapsed_time": 10.161435842514038,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q14b_0",
+          "elapsed_time": 5.834300518035889,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q15",
+      "total_elapsed_time": 10.651716232299805,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q15_0",
+          "elapsed_time": 6.288810729980469,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q16",
+      "total_elapsed_time": 66.83894467353821,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q16_0",
+          "elapsed_time": 62.5744264125824,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q17",
+      "total_elapsed_time": 23.190683841705322,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q17_0",
+          "elapsed_time": 14.9408540725708,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q18",
+      "total_elapsed_time": 14.660708665847778,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q18_0",
+          "elapsed_time": 9.85591983795166,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q19",
+      "total_elapsed_time": 10.932467699050903,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q19_0",
+          "elapsed_time": 6.219832420349121,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q1",
+      "total_elapsed_time": 12.119730234146118,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q1_0",
+          "elapsed_time": 7.754929542541504,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q20",
+      "total_elapsed_time": 7.736689567565918,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q20_0",
+          "elapsed_time": 3.3006107807159424,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q21",
+      "total_elapsed_time": 4.802489995956421,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q21_0",
+          "elapsed_time": 0.5077383518218994,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q22",
+      "total_elapsed_time": 4.64498496055603,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q22_0",
+          "elapsed_time": 0.4211001396179199,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q23a",
+      "total_elapsed_time": 107.81395697593689,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q23a_0",
+          "elapsed_time": 103.61570501327515,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q23b",
+      "total_elapsed_time": 116.75944304466248,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q23b_0",
+          "elapsed_time": 109.27604246139526,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q24a",
+      "total_elapsed_time": 114.83066368103027,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q24a_0",
+          "elapsed_time": 107.09730243682861,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q24b",
+      "total_elapsed_time": 116.16339659690857,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q24b_0",
+          "elapsed_time": 105.06336569786072,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q25",
+      "total_elapsed_time": 21.607242822647095,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q25_0",
+          "elapsed_time": 10.597747087478638,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q26",
+      "total_elapsed_time": 10.065027713775635,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q26_0",
+          "elapsed_time": 5.492086887359619,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q27",
+      "total_elapsed_time": 11.727216958999634,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q27_0",
+          "elapsed_time": 7.105286121368408,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q28",
+      "total_elapsed_time": 82.47686052322388,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q28_0",
+          "elapsed_time": 77.8313627243042,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q29",
+      "total_elapsed_time": 35.22753143310547,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q29_0",
+          "elapsed_time": 27.68001651763916,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q2",
+      "total_elapsed_time": 23.663860082626343,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q2_0",
+          "elapsed_time": 18.059327602386475,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q30",
+      "total_elapsed_time": 5.521014213562012,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q30_0",
+          "elapsed_time": 0.2931864261627197,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q31",
+      "total_elapsed_time": 6.30751895904541,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q31_0",
+          "elapsed_time": 1.9270622730255127,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q32",
+      "total_elapsed_time": 7.50445818901062,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q32_0",
+          "elapsed_time": 3.2470638751983643,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q33",
+      "total_elapsed_time": 7.84481406211853,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q33_0",
+          "elapsed_time": 3.567018747329712,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q34",
+      "total_elapsed_time": 11.946021556854248,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q34_0",
+          "elapsed_time": 7.677519798278809,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q35",
+      "total_elapsed_time": 14.578569889068604,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q35_0",
+          "elapsed_time": 10.107812881469727,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q36",
+      "total_elapsed_time": 11.14931344985962,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q36_0",
+          "elapsed_time": 6.704484462738037,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q37",
+      "total_elapsed_time": 18.96243977546692,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q37_0",
+          "elapsed_time": 14.413944959640503,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q38",
+      "total_elapsed_time": 7.136189937591553,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q38_0",
+          "elapsed_time": 2.114250659942627,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q39a",
+      "total_elapsed_time": 5.024283170700073,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q39a_0",
+          "elapsed_time": 0.674445629119873,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q39b",
+      "total_elapsed_time": 5.023455858230591,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q39b_0",
+          "elapsed_time": 0.550417423248291,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q3",
+      "total_elapsed_time": 8.347216606140137,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q3_0",
+          "elapsed_time": 4.102349519729614,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q40",
+      "total_elapsed_time": 6.282173156738281,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q40_0",
+          "elapsed_time": 1.8953077793121338,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q41",
+      "total_elapsed_time": 5.561692237854004,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q41_0",
+          "elapsed_time": 1.1111571788787842,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q42",
+      "total_elapsed_time": 6.997658967971802,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q42_0",
+          "elapsed_time": 2.5312914848327637,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q43",
+      "total_elapsed_time": 9.630659103393555,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q43_0",
+          "elapsed_time": 5.291893243789673,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q44",
+      "total_elapsed_time": 27.693500757217407,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q44_0",
+          "elapsed_time": 23.240599632263184,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q45",
+      "total_elapsed_time": 6.663028955459595,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q45_0",
+          "elapsed_time": 0.7692041397094727,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q46",
+      "total_elapsed_time": 12.612887859344482,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q46_0",
+          "elapsed_time": 8.202503204345703,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q47",
+      "total_elapsed_time": 17.60003113746643,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q47_0",
+          "elapsed_time": 13.099032640457153,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q48",
+      "total_elapsed_time": 12.729752779006958,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q48_0",
+          "elapsed_time": 8.19389820098877,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q49",
+      "total_elapsed_time": 25.301366567611694,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q49_0",
+          "elapsed_time": 20.779858112335205,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q4",
+      "total_elapsed_time": 10.889480352401733,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q4_0",
+          "elapsed_time": 6.125905990600586,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q50",
+      "total_elapsed_time": 67.90525126457214,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q50_0",
+          "elapsed_time": 63.47841548919678,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q51",
+      "total_elapsed_time": 26.36431074142456,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q51_0",
+          "elapsed_time": 17.39275574684143,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q52",
+      "total_elapsed_time": 7.137808561325073,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q52_0",
+          "elapsed_time": 2.3390414714813232,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q53",
+      "total_elapsed_time": 9.08656620979309,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q53_0",
+          "elapsed_time": 4.635540962219238,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q54",
+      "total_elapsed_time": 11.830028772354126,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q54_0",
+          "elapsed_time": 7.2808310985565186,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q55",
+      "total_elapsed_time": 6.33685564994812,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q55_0",
+          "elapsed_time": 2.0050599575042725,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q56",
+      "total_elapsed_time": 7.900172233581543,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q56_0",
+          "elapsed_time": 3.58056640625,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q57",
+      "total_elapsed_time": 14.88808012008667,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q57_0",
+          "elapsed_time": 10.637059688568115,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q58",
+      "total_elapsed_time": 6.807267904281616,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q58_0",
+          "elapsed_time": 2.3194327354431152,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q59",
+      "total_elapsed_time": 26.772221565246582,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q59_0",
+          "elapsed_time": 22.47959852218628,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q5",
+      "total_elapsed_time": 10.303597688674927,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q5_0",
+          "elapsed_time": 4.969151973724365,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q60",
+      "total_elapsed_time": 7.847556114196777,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q60_0",
+          "elapsed_time": 3.6106069087982178,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q61",
+      "total_elapsed_time": 10.827607870101929,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q61_0",
+          "elapsed_time": 6.565396308898926,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q62",
+      "total_elapsed_time": 4.577373743057251,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q62_0",
+          "elapsed_time": 0.28470873832702637,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q63",
+      "total_elapsed_time": 8.724134922027588,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q63_0",
+          "elapsed_time": 4.488250255584717,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q64",
+      "total_elapsed_time": 74.32124257087708,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q64_0",
+          "elapsed_time": 69.81593060493469,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q65",
+      "total_elapsed_time": 39.67300200462341,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q65_0",
+          "elapsed_time": 31.551886558532715,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q66",
+      "total_elapsed_time": 7.94092869758606,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q66_0",
+          "elapsed_time": 1.2645900249481201,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q67",
+      "total_elapsed_time": 292.0178384780884,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q67_0",
+          "elapsed_time": 287.2230427265167,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q68",
+      "total_elapsed_time": 21.258508443832397,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q68_0",
+          "elapsed_time": 8.840919494628906,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q69",
+      "total_elapsed_time": 12.869625329971313,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q69_0",
+          "elapsed_time": 8.440531492233276,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q6",
+      "total_elapsed_time": 11.244518756866455,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q6_0",
+          "elapsed_time": 6.838149070739746,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q70",
+      "total_elapsed_time": 15.407150983810425,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q70_0",
+          "elapsed_time": 11.14463758468628,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q71",
+      "total_elapsed_time": 6.2239601612091064,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q71_0",
+          "elapsed_time": 1.8050801753997803,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q72",
+      "total_elapsed_time": 21.08624792098999,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q72_0",
+          "elapsed_time": 16.8528254032135,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q73",
+      "total_elapsed_time": 14.151476621627808,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q73_0",
+          "elapsed_time": 8.457921266555786,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q74",
+      "total_elapsed_time": 7.92880916595459,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q74_0",
+          "elapsed_time": 2.6607489585876465,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q75",
+      "total_elapsed_time": 54.15242576599121,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q75_0",
+          "elapsed_time": 49.6576726436615,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q76",
+      "total_elapsed_time": 30.53147530555725,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q76_0",
+          "elapsed_time": 23.43740940093994,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q77",
+      "total_elapsed_time": 11.83583950996399,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q77_0",
+          "elapsed_time": 5.593445539474487,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q78",
+      "total_elapsed_time": 26.437300205230713,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q78_0",
+          "elapsed_time": 22.136679649353027,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q79",
+      "total_elapsed_time": 12.833919525146484,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q79_0",
+          "elapsed_time": 6.453392744064331,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q7",
+      "total_elapsed_time": 12.69012188911438,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q7_0",
+          "elapsed_time": 7.1576926708221436,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q80",
+      "total_elapsed_time": 27.250182628631592,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q80_0",
+          "elapsed_time": 22.53892993927002,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q81",
+      "total_elapsed_time": 21.16272521018982,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q81_0",
+          "elapsed_time": 15.855618715286255,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q82",
+      "total_elapsed_time": 26.72063446044922,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q82_0",
+          "elapsed_time": 22.160497903823853,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q83",
+      "total_elapsed_time": 7.975900650024414,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q83_0",
+          "elapsed_time": 2.5115997791290283,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q84",
+      "total_elapsed_time": 10.933441162109375,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q84_0",
+          "elapsed_time": 6.352372169494629,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q85",
+      "total_elapsed_time": 5.238038539886475,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q85_0",
+          "elapsed_time": 0.5845444202423096,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q86",
+      "total_elapsed_time": 4.520310163497925,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q86_0",
+          "elapsed_time": 0.182603120803833,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q87",
+      "total_elapsed_time": 20.274390935897827,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q87_0",
+          "elapsed_time": 16.03580355644226,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q88",
+      "total_elapsed_time": 5.601102352142334,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q88_0",
+          "elapsed_time": 0.8238768577575684,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q89",
+      "total_elapsed_time": 9.522781133651733,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q89_0",
+          "elapsed_time": 5.193170547485352,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q8",
+      "total_elapsed_time": 9.406490564346313,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q8_0",
+          "elapsed_time": 4.8653974533081055,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q90",
+      "total_elapsed_time": 4.657766103744507,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q90_0",
+          "elapsed_time": 0.3376200199127197,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q91",
+      "total_elapsed_time": 9.91194748878479,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q91_0",
+          "elapsed_time": 5.581741809844971,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q92",
+      "total_elapsed_time": 4.709817409515381,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q92_0",
+          "elapsed_time": 0.44223570823669434,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q93",
+      "total_elapsed_time": 96.81343817710876,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q93_0",
+          "elapsed_time": 92.60064315795898,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q94",
+      "total_elapsed_time": 11.715751647949219,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q94_0",
+          "elapsed_time": 0.5946991443634033,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q95",
+      "total_elapsed_time": 4.6663384437561035,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q95_0",
+          "elapsed_time": 0.47600746154785156,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q96",
+      "total_elapsed_time": 4.49846625328064,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q96_0",
+          "elapsed_time": 0.3046915531158447,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q97",
+      "total_elapsed_time": 27.675455570220947,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q97_0",
+          "elapsed_time": 23.47694230079651,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q98",
+      "total_elapsed_time": 9.318017482757568,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q98_0",
+          "elapsed_time": 4.202406406402588,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q99",
+      "total_elapsed_time": 4.695034027099609,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q99_0",
+          "elapsed_time": 0.28081440925598145,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    },
+    {
+      "sql_file": "q9",
+      "total_elapsed_time": 61.375633239746094,
+      "query_count": 1,
+      "queries": [
+        {
+          "query_index": 0,
+          "query": "q9_0",
+          "elapsed_time": 57.08915615081787,
+          "status": "success"
+        }
+      ],
+      "status": "success"
+    }
+  ]
+}
