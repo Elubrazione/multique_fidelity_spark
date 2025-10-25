@@ -464,7 +464,7 @@ def main():
     parser.add_argument('--test_mode', action='store_true', default=False, help='test mode, only evaluate a few configs')
     parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
     parser.add_argument('--resume', action='store_true', help='resume from latest experiment directory')
-    paser.add_argument('--history', type=str, default=None, help='path to existing configs history file to load')
+    parser.add_argument('--history', type=str, default=None, help='path to existing configs history file to load')
     args = parser.parse_args()
     
     if args.resume:
