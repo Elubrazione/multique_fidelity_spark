@@ -1,10 +1,10 @@
 """
 Dimension-based compression for reducing the number of hyperparameters.
 """
-import numpy as np
 from typing import List, Optional, Tuple
+import numpy as np
 from openbox import logger
-from ConfigSpace import ConfigurationSpace
+from ConfigSpace import ConfigurationSpace, Configuration
 
 from .base import BaseCompressor
 from .utils import prepare_historical_data, load_expert_params
@@ -14,7 +14,7 @@ class DimensionCompressor(BaseCompressor):
     """Base Dimension-based compressor that reduces the number of hyperparameters based on importance."""
     
     def __init__(self, config_space: ConfigurationSpace, 
-                strategy: str = 'none', 
+                strategy: str = 'dimension', 
                 topk: int = 35,
                 expert_params: Optional[List[str]] = None,
                 expert_config_file: str = "config_space/expert_space.json",
@@ -24,7 +24,7 @@ class DimensionCompressor(BaseCompressor):
         
         Args:
             config_space: Original configuration space
-            strategy: Compression strategy ('none', 'ottertune', 'rover', etc.)
+            strategy: Compression strategy (e.g. 'expert', 'none', 'dimension')
             topk: Number of top parameters to keep
             expert_params: List of expert-selected parameter names
             expert_config_file: Path to expert configuration file
@@ -37,13 +37,15 @@ class DimensionCompressor(BaseCompressor):
         self.selected_indices = None
 
 
-    def compress(self, space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, List[int]]:
+    def compress_dimension(
+        self,
+        space_history: Optional[List[Tuple[List[Configuration], List[float]]]] = None,
+    ) -> Tuple[ConfigurationSpace, List[int]]:
         """
         Perform dimension compression.
         
         Args:
             space_history: Historical data for compression analysis
-            
         Returns:
             Tuple of (compressed_space, selected_indices)
         """
@@ -72,18 +74,15 @@ class DimensionCompressor(BaseCompressor):
     def update_compression(self, new_strategy: Optional[str] = None,
                         new_topk: Optional[int] = None,
                         new_expert_params: Optional[List[str]] = None,
-                        space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, List[int]]:
+                        **kwargs) -> None:
         """
-        Update compression with new parameters and recompute.
+        Update compression parameters without re-running compression.
         
         Args:
             new_strategy: New compression strategy
             new_topk: New number of top parameters to keep
             new_expert_params: New expert-selected parameters
-            space_history: Historical data for compression analysis
-            
-        Returns:
-            Tuple of (compressed_space, selected_indices)
+            **kwargs: Additional parameters
         """
         # Check if any parameters actually changed
         params_changed = False
@@ -103,10 +102,8 @@ class DimensionCompressor(BaseCompressor):
             self.selected_indices = None
             self.compression_info = {}
             logger.info(f"Parameters changed, clearing cache. New strategy={self.strategy}, topk={self.topk}")
-            return self.compress(space_history)
         else:
-            logger.info("No parameter changes detected, using existing results")
-            return self.compressed_space, self.selected_indices
+            logger.info("No parameter changes detected")
 
 
     def _expert_compression(self) -> Tuple[ConfigurationSpace, List[int]]:
@@ -154,9 +151,7 @@ class DimensionCompressor(BaseCompressor):
             return self._use_original_space("No space history provided")
             
         hist_x, hist_y = prepare_historical_data(space_history)
-        if not hist_x or not hist_y:
-            return self._use_original_space("Invalid space history data")
-        
+
         # 1. Get algorithm-specific parameter selection
         algorithm_indices = self._select_parameters(hist_x, hist_y)
         # 2. Combine with expert parameters if any
@@ -168,7 +163,7 @@ class DimensionCompressor(BaseCompressor):
         return compressed_space, selected_indices
 
 
-    def _select_parameters(self, hist_x: List, hist_y: List) -> List[int]:
+    def _select_parameters(self, hist_x: List[np.ndarray], hist_y: List[np.ndarray]) -> List[int]:
         """
         Select parameters using algorithm-specific method.
         Subclasses must override this method to implement specific algorithms.
@@ -180,9 +175,9 @@ class DimensionCompressor(BaseCompressor):
         Returns:
             List of selected parameter indices
         """
-        # Default implementation - subclasses should override
-        logger.warning(f"Algorithm compression strategy '{self.strategy}' not implemented in base class")
-        return list(range(min(self.topk, len(self.origin_config_space.get_hyperparameters()))))
+        if len(hist_x) == 0 or len(hist_y) == 0:
+            logger.warning("No valid historical data for dimension compression")
+            return list(range(len(self.origin_config_space.get_hyperparameters())))
 
 
     def _combine_with_expert_params(self, algorithm_indices: List[int]) -> List[int]:

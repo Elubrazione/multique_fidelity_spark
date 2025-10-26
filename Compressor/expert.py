@@ -50,7 +50,7 @@ class ExpertCompressor(DimensionCompressor):
             Tuple of (compressed_space, selected_indices)
         """
         # Expert compression doesn't use space_history, but we keep the parameter for compatibility
-        return super().compress(space_history)
+        return super().compress_dimension(space_history)
     
     def get_expert_space(self, expert_modified_space: Optional[ConfigurationSpace] = None) -> ConfigurationSpace:
         """
