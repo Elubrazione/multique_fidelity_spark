@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, Tuple, List
 from sklearn.ensemble import RandomForestRegressor
-from ConfigSpace import ConfigurationSpace
+from ConfigSpace import ConfigurationSpace, Configuration
 from openbox import space as sp, logger
 from openbox.utils.config_space.util import convert_configurations_to_array
 
@@ -81,56 +81,28 @@ def load_performance_data(data_path: str) -> pd.DataFrame:
         logger.error(f"Failed to load data from {data_path}: {e}")
         return None
 
-def prepare_historical_data(space_history: List) -> Tuple[List, List]:
+def prepare_historical_data(
+    space_history: List[Tuple[List[Configuration], List[float]]]
+) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
     Prepare historical data for compression analysis.
     
     Args:
-        space_history: List of History objects or (X, y) tuples
+        space_history: List of Tuple[List[Configuration], List[float]] tuples
         
     Returns:
-        Tuple of (hist_x, hist_y) where hist_x is list of configuration arrays,
+        Tuple of (hist_x, hist_y) where hist_x is list of configurations,
         hist_y is list of objective arrays
     """
     try:
-        from openbox.utils.history import History
-        if not space_history:
-            return [], []
-        
-        # Check if it's a list of History objects
-        if isinstance(space_history[0], History):
-            all_configs = []
-            all_objectives = []
-            for history in space_history:
-                for obs in history.observations:
-                    all_configs.append(obs.config)
-                    all_objectives.append(obs.objectives[0] if obs.objectives else 0.0)
-            
-            if not all_configs:
-                logger.warning("No observations found in space_history")
-                return [], []
-            
-            hist_x = convert_configurations_to_array(all_configs)
-            hist_y = all_objectives
-            logger.info(f"Prepared {len(hist_x)} observations from {len(space_history)} histories")
-            return hist_x, hist_y
-        
-        # Legacy format: list of (X, y) tuples
         hist_x = []
         hist_y = []
-        
         for idx, (X, y) in enumerate(space_history):
             if not idx:
                 logger.info(f"Processing space_history[0] objectives: {np.array(y)}")
-            # X should be a single Configuration object, wrap it in a list
-            if hasattr(X, 'get_array'):
-                hist_x.append(convert_configurations_to_array([X]))
-            else:
-                hist_x.append(convert_configurations_to_array(X))
+            hist_x.append(convert_configurations_to_array(X))
             hist_y.append(np.array(y))
-            
         return hist_x, hist_y
-        
     except Exception as e:
         logger.error(f"Error preparing historical data: {e}")
         return [], []
@@ -261,11 +233,12 @@ def collect_compression_details(original_space: ConfigurationSpace, compressed_s
     return details
 
 
-def compute_shap_based_ranges(shap_values, X, feature_cols, shap_vals_array, sigma):
+def compute_shap_based_ranges(X, feature_cols, shap_vals_array, sigma):
     """Compute ranges based on SHAP analysis."""
     shap_based_ranges = {}
     for i, param in enumerate(feature_cols):
-        values = X[param].values
+        # X is a numpy array, not DataFrame, so we can use [:, i] to get the i-th column
+        values = X[:, i]
         shap_effect = shap_vals_array[:, i]
         
         # Get values with beneficial SHAP effects (negative for minimization)
@@ -279,41 +252,6 @@ def compute_shap_based_ranges(shap_values, X, feature_cols, shap_vals_array, sig
         shap_based_ranges[param] = (min_val, max_val)
     return shap_based_ranges
 
-
-def analyze_with_shap(data: pd.DataFrame, numeric_params: List[str], 
-                    target_column: str, top_ratio: float, sigma: float,
-                    original_space: ConfigurationSpace) -> ConfigurationSpace:
-    """Analyze data and compute compressed space using SHAP analysis."""
-    try:
-        # Prepare data
-        sorted_data = data.sort_values(target_column)
-        top_data = sorted_data.head(int(len(sorted_data) * top_ratio))
-        X = top_data[numeric_params]
-        y = top_data[target_column]
-        
-        # Train SHAP model
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X, y)
-        
-        # Compute SHAP values
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer(X)
-        shap_vals_array = shap_values.values
-        
-        # Compute compressed ranges based on SHAP analysis
-        compressed_ranges = compute_shap_based_ranges(
-            shap_values, X, numeric_params, shap_vals_array, sigma
-        )
-        # Create compressed space
-        compressed_space = create_space_from_ranges(original_space, compressed_ranges)
-        return compressed_space
-    except ImportError as e:
-        logger.error(f"Required libraries not available for SHAP analysis: {e}")
-        return original_space
-    except Exception as e:
-        logger.error(f"Error in SHAP analysis: {e}")
-        return original_space
-
 def filter_numeric_params(space: ConfigurationSpace) -> List[str]:
     """Get list of numeric parameter names from configuration space."""
     numeric_params = []
@@ -321,9 +259,3 @@ def filter_numeric_params(space: ConfigurationSpace) -> List[str]:
         if hasattr(hp, 'lower') and hasattr(hp, 'upper'):
             numeric_params.append(hp.name)
     return numeric_params
-
-def compute_data_hash(hist_x: List, hist_y: List) -> str:
-    """Compute hash for data to enable caching."""
-    import hashlib
-    data_str = f"{len(hist_x)}_{len(hist_y)}_{hash(str(hist_x))}_{hash(str(hist_y))}"
-    return hashlib.md5(data_str.encode()).hexdigest()

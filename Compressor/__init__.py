@@ -13,11 +13,13 @@ from .dimension import DimensionCompressor
 from .range import RangeCompressor
 from .expert import ExpertCompressor
 from .compressor import Compressor
+from .shap_compressor import SHAPCompressor
 
 __all__ = [
     'BaseCompressor',
     'DimensionCompressor', 
     'RangeCompressor',
     'ExpertCompressor',
-    'Compressor'
+    'Compressor',
+    'SHAPCompressor'
 ]
