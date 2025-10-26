@@ -44,6 +44,7 @@ class ConfigManager:
         
         self.HUGE_SPACE_FILE = os.path.join(self.ROOT_DIR, self.config['config_space'])
         self.OS_CONFIG_SPACE_FILE = os.path.join(self.ROOT_DIR, self.config['os_config_space'])
+        self.EXPERT_PARAMS_FILE = os.path.join(self.ROOT_DIR, self.config['expert_space'])
 
 
 config_manager = ConfigManager()
@@ -70,3 +71,4 @@ HISTORY_COMPRESS_DIR = config_manager.HISTORY_COMPRESS_DIR
 RANGE_COMPRESS_DATA = config_manager.RANGE_COMPRESS_DATA
 HUGE_SPACE_FILE = config_manager.HUGE_SPACE_FILE
 OS_CONFIG_SPACE_FILE = config_manager.OS_CONFIG_SPACE_FILE
+EXPERT_PARAMS_FILE = config_manager.EXPERT_PARAMS_FILE

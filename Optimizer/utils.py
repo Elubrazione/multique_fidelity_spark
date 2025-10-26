@@ -5,8 +5,8 @@ import numpy as np
 from queue import Empty
 from multiprocessing import Process, Queue
 from openbox import logger
-
 from Compressor.utils import load_expert_params
+from config import EXPERT_PARAMS_FILE
 
 
 def build_optimizer(args, **kwargs):
@@ -14,14 +14,14 @@ def build_optimizer(args, **kwargs):
     assert scene_str in ["spark"]
 
     space_names = set(kwargs['config_space'].get_hyperparameter_names())
-    expert_params = [p for p in load_expert_params(scene=scene_str) if p in space_names]
+    expert_params = [p for p in load_expert_params(EXPERT_PARAMS_FILE, scene_str) if p in space_names]
 
     task_str = kwargs.get('task_str', 'run')
     meta_feature = kwargs.get('meta_feature', None)
     source_hpo_data = kwargs.get('source_hpo_data', None)
 
     ws_args = kwargs.get('ws_args', None)
-    tl_args = kwargs.get('tl_wargs', None)
+    tl_args = kwargs.get('tl_args', None)
     ep_args = kwargs.get('ep_args', None)
     cp_args = kwargs.get('cp_args', None)
 

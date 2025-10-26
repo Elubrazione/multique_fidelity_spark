@@ -191,7 +191,7 @@ class BO(BaseAdvisor):
     def _setup_optimizer(self):
         """Setup surrogate model and acquisition optimizer after compression."""
         self.history.config_space = self.sample_space
-        self.history.meta_info["compressor"] = js.loads(write(self.compressor.compression_info))
+        self.history.meta_info["compressor"] = self.compressor.compression_info
 
         self.ini_configs = list()
         logger.info("ConfigSpace after whole compression (dimension + range): %s !!!" % (str(self.sample_space)))

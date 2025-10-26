@@ -94,8 +94,9 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
                 hist_x_numeric = hist_x[i][:, self.numeric_hyperparameter_indices]
                 # Force conversion to float to handle mixed-type arrays
                 hist_x_numeric = hist_x_numeric.astype(float)
-            
-            model = XGBRegressor(n_estimators=100, random_state=42)
+            from sklearn.ensemble import RandomForestRegressor
+            # model = XGBRegressor(n_estimators=100, random_state=42)
+            model = RandomForestRegressor(n_estimators=100, random_state=42)
             model.fit(hist_x_numeric, hist_y[i])
             explainer = shap.Explainer(model)
             shap_value = -np.abs(explainer(hist_x_numeric, check_additivity=False).values)
@@ -144,10 +145,13 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         
         _, importances, _ = self._fetch_shap_cache(hist_x, hist_y)
         
-        top_k = min(self.topk, len(self.hyperparameter_names))
-        selected_indices = np.argsort(importances)[: top_k].tolist()
-        selected_param_names = [self.hyperparameter_names[i] for i in selected_indices]
-        importances_selected = importances[selected_indices]
+        top_k = min(self.topk, len(self.numeric_hyperparameter_names))
+        selected_numeric_indices = np.argsort(importances)[: top_k].tolist()
+        selected_param_names = [self.numeric_hyperparameter_names[i] for i in selected_numeric_indices]
+        importances_selected = importances[selected_numeric_indices]
+
+        # Convert numeric parameter indices to global parameter indices
+        selected_indices = [self.numeric_hyperparameter_indices[i] for i in selected_numeric_indices]
 
         logger.info(f"SHAP dimension compression selected parameters: {selected_param_names}")
         logger.info(f"SHAP dimension compression importances: {importances_selected}")
@@ -200,7 +204,7 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         
         compressed_ranges = compute_shap_based_ranges(
             X_combined, self.numeric_hyperparameter_names,
-            shap_values_combined, self.sigma
+            shap_values_combined, self.sigma, self.origin_config_space
         )
         compressed_space = create_space_from_ranges(self.origin_config_space, compressed_ranges)
         
