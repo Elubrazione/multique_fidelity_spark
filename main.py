@@ -117,7 +117,9 @@ ep_args = {
     'prior': None,
 }
 cp_args = {
-    'topk': args.cp_topk
+    'topk': args.cp_topk,
+    'sigma': 2.0,
+    'top_ratio': 0.8,
 }
 
 
@@ -132,12 +134,10 @@ opt_kwargs = {
     'meta_feature': {'meta_feature': None, 'ini_context': None},
     'ws_args': ws_args, 'tl_wargs': tl_wargs, 'ep_args': ep_args, 'cp_args': cp_args,
     'source_hpo_data': source_hpo_data,
-    'source_compress_data': source_compress_data,
     'scene': "spark",
     'config_modifier': modifier,
     'expert_modified_space': None,
     'enable_range_compression': not args.disable_range_compress,
-    'range_compress_data_path': RANGE_COMPRESS_DATA,
 }
 optimizer = build_optimizer(args, **opt_kwargs)
 
