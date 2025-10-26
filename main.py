@@ -28,7 +28,7 @@ parser.add_argument('--target', type=str, default='spark_hstest')
 
 parser.add_argument('--expert', type=str, default='none', choices=['none', 'pibo', 'bo_pro', 'prior_band'])
 
-parser.add_argument('--compress', type=str, default='none', choices=['none', 'ottertune', 'perrone', 'tuneful', 'locat', 'opadviser', 'rover', 'rover-s', 'rover-l', 'rover-g'])
+parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap'])
 parser.add_argument('--cp_data_dir', type=str, default="nodes_2/huge_80d_addos/")
 parser.add_argument('--cp_topk', type=int, default=40)
 
@@ -110,7 +110,7 @@ ws_args = {
     'topk': args.ws_topk,
     'inner_surrogate_model': args.ws_inner_surrogate_model
 }
-tl_wargs = {
+tl_args = {
     'topk': args.tl_topk
 }
 ep_args = {
@@ -132,7 +132,7 @@ opt_kwargs = {
     'target': args.target,
     'task': args.task,
     'meta_feature': {'meta_feature': None, 'ini_context': None},
-    'ws_args': ws_args, 'tl_wargs': tl_wargs, 'ep_args': ep_args, 'cp_args': cp_args,
+    'ws_args': ws_args, 'tl_args': tl_args, 'ep_args': ep_args, 'cp_args': cp_args,
     'source_hpo_data': source_hpo_data,
     'scene': "spark",
     'config_modifier': modifier,
@@ -143,6 +143,7 @@ optimizer = build_optimizer(args, **opt_kwargs)
 
 if __name__ == '__main__':
     if args.test_mode:
+        optimizer.save_info()
         pass
     else:
         for i in range(optimizer.iter_num):

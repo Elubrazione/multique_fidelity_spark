@@ -107,11 +107,12 @@ def prepare_historical_data(
         logger.error(f"Error preparing historical data: {e}")
         return [], []
 
-def load_expert_params(expert_config_file: str) -> List[str]:
+def load_expert_params(expert_config_file: str, key: str) -> List[str]:
     """Load expert parameters from configuration file."""
     try:
         with open(expert_config_file, "r") as f:
-            expert_params = json.load(f)                
+            all_expert_params = json.load(f)   
+        expert_params = all_expert_params.get(key, [])             
         return expert_params
         
     except FileNotFoundError:
@@ -148,6 +149,12 @@ def _filter_range_by_std(data: List[float], sigma: float = 2.0) -> Tuple[float, 
     min_val = max(np.min(data_array), mean - sigma * std)
     max_val = min(np.max(data_array), mean + sigma * std)
     
+    if min_val >= max_val:
+        min_val = np.min(data_array)
+        max_val = np.max(data_array)
+        if min_val >= max_val:
+            min_val = mean - 0.1
+            max_val = mean + 0.1
     return min_val, max_val
 
 
@@ -158,20 +165,25 @@ def update_hp_range(space: ConfigurationSpace, name: str, new_hp: Any) -> None:
         return
     
     if hasattr(new_hp, 'lower') and hasattr(new_hp, 'upper'):   # Numeric hyperparameter
+        # Validate range before creating new hyperparameter
+        if new_hp.upper <= new_hp.lower:
+            logger.warning(f"Invalid range [{new_hp.lower}, {new_hp.upper}] for {name}, skipping compression")
+            return
+            
         if isinstance(new_hp, sp.Int):
             new_hp_obj = sp.Int(
                 name=name,
-                lower=new_hp.lower,
-                upper=new_hp.upper,
-                default_value=new_hp.default_value,
+                lower=int(new_hp.lower),
+                upper=int(new_hp.upper),
+                default_value=int(new_hp.default_value),
                 log=new_hp.log,
             )
         elif isinstance(new_hp, sp.Real):
             new_hp_obj = sp.Real(
                 name=name,
-                lower=new_hp.lower,
-                upper=new_hp.upper,
-                default_value=new_hp.default_value,
+                lower=float(new_hp.lower),
+                upper=float(new_hp.upper),
+                default_value=float(new_hp.default_value),
                 log=new_hp.log,
             )
         else:
@@ -233,7 +245,7 @@ def collect_compression_details(original_space: ConfigurationSpace, compressed_s
     return details
 
 
-def compute_shap_based_ranges(X, feature_cols, shap_vals_array, sigma):
+def compute_shap_based_ranges(X, feature_cols, shap_vals_array, sigma, original_space=None):
     """Compute ranges based on SHAP analysis."""
     shap_based_ranges = {}
     for i, param in enumerate(feature_cols):
@@ -249,8 +261,21 @@ def compute_shap_based_ranges(X, feature_cols, shap_vals_array, sigma):
         else:
             min_val, max_val = _filter_range_by_std(values, sigma)
         
+        # If we have original space, convert normalized values back to original parameter ranges
+        if original_space is not None:
+            try:
+                hp = original_space.get_hyperparameter(param)
+                if hasattr(hp, 'lower') and hasattr(hp, 'upper'):
+                    # Convert normalized values back to original parameter ranges
+                    original_min = hp.lower + min_val * (hp.upper - hp.lower)
+                    original_max = hp.lower + max_val * (hp.upper - hp.lower)
+                    min_val, max_val = original_min, original_max
+            except Exception as e:
+                logger.warning(f"Failed to convert normalized range for {param}: {e}")
+        
         shap_based_ranges[param] = (min_val, max_val)
     return shap_based_ranges
+
 
 def filter_numeric_params(space: ConfigurationSpace) -> List[str]:
     """Get list of numeric parameter names from configuration space."""

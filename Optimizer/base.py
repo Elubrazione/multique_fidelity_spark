@@ -27,7 +27,7 @@ class BaseOptimizer:
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
         assert ep_strategy in ['none', 'pibo', 'bo_pro', 'prior_band']
-        assert cprs_strategy in ['ottertune', 'perrone', 'tuneful', 'locat', 'opadviser', 'rover', 'rover-s', 'rover-l', 'rover-g', 'expert', 'none']
+        assert cprs_strategy in ['shap', 'expert', 'none']
         assert rand_mode in ['ran', 'rs']  # 如果是rs，就是返回random search里面排序过后的，而不是纯随机
 
         self.eval_func = eval_func
