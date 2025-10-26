@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple, Any
 from openbox import logger
 from ConfigSpace import ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
+from .utils import filter_numeric_params
 
 
 class BaseCompressor:
@@ -21,6 +22,10 @@ class BaseCompressor:
             **kwargs: Additional compression-specific parameters
         """
         self.origin_config_space = config_space
+        self.hyperparameter_names = [hp.name for hp in self.origin_config_space.get_hyperparameters()]
+        self.numeric_hyperparameter_names = filter_numeric_params(self.origin_config_space)
+        self.numeric_hyperparameter_indices = [self.hyperparameter_names.index(name) for name in self.numeric_hyperparameter_names]
+    
         self.compressed_space = None
         self.compression_info = {}
         

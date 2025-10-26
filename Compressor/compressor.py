@@ -75,6 +75,7 @@ class Compressor:
         # Step 1: Dimension compression
         logger.info("Performing dimension compression...")
         current_space, selected_indices = self.compress_dimension(space_history)
+        # surrogate_space = copy.deepcopy(current_space)
         
         step_info = {
             'type': 'dimension',

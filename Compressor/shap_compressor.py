@@ -17,8 +17,6 @@ from .dimension import DimensionCompressor
 from .range import RangeCompressor
 from .utils import (
     create_space_from_ranges,
-    filter_numeric_params,
-    compute_data_hash,
     compute_shap_based_ranges
 )
 
@@ -58,7 +56,6 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
             'models': None,
             'importances': None,
             'shap_values': None,
-            'data_hash': None,
         }
         
         Compressor.__init__(
@@ -76,12 +73,8 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         Returns:
             Tuple of (models of different tasks, importances of different tasks, shap_values of different tasks)
         """
-        # Compute data hash for caching
-        data_hash = compute_data_hash(hist_x, hist_y)
-        
         # Check if we can use cached results
-        if (self._shap_cache['data_hash'] == data_hash and 
-            self._shap_cache['models'] is not None and
+        if (self._shap_cache['models'] is not None and
             self._shap_cache['shap_values'] is not None and
             self._shap_cache['importances'] is not None):
             logger.info("Using cached SHAP model")
@@ -92,18 +85,24 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         models = []
         importances = []
         shap_values = []
-        param_names = [hp.name for hp in self.origin_config_space.get_hyperparameters()]
 
         for i in range(len(hist_x)):
+            # Check if hist_x[i] is already numeric data or full data
+            if hist_x[i].shape[1] == len(self.numeric_hyperparameter_names):
+                hist_x_numeric = hist_x[i]  # Already numeric data, use directly
+            else:   # Full data, extract numeric parameters
+                hist_x_numeric = hist_x[i][:, self.numeric_hyperparameter_indices]
+                # Force conversion to float to handle mixed-type arrays
+                hist_x_numeric = hist_x_numeric.astype(float)
+            
             model = XGBRegressor(n_estimators=100, random_state=42)
-            model.fit(hist_x[i], hist_y[i])
+            model.fit(hist_x_numeric, hist_y[i])
             explainer = shap.Explainer(model)
-            shap_value = explainer(hist_x[i], check_additivity=False).values
+            shap_value = -np.abs(explainer(hist_x_numeric, check_additivity=False).values)
             mean_shap = shap_value.mean(axis=0)
             df = pd.DataFrame({
-                "feature": param_names,
+                "feature": self.numeric_hyperparameter_names,
                 "importance": mean_shap,
-                "shap_value": shap_value,
                 # minimization problem
                 "effect": np.where(mean_shap < 0, "increase_objective", "decrease_objective")
             }).sort_values("importance", ascending=True)
@@ -120,7 +119,6 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
             'models': models,
             'importances': importances,
             'shap_values': shap_values,
-            'data_hash': data_hash,
         })
         return models, importances, shap_values
 
@@ -146,15 +144,71 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         
         _, importances, _ = self._fetch_shap_cache(hist_x, hist_y)
         
-        param_names = [hp.name for hp in self.origin_config_space.get_hyperparameters()]
-        top_k = min(self.topk, len(param_names))
-        selected_indices = np.argsort(importances)[: top_k]
-        selected_param_names = [param_names[i] for i in selected_indices]
-        logger.info(f"SHAP dimension compression selected {len(selected_param_names)} parameters: "
-                    f"{selected_param_names}")
+        top_k = min(self.topk, len(self.hyperparameter_names))
+        selected_indices = np.argsort(importances)[: top_k].tolist()
+        selected_param_names = [self.hyperparameter_names[i] for i in selected_indices]
+        importances_selected = importances[selected_indices]
+
+        logger.info(f"SHAP dimension compression selected parameters: {selected_param_names}")
+        logger.info(f"SHAP dimension compression importances: {importances_selected}")
         return selected_indices
 
+    def _compute_range_compression(
+        self, hist_x: List[np.ndarray], hist_y: List[np.ndarray]
+    ) -> ConfigurationSpace:
+        """
+        Compute range compression using SHAP analysis.
+        
+        Args:
+            hist_x: Historical configuration data
+            hist_y: Historical performance data
             
+        Returns:
+            Compressed configuration space with adjusted ranges
+        """
+        super()._compute_range_compression(hist_x, hist_y)
+        
+        _, _, shap_values = self._fetch_shap_cache(hist_x, hist_y)
+
+        all_x = []
+        all_y = []
+        all_shap_values = []
+        
+        for i in range(len(hist_x)):
+            # if hist_x[i] is already numeric data, create DataFrame directly
+            if hist_x[i].shape[1] == len(self.numeric_hyperparameter_names):
+                df = pd.DataFrame(hist_x[i], columns=self.numeric_hyperparameter_names)
+            else:
+                # Extract numeric parameters and convert to float
+                numeric_data = hist_x[i][:, self.numeric_hyperparameter_indices].astype(float)
+                df = pd.DataFrame(numeric_data, columns=self.numeric_hyperparameter_names)
+
+            df_with_target = df.copy()
+            df_with_target['target'] = hist_y[i]
+            sorted_data = df_with_target.sort_values('target')
+            top_data = sorted_data.head(int(len(sorted_data) * self.top_ratio))
+
+            top_indices = top_data.index.tolist()
+            
+            all_x.append(top_data[self.numeric_hyperparameter_names].values)
+            all_y.append(top_data['target'].values)
+            all_shap_values.append(shap_values[i][top_indices])
+        
+        X_combined = np.vstack(all_x)
+        # y_combined = np.hstack(all_y)
+        shap_values_combined = np.vstack(all_shap_values)
+        
+        compressed_ranges = compute_shap_based_ranges(
+            X_combined, self.numeric_hyperparameter_names,
+            shap_values_combined, self.sigma
+        )
+        compressed_space = create_space_from_ranges(self.origin_config_space, compressed_ranges)
+        
+        logger.info(f"SHAP range compression completed: "
+                    f"{len(self.origin_config_space.get_hyperparameters())} -> "
+                    f"{len(compressed_space.get_hyperparameters())} parameters")
+        return compressed_space
+    
     def update_compression(self, **kwargs):
         """
         Update compression parameters and clear caches.
