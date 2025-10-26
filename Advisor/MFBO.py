@@ -9,26 +9,27 @@ from .utils import build_observation
 
 class MFBO(BO):
     def __init__(self, config_space: ConfigurationSpace,
-                 surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
-                 ws_strategy='none', ws_args={'init_num': 5},
-                 tl_args={'topk': 5}, source_hpo_data=None,
-                 cprs_strategy='none', space_history = None, cp_topk=35, range_config_space=None,
-                 ep_args=None, ep_strategy='none', expert_params=[],
-                 enable_range_compression=False, range_compress_data_path=None,
-                 safe_flag=False, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
+                surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
+                ws_strategy='none', ws_args={'init_num': 5},
+                tl_args={'topk': 5}, source_hpo_data=None,
+                cprs_strategy='shap', cp_args=None,
+                ep_args=None, ep_strategy='none', expert_params=[],
+                enable_range_compression=True,
+                safe_flag=False, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
         super().__init__(config_space, meta_feature=meta_feature,
-                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
-                         ws_strategy=ws_strategy, ws_args=ws_args,
-                         tl_args=tl_args, source_hpo_data=source_hpo_data,
-                         ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
-                         cprs_strategy=cprs_strategy, space_history=space_history, cp_topk=cp_topk, range_config_space=range_config_space,
-                         safe_flag=safe_flag, seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
-                         enable_range_compression=enable_range_compression, range_compress_data_path=range_compress_data_path, **kwargs)
+                        surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
+                        ws_strategy=ws_strategy, ws_args=ws_args,
+                        tl_args=tl_args, source_hpo_data=source_hpo_data,
+                        ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
+                        cprs_strategy=cprs_strategy, cp_args=cp_args,
+                        safe_flag=safe_flag, seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
+                        enable_range_compression=enable_range_compression,
+                        **kwargs)
 
         self.history_list: List[History] = list()  # 低精度组的 history -> List[History]
         self.resource_identifiers = list()
         if self.source_hpo_data is not None and not surrogate_type.startswith('mfse'):
-            self.history_list = self._source_hpo_data_in_new_space(self.source_hpo_data)
+            self.history_list = self.compressor.transform_source_data(self.source_hpo_data)
             self.resource_identifiers = [-1] * len(self.source_hpo_data)  # 占位符
 
 
@@ -116,7 +117,7 @@ class MFBO(BO):
                     if rank < len(obs_list):
                         old_conf = obs_list[rank].config
                         logger.info("Warm start configuration from task %d, rank %d, objective: %s" % 
-                                  (task_idx, rank, obs_list[rank].objectives[0]))
+                                    (task_idx, rank, obs_list[rank].objectives[0]))
                         new_conf = Configuration(self.config_space, values={
                             name: old_conf[name] for name in self.sample_space.get_hyperparameter_names()
                         })

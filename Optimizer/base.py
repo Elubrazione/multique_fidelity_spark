@@ -17,11 +17,11 @@ class BaseOptimizer:
                  source_hpo_data=None, ep_args=None, ep_strategy='none',
                  method_id='advisor', task_id='test', target='redis', task_str='run',
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
-                 space_history = None, cprs_strategy='none', cp_args=None, range_config_space=None,
+                 cprs_strategy='none', cp_args=None,
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
                  config_modifier=None, expert_modified_space=None, expert_params=[],
-                 enable_range_compression=False, range_compress_data_path=None):
+                 enable_range_compression=False):
 
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC', 'FlexHB_SMAC']
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
@@ -49,12 +49,9 @@ class BaseOptimizer:
         else:
             tl_str = tl_strategy
             
-        # 校验空间压缩
-        if not space_history:
-            cprs_strategy = 'none'
         cp_topk = cp_args['topk'] if cprs_strategy != 'none' and cp_args['topk'] > 0 \
                                     else len(config_space)
-        cp_str = '%sk%d' % (cprs_strategy, cp_topk)
+        cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (cprs_strategy, cp_topk, cp_args['sigma'], cp_args['top_ratio'])
 
         self.method_id = method_id
         if rand_mode == 'rs':
@@ -112,7 +109,7 @@ class BaseOptimizer:
                               surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                               ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                               ep_args=ep_args, ep_strategy=ep_strategy, meta_feature=meta_feature,
-                              cprs_strategy=cprs_strategy, space_history=space_history, cp_topk=cp_topk,
+                              cprs_strategy=cprs_strategy, cp_args=cp_args,
                               safe_flag=False, seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                               expert_modified_space=expert_modified_space, expert_params=expert_params,
                               _logger_kwargs=self._logger_kwargs)
@@ -124,11 +121,10 @@ class BaseOptimizer:
             self.advisor = MFBO(config_space, source_hpo_data=source_hpo_data, meta_feature=meta_feature,
                                 surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                                 ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
-                                range_config_space=range_config_space,
-                                cprs_strategy=cprs_strategy, space_history=space_history, cp_topk=cp_topk,
+                                cprs_strategy=cprs_strategy, cp_args=cp_args,
                                 safe_flag=False, seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                                 expert_params=expert_params,
-                                enable_range_compression=enable_range_compression, range_compress_data_path=range_compress_data_path,
+                                enable_range_compression=enable_range_compression,
                                 _logger_kwargs=self._logger_kwargs)
 
         self.timeout = per_run_time_limit

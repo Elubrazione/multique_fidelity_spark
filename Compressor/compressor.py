@@ -48,6 +48,7 @@ class Compressor:
         # Compression results
         self.compression_results: Dict[str, Any] = {}
         self.compressed_space: Optional[ConfigurationSpace] = None
+        self.surrogate_space: Optional[ConfigurationSpace] = None
         
 
     def compress_space(self, space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, Dict[str, Any]]:
@@ -75,7 +76,7 @@ class Compressor:
         # Step 1: Dimension compression
         logger.info("Performing dimension compression...")
         current_space, selected_indices = self.compress_dimension(space_history)
-        # surrogate_space = copy.deepcopy(current_space)
+        self.surrogate_space = copy.deepcopy(current_space)
         
         step_info = {
             'type': 'dimension',
@@ -110,7 +111,7 @@ class Compressor:
                     f"{compression_info['final_params']} parameters "
                     f"(ratio: {compression_info['overall_compression_ratio']:.3f})")
         
-        return current_space, compression_info
+        return self.surrogate_space, current_space
     
     def get_expert_modified_space(self, expert_modified_space: Optional[ConfigurationSpace] = None) -> Optional[ConfigurationSpace]:
         """
@@ -138,20 +139,20 @@ class Compressor:
     
     def transform_source_data(self, source_hpo_data: Optional[List[History]]) -> Optional[List[History]]:
         """
-        Transform source HPO data to match compressed space.
+        Transform source HPO data to match surrogate space.
         
         Args:
             source_hpo_data: List of source histories
             
         Returns:
-            Transformed histories matching the compressed space
+            Transformed histories matching the surrogate space
         """
-        if not source_hpo_data or not self.compressed_space:
+        if not source_hpo_data or not self.surrogate_space:
             return source_hpo_data
             
-        logger.info(f"Transforming {len(source_hpo_data)} source histories to match compressed space")
+        logger.info(f"Transforming {len(source_hpo_data)} source histories to match surrogate space")
         
-        target_param_names = [param.name for param in self.compressed_space.get_hyperparameters()]
+        target_param_names = [param.name for param in self.surrogate_space.get_hyperparameters()]
         new_histories = []
         
         for history in source_hpo_data:

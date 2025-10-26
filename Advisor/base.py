@@ -11,15 +11,13 @@ from .utils import map_source_hpo_data, build_observation
 
 class BaseAdvisor:
     def __init__(self, config_space: ConfigurationSpace,
-                 task_id='test',
-                 ep_args=None, ep_strategy='none',
-                 ws_strategy='none', ws_args=None, tl_args=None, source_hpo_data=None,
-                 range_config_space=None, cprs_strategy='none', space_history = None, cp_topk=35,
-                 meta_feature=None, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
+                task_id='test',
+                ep_args=None, ep_strategy='none',
+                ws_strategy='none', ws_args=None, tl_args=None, source_hpo_data=None,
+                cprs_strategy='none', cp_args=None,
+                meta_feature=None, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
 
         self._logger_kwargs = kwargs.get('_logger_kwargs', None)
-
-        self.cp_topk = cp_topk
 
         # 随机种子
         self.seed = seed
@@ -33,10 +31,8 @@ class BaseAdvisor:
         self.config_space_seed = self.rng.randint(MAXINT)
         
         self.config_space = None
-        self.range_config_space = range_config_space
 
         # 历史数据
-        meta_feature['cp_topk'] = cp_topk
         meta_feature['seed'] = seed
         meta_feature['rand_prob'] = rand_prob
         meta_feature['rand_mode'] = rand_mode
@@ -50,7 +46,8 @@ class BaseAdvisor:
         self.ep_args = ep_args
         self.ep_strategy = ep_strategy
         self.cprs_strategy = cprs_strategy
-
+        self.cp_args = cp_args
+        
         self.source_hpo_data_sims = None
         self.source_hpo_data = self.filter_source_hpo_data(source_hpo_data)
 
