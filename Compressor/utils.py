@@ -9,7 +9,7 @@ from ConfigSpace import ConfigurationSpace
 from openbox import space as sp, logger
 from openbox.utils.config_space.util import convert_configurations_to_array
 
-# ==================== Configuration Space Utilities ====================
+
 def create_param(key, value):
     q_val = value.get('q', None)
     param_type = value['type']
@@ -59,6 +59,11 @@ def create_space_from_ranges(original_space: ConfigurationSpace, compressed_rang
         try:
             hp = compressed_space.get_hyperparameter(param_name)
             if hasattr(hp, 'lower') and hasattr(hp, 'upper'):
+                # Validate range before updating
+                if min_val >= max_val:
+                    logger.warning(f"Invalid range [{min_val}, {max_val}] for {param_name}, skipping compression")
+                    continue
+                    
                 _update_numeric_hp(hp, min_val, max_val)
                 logger.info(f"Compressed {param_name}: [{hp.lower}, {hp.upper}]")
         except Exception as e:
@@ -67,7 +72,6 @@ def create_space_from_ranges(original_space: ConfigurationSpace, compressed_rang
     return compressed_space
 
 
-# ==================== Performance Data Utilities ====================
 def load_performance_data(data_path: str) -> pd.DataFrame:
     try:
         data = pd.read_csv(data_path)
@@ -78,20 +82,58 @@ def load_performance_data(data_path: str) -> pd.DataFrame:
         return None
 
 def prepare_historical_data(space_history: List) -> Tuple[List, List]:
-    hist_x = []
-    hist_y = []
+    """
+    Prepare historical data for compression analysis.
     
-    for idx, (X, y) in enumerate(space_history):
-        if not idx:
-            logger.info(f"Processing space_history[0] objectives: {np.array(y)}")
-        # X should be a single Configuration object, wrap it in a list
-        if hasattr(X, 'get_array'):
-            hist_x.append(convert_configurations_to_array([X]))
-        else:
-            hist_x.append(convert_configurations_to_array(X))
-        hist_y.append(np.array(y))
+    Args:
+        space_history: List of History objects or (X, y) tuples
         
-    return hist_x, hist_y
+    Returns:
+        Tuple of (hist_x, hist_y) where hist_x is list of configuration arrays,
+        hist_y is list of objective arrays
+    """
+    try:
+        from openbox.utils.history import History
+        if not space_history:
+            return [], []
+        
+        # Check if it's a list of History objects
+        if isinstance(space_history[0], History):
+            all_configs = []
+            all_objectives = []
+            for history in space_history:
+                for obs in history.observations:
+                    all_configs.append(obs.config)
+                    all_objectives.append(obs.objectives[0] if obs.objectives else 0.0)
+            
+            if not all_configs:
+                logger.warning("No observations found in space_history")
+                return [], []
+            
+            hist_x = convert_configurations_to_array(all_configs)
+            hist_y = all_objectives
+            logger.info(f"Prepared {len(hist_x)} observations from {len(space_history)} histories")
+            return hist_x, hist_y
+        
+        # Legacy format: list of (X, y) tuples
+        hist_x = []
+        hist_y = []
+        
+        for idx, (X, y) in enumerate(space_history):
+            if not idx:
+                logger.info(f"Processing space_history[0] objectives: {np.array(y)}")
+            # X should be a single Configuration object, wrap it in a list
+            if hasattr(X, 'get_array'):
+                hist_x.append(convert_configurations_to_array([X]))
+            else:
+                hist_x.append(convert_configurations_to_array(X))
+            hist_y.append(np.array(y))
+            
+        return hist_x, hist_y
+        
+    except Exception as e:
+        logger.error(f"Error preparing historical data: {e}")
+        return [], []
 
 def load_expert_params(expert_config_file: str) -> List[str]:
     """Load expert parameters from configuration file."""
@@ -110,8 +152,6 @@ def load_expert_params(expert_config_file: str) -> List[str]:
         logger.error(f"Error loading expert parameters: {e}")
         return []
 
-
-# ==================== Range Compression Utilities ====================
 
 def _update_numeric_hp(hp, min_val: float, max_val: float) -> None:
     """Update numeric hyperparameter bounds and default value."""
@@ -221,8 +261,6 @@ def collect_compression_details(original_space: ConfigurationSpace, compressed_s
     return details
 
 
-
-# ==================== SHAP-based Range Analysis Utilities ====================
 def compute_shap_based_ranges(shap_values, X, feature_cols, shap_vals_array, sigma):
     """Compute ranges based on SHAP analysis."""
     shap_based_ranges = {}
@@ -283,3 +321,9 @@ def filter_numeric_params(space: ConfigurationSpace) -> List[str]:
         if hasattr(hp, 'lower') and hasattr(hp, 'upper'):
             numeric_params.append(hp.name)
     return numeric_params
+
+def compute_data_hash(hist_x: List, hist_y: List) -> str:
+    """Compute hash for data to enable caching."""
+    import hashlib
+    data_str = f"{len(hist_x)}_{len(hist_y)}_{hash(str(hist_x))}_{hash(str(hist_y))}"
+    return hashlib.md5(data_str.encode()).hexdigest()

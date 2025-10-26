@@ -3,93 +3,82 @@ Range-based compression for reducing hyperparameter value ranges.
 """
 
 import copy
-from typing import Optional, List
-from ConfigSpace import ConfigurationSpace
+import numpy as np
+from typing import Optional, List, Tuple
+from ConfigSpace import ConfigurationSpace, Configuration
 from openbox import logger
 
 from .base import BaseCompressor
 from .utils import (
-    load_performance_data, 
     update_hp_range,
     collect_compression_details,
-    analyze_with_shap,
-    filter_numeric_params
+    prepare_historical_data
 )
 
 
 class RangeCompressor(BaseCompressor):
-    """Compressor that reduces the range of hyperparameter values."""
+    """Base compressor that reduces the range of hyperparameter values."""
     
     def __init__(self, config_space: ConfigurationSpace, 
-                data_path: Optional[str] = None,
-                target_column: str = 'spark_time',
                 top_ratio: float = 0.8,
                 sigma: float = 2.0,
-                computed_space: Optional[ConfigurationSpace] = None,
                 **kwargs):
         """
         Initialize range compressor.
         
         Args:
             config_space: Original configuration space
-            data_path: Path to historical performance data (CSV file)
-            target_column: Name of the target performance column
             top_ratio: Ratio of top-performing configurations to analyze
             sigma: Standard deviation multiplier for range filtering
-            computed_space: Pre-computed range-compressed space (if provided, skips computation)
         """
         super().__init__(config_space, **kwargs)
         
+        # Set strategy for range compression
         self.strategy = 'range'
-        
+                
         # Store parameters for update_compression
-        self.data_path = data_path
-        self.target_column = target_column
         self.top_ratio = top_ratio
         self.sigma = sigma
+
+        self.computed_space = None
         
-        if computed_space is not None:
-            self.computed_space = computed_space
-        elif data_path is not None:
-            self.computed_space = self._compute_range_compression(data_path, target_column, top_ratio, sigma)
-        else:
-            self.computed_space = None
-        
-    def compress(self, base_space: Optional[ConfigurationSpace] = None) -> ConfigurationSpace:
+    def compress_range(
+        self, base_space: Optional[ConfigurationSpace] = None,
+        space_history: Optional[List[Tuple[List[Configuration], List[float]]]] = None,
+    ) -> ConfigurationSpace:
         """
         Perform range compression.
         
         Args:
             base_space: Base space to compress (if None, uses original space)
-            
+            space_history: Historical data for compression analysis
         Returns:
             Range-compressed configuration space
         """
         # Check cache first
         if (self.compressed_space is not None and 
             self.compression_info != {} and
-            base_space is None):  # Only cache when range compressing original space
+            base_space is None and space_history is None):  # Only cache when range compressing original space
             logger.info("Using existing range compression results (no changes detected)")
             return self.compressed_space
         
         if base_space is None:  # if base_space is not provided, range compress original space
             base_space = copy.deepcopy(self.origin_config_space)
-            
-        if self.computed_space is None:
-            logger.info("No range compression data provided, using base space")
-            self.compressed_space = base_space
-        else:
-            logger.info("Applying range compression to base space (original space or given space) using computed space...")
-            self.compressed_space = self._apply_range_compression(base_space)
 
-        # Collect detailed range compression information
-        if self.computed_space is not None:
+        if space_history is not None:
+            logger.info("Computing range compression from new space history...")
+            hist_x, hist_y = prepare_historical_data(space_history)
+            self.computed_space = self._compute_range_compression(hist_x, hist_y)
+            logger.info("Applying range compression to base space...")            
+            self.compressed_space = self._apply_range_compression(base_space)
             range_compression_details = collect_compression_details(base_space, self.computed_space)
             computed_params_count = len(self.computed_space.get_hyperparameters())
         else:
+            logger.info("No new space history provided to compute range compression, using base space as is")
+            self.compressed_space = base_space
             range_compression_details = {}
             computed_params_count = 0
-        
+
         self._set_compression_info(
             self.compressed_space,
             computed_params=computed_params_count,
@@ -97,32 +86,19 @@ class RangeCompressor(BaseCompressor):
         )
         return self.compressed_space
     
-    def update_compression(self, new_data_path: Optional[str] = None,
-                        new_target_column: Optional[str] = None,
-                        new_top_ratio: Optional[float] = None,
+    def update_compression(self, new_top_ratio: Optional[float] = None,
                         new_sigma: Optional[float] = None,
-                        base_space: Optional[ConfigurationSpace] = None) -> ConfigurationSpace:
+                        **kwargs) -> None:
         """
-        Update range compression with new parameters and recompute.
+        Update range compression parameters without re-running compression.
         
         Args:
-            new_data_path: New path to performance data
-            new_target_column: New target column name
             new_top_ratio: New top ratio for analysis
             new_sigma: New sigma for range filtering
-            base_space: Base space to compress
-            
-        Returns:
-            Updated range-compressed configuration space
+            **kwargs: Additional parameters
         """
         params_changed = False
 
-        if new_data_path is not None and new_data_path != getattr(self, 'data_path', None):
-            self.data_path = new_data_path
-            params_changed = True
-        if new_target_column is not None and new_target_column != getattr(self, 'target_column', None):
-            self.target_column = new_target_column
-            params_changed = True
         if new_top_ratio is not None and new_top_ratio != getattr(self, 'top_ratio', None):
             self.top_ratio = new_top_ratio
             params_changed = True
@@ -133,19 +109,10 @@ class RangeCompressor(BaseCompressor):
         if params_changed:  # Clear cache if parameters changed
             self.compressed_space = None
             self.compression_info = {}
-            
-            if new_data_path is not None:   # Recompute computed_space if data_path changed
-                self.computed_space = self._compute_range_compression(
-                    new_data_path, 
-                    new_target_column or self.target_column,
-                    new_top_ratio or self.top_ratio,
-                    new_sigma or self.sigma
-                )
+            self.computed_space = None
             logger.info(f"Range compression parameters changed, clearing cache")
         else:
-            logger.info("No parameter changes detected, using existing results")
-
-        return self.compress(base_space)
+            logger.info("No parameter changes detected")
 
 
     def _apply_range_compression(self, base_space: ConfigurationSpace) -> ConfigurationSpace:
@@ -189,38 +156,19 @@ class RangeCompressor(BaseCompressor):
         return list(details.keys())
     
     
-    def _compute_range_compression(self, data_path: str,
-                                target_column: str = 'spark_time',
-                                top_ratio: float = 0.8,
-                                sigma: float = 2.0) -> ConfigurationSpace:
+    def _compute_range_compression(
+        self, hist_x: List[np.ndarray], hist_y: List[np.ndarray]
+    ) -> ConfigurationSpace:
         """
-        Compute range compression space from historical data using SHAP analysis.
+        Abstract method to compute range compression space.
+        Subclasses must implement this method to provide specific range compression algorithms.
         
         Args:
-            data_path: Path to historical performance data (CSV file)
-            target_column: Name of the target performance column
-            top_ratio: Ratio of top-performing configurations to analyze
-            sigma: Standard deviation multiplier for range filtering
-            
+            hist_x: Historical configuration data
+            hist_y: Historical performance data
         Returns:
             Range-compressed configuration space
         """
-        try:
-            logger.info("Computing range compression space from data...")
-            data = load_performance_data(data_path)
-            if data is None:
-                logger.warning("Failed to load performance data")
-                return self.origin_config_space    
-            numeric_params = filter_numeric_params(self.origin_config_space)
-
-            if not numeric_params:
-                logger.warning("No numeric parameters found for range compression")
-                return self.origin_config_space
-                
-            compressed_space = analyze_with_shap(data, numeric_params, target_column, top_ratio, sigma, self.origin_config_space)
-            logger.info(f"Range compression completed: {len(numeric_params)} parameters analyzed")
-            return compressed_space
-            
-        except Exception as e:
-            logger.error(f"Error in range compression: {e}")
+        if len(hist_x) == 0 or len(hist_y) == 0:
+            logger.warning("No valid historical data for range compression")
             return self.origin_config_space

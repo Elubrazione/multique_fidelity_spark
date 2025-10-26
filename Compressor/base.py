@@ -3,14 +3,13 @@ Base compression interface and utilities.
 """
 
 import copy
-from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple, Any
 from openbox import logger
 from ConfigSpace import ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
 
-class BaseCompressor(ABC):
+class BaseCompressor:
     """Base class for all compression strategies."""
     
     def __init__(self, config_space: ConfigurationSpace, **kwargs):
@@ -25,16 +24,6 @@ class BaseCompressor(ABC):
         self.compressed_space = None
         self.compression_info = {}
         
-    @abstractmethod
-    def compress(self, *args, **kwargs) -> ConfigurationSpace:
-        """
-        Perform compression on the configuration space.
-        
-        Returns:
-            Compressed configuration space
-        """
-        pass
-    
     def get_compression_info(self) -> dict:
         """Get information about the compression process."""
         return self.compression_info.copy()
