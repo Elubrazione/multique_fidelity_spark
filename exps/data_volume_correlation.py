@@ -465,6 +465,7 @@ def main():
     parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
     parser.add_argument('--resume', action='store_true', help='resume from latest experiment directory')
     parser.add_argument('--history', type=str, default=None, help='path to existing configs history file to load')
+    parser.add_argument('--history_start_idx', type=int, default=1, help='starting index for history configs (default: 1)')
     args = parser.parse_args()
     
     if args.resume:
@@ -515,6 +516,7 @@ def main():
     logger.info("begin to sample configs...")
     if args.history:
         logger.info(f"load existing configs from history file: {args.history}")
+        logger.info(f"history configs will start from index: {args.history_start_idx}")
         with open(args.history, 'r') as f:
             existing_configs_data = json.load(f)
         existing_configs = []
@@ -552,8 +554,7 @@ def main():
             save_results(results, experiment_dir)
             logger.info("saved rebuilt results to config_validation_results.json, csv and statistics")
     
-    total_evaluations = len(configs) * len(fidelity_mapping) + len(completed_evaluations) if args.history else 0
-    config_idx_offset = len(completed_evaluations) // len(fidelity_mapping) if args.history else 0
+    total_evaluations = len(configs) * len(fidelity_mapping)
     remaining_evaluations = total_evaluations - len(completed_evaluations)
     current_evaluation = len(completed_evaluations)
     
@@ -561,11 +562,11 @@ def main():
     logger.info(f"total evaluations: {total_evaluations}")
     logger.info(f"completed evaluations: {len(completed_evaluations)}")
     logger.info(f"remaining evaluations: {remaining_evaluations}")
-    logger.info(f"config index offset: {config_idx_offset}")
     
     for config_idx, config in enumerate(configs):
-        config_idx += config_idx_offset  # adjust index if resuming from history
-        logger.info(f"evaluate config {config_idx + 1}/{len(configs)}")
+        # Calculate actual config index based on history start index
+        actual_config_idx = config_idx + args.history_start_idx - 1 if args.history else config_idx
+        logger.info(f"evaluate config {actual_config_idx + 1} (config {config_idx + 1}/{len(configs)})")
         logger.info(f"  config: {config}")
         
         for fidelity_str in fidelity_mapping.keys():
@@ -573,8 +574,8 @@ def main():
             database = fidelity_mapping[fidelity_str]
             
             # check if the evaluation is completed
-            if (config_idx + 1, fidelity) in completed_evaluations:
-                logger.info(f"  skip completed evaluation: config_{config_idx + 1}, fidelity_{fidelity}")
+            if (actual_config_idx + 1, fidelity) in completed_evaluations:
+                logger.info(f"  skip completed evaluation: config_{actual_config_idx + 1}, fidelity_{fidelity}")
                 continue
             
             current_evaluation += 1
@@ -582,10 +583,10 @@ def main():
             logger.info(f"   evaluation progress: {current_evaluation}/{total_evaluations} - Fidelity: {fidelity}, Database: {database}")
             
             result = evaluate_config_on_fidelity(config, fidelity, database, fixed_sqls, 
-                                                 config_idx + 1, experiment_dir, args.sql_dir)
+                                                actual_config_idx + 1, experiment_dir, args.sql_dir)
             
             result_record = {
-                'config_id': config_idx,
+                'config_id': actual_config_idx,
                 'fidelity': fidelity,
                 'database': database,
                 'config': config.get_dictionary() if hasattr(config, 'get_dictionary') else config,
