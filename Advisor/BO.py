@@ -1,13 +1,7 @@
-import json as js
 import numpy as np
 import copy
-from datetime import datetime
-from itertools import combinations
-from openbox import logger, space as sp
-from openbox.utils.history import Observation, History
-from openbox.utils.config_space.util import convert_configurations_to_array
+from openbox import logger
 from ConfigSpace import Configuration, ConfigurationSpace
-from ConfigSpace.read_and_write.json import write
 
 from .base import BaseAdvisor
 from .utils import build_my_surrogate, build_my_acq_func
@@ -194,6 +188,8 @@ class BO(BaseAdvisor):
         self.history.meta_info["compressor"] = self.compressor.compression_info
 
         self.ini_configs = list()
+        self.sample_space.seed(self.seed)
+        self.config_space.seed(self.seed)
         logger.info("ConfigSpace after whole compression (dimension + range): %s !!!" % (str(self.sample_space)))
         
         self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space, rng=self.rng,

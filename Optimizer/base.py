@@ -182,25 +182,26 @@ class BaseOptimizer:
         config = self.advisor.sample()
         if self.config_modifier is not None:
             config = self.config_modifier(config)
-            
-        logger.info(
-            "[{}] iter ------------------------------------------------{:5d}".format(self.task_str, self.iter_id))
-        if config.origin:
-            logger.warn("[{}] !!!!!!!!!! {} !!!!!!!!!!".format(self.task_str, config.origin))
-
         obj_args, obj_kwargs = (config,), dict() # 这里只是将参数包装了一下, run_obj_func里面又会将他们解开, 解开后本质上是
-
         results = run_obj_func(self.eval_func, obj_args, obj_kwargs, self.timeout) # 返回一个字典, 其中`results`中的内容就是上面的{perf:...}
         self.advisor.update(config, results)
-
-        logger.info('[{}] Config: '.format(self.task_str) + str(config.get_dictionary()))
-        logger.info('[{}] Obj: {}, best obj: {}'.format(self.task_str, results['result']['objective'], self.advisor.history.get_incumbent_value()))
-
-        logger.info(
-            "[{}] ===================================================================================================================================================".format(
-                self.task_str))
-
+        self.log_iteration_results([config], [results['result']['objective']])
         self.save_info()
+
+    def log_iteration_results(self, configs, performances, iteration_id=None):
+        iter_id = iteration_id if iteration_id is not None else self.iter_id
+        
+        logger.info("[{}] iter ------------------------------------------------{:5d}".format(self.task_str, iter_id))
+        
+        for idx, config in enumerate(configs):
+            if hasattr(config, 'origin') and config.origin:
+                logger.warn("[{}] !!!!!!!!!! {} !!!!!!!!!!".format(self.task_str, config.origin))
+            
+            logger.info('[{}] Config: '.format(self.task_str) + str(config.get_dictionary()))
+            logger.info('[{}] Obj: {}'.format(self.task_str, performances[idx]))
+        
+        logger.info('[{}] best obj: {}'.format(self.task_str, self.advisor.history.get_incumbent_value()))
+        logger.info("[{}] ===================================================================================================================================================".format(self.task_str))
 
     def save_info(self, interval=1):
         # 将迁移学习的w保存
