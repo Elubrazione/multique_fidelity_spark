@@ -170,6 +170,9 @@ def rebuild_results_from_execution_files(experiment_dir, fidelity_mapping):
                         logger.warning(f"failed to rebuild result from {result_file}: {e}")
                         continue
     
+    results.sort(key=lambda x: (x['config_id'], x['fidelity']))
+    logger.info(f"results sorted by config_id and fidelity, total: {len(results)}")
+    
     return results
 
 def filter_expert_config_space(original_config_space):
@@ -535,21 +538,58 @@ def main():
     # load the existing results
     results = []
     existing_results_file = os.path.join(experiment_dir, 'config_validation_results.json')
+    should_rebuild = False
+    
     if os.path.exists(existing_results_file):
         try:
             with open(existing_results_file, 'r') as f:
                 results = json.load(f)
             logger.info(f"loaded {len(results)} existing results from previous run")
+            
+            # check if the number of completed executions is greater than current results
+            completed_executions = len(completed_evaluations)
+            logger.info(f"found {completed_executions} completed executions")
+            
+            if len(results) < completed_executions:
+                logger.warning(f"existing results count ({len(results)}) is less than completed executions ({completed_executions}), will rebuild")
+                should_rebuild = True
+                results = []
+            else:
+                # also check CSV file for consistency
+                csv_file = os.path.join(experiment_dir, 'config_validation_results.csv')
+                if os.path.exists(csv_file):
+                    try:
+                        import pandas as pd
+                        df = pd.read_csv(csv_file)
+                        csv_count = len(df)
+                        if csv_count < completed_executions:
+                            logger.warning(f"CSV file count ({csv_count}) is less than completed executions ({completed_executions}), will rebuild")
+                            should_rebuild = True
+                            results = []
+                        else:
+                            logger.info(f"both JSON ({len(results)}) and CSV ({csv_count}) results match completed executions ({completed_executions})")
+                    except Exception as e:
+                        logger.warning(f"failed to check CSV file: {e}, will rebuild")
+                        should_rebuild = True
+                        results = []
+                else:
+                    logger.warning("CSV file not found, will rebuild")
+                    should_rebuild = True
+                    results = []
+                
         except (json.JSONDecodeError, IOError) as e:
             logger.warning(f"failed to load existing results: {e}")
+            should_rebuild = True
             results = []
     else:
-        # if no config_validation_results.json exists, rebuild results from execution_results.json files
-        logger.info("no config_validation_results.json found, rebuilding results from execution_results.json files")
+        logger.info("no config_validation_results.json found")
+        should_rebuild = True
+    
+    if should_rebuild:
+        logger.info("rebuilding results from execution_results.json files")
         results = rebuild_results_from_execution_files(experiment_dir, fidelity_mapping)
         logger.info(f"rebuilt {len(results)} results from execution files")
         
-        # save the rebuilt results to avoid rebuilding next time
         if results:
             save_results(results, experiment_dir)
             logger.info("saved rebuilt results to config_validation_results.json, csv and statistics")
