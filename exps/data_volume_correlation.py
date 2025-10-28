@@ -12,8 +12,6 @@ import json
 import numpy as np
 import pandas as pd
 import time
-import random
-import paramiko
 from datetime import datetime
 from openbox import logger
 from pyspark.sql import SparkSession
@@ -22,6 +20,57 @@ from ConfigSpace import ConfigurationSpace
 from space_values import load_space_from_json
 from utils.spark import get_full_queries_tasks, clear_cache_on_remote, custom_sort
 from config import HUGE_SPACE_FILE, SPARK_NODES, DATA_DIR
+
+
+def extract_sql_performance_data(sql_results):
+    performance_data = {}
+    
+    for sql_result in sql_results:
+        sql_file = sql_result.get('sql_file', '')
+        if not sql_file:
+            continue
+        
+        if sql_result.get('status') == 'success':
+            performance_data[f'et_{sql_file}'] = sql_result.get('total_elapsed_time', 0)
+            
+            queries = sql_result.get('queries', [])
+            for query in queries:
+                elapsed_time = query.get('elapsed_time', 0)
+                performance_data[f'qt_{sql_file}'] = elapsed_time
+        else:
+            performance_data[f'et_{sql_file}'] = float('inf')
+            performance_data[f'qt_{sql_file}'] = float('inf')
+    
+    return performance_data
+
+
+def find_latest_experiment_dir(base_dir="./exps/data_volume_correlation"):
+    if not os.path.exists(base_dir):
+        return None
+    
+    experiment_dirs = []
+    for item in os.listdir(base_dir):
+        item_path = os.path.join(base_dir, item)
+        if os.path.isdir(item_path) and item.startswith('20'):  # match the timestamp format
+            all_inner_items = os.listdir(item_path)
+            # filter experiments that contain .log files (current experiment runs)
+            if any(inner_item.endswith('.log') for inner_item in all_inner_items):
+                experiment_dirs.append(item_path)
+    
+    if not experiment_dirs:
+        return None
+    
+    # sort by modification time, return the latest
+    latest_dir = max(experiment_dirs, key=os.path.getmtime)
+    logger.info(f"found latest experiment directory: {latest_dir}")
+    return latest_dir
+
+
+def add_error_sql_performance_data(result_data, sql_files):
+    for sql_file in sql_files:
+        result_data[f'et_{sql_file}'] = float('inf')
+        result_data[f'qt_{sql_file}'] = float('inf')
+    return result_data
 
 
 def setup_openbox_logging(experiment_dir):
@@ -50,28 +99,6 @@ def create_fixed_sqls(sql_dir, test_mode=False):
         return queries[: 2]
     return queries
 
-def find_latest_experiment_dir():
-    """find the latest experiment directory"""
-    base_dir = "./exps/data_volume_correlation"
-    if not os.path.exists(base_dir):
-        return None
-    
-    experiment_dirs = []
-    for item in os.listdir(base_dir):
-        item_path = os.path.join(base_dir, item)
-        if os.path.isdir(item_path) and item.startswith('20'):  # match the timestamp format
-            all_inner_items = os.listdir(item_path)
-            # filter experiments that contain .log files (current experiment runs)
-            if any(inner_item.endswith('.log') for inner_item in all_inner_items):
-                experiment_dirs.append(item_path)
-    
-    if not experiment_dirs:
-        return None
-    
-    # sort by modification time, return the latest
-    latest_dir = max(experiment_dirs, key=os.path.getmtime)
-    logger.info(f"found latest experiment directory: {latest_dir}")
-    return latest_dir
 
 def detect_completed_evaluations(experiment_dir, fidelity_mapping):
     """detect the completed configurations and fidelity combinations"""
@@ -163,6 +190,9 @@ def rebuild_results_from_execution_files(experiment_dir, fidelity_mapping):
                             'total_files': summary.get('total_files', 0)
                         }
                         
+                        sql_results = result_data.get('results', [])
+                        sql_performance = extract_sql_performance_data(sql_results)
+                        result_record.update(sql_performance)
                         results.append(result_record)
                         logger.info(f"rebuilt result: config_{config_idx}, fidelity_{fidelity}, objective={objective:.2f}")
                         
@@ -392,7 +422,7 @@ def evaluate_config_on_fidelity(config, fidelity, database, sql_files,
         spark.stop()
         logger.info("SparkSession closed")
         
-        return {
+        result_data = {
             'objective': objective,
             'elapsed_time': overall_elapsed_time,
             'spark_time': total_spark_time,
@@ -402,12 +432,15 @@ def evaluate_config_on_fidelity(config, fidelity, database, sql_files,
             'successful_files': len(successful_results),
             'total_files': len(sql_files)
         }
+        sql_performance = extract_sql_performance_data(results)
+        result_data.update(sql_performance)
+        
+        return result_data
             
     except Exception as e:
         logger.error(f"error while evaluating config: {e}")
-        if 'spark' in locals():
-            spark.stop()
-        return {
+        spark.stop()
+        error_result = {
             'objective': float('inf'),
             'elapsed_time': 0,
             'spark_time': 0,
@@ -418,6 +451,8 @@ def evaluate_config_on_fidelity(config, fidelity, database, sql_files,
             'successful_files': 0,
             'total_files': len(sql_files)
         }
+        add_error_sql_performance_data(error_result, sql_files)
+        return error_result
 
 
 def save_results(results, output_dir):    
@@ -603,6 +638,8 @@ def main():
     logger.info(f"completed evaluations: {len(completed_evaluations)}")
     logger.info(f"remaining evaluations: {remaining_evaluations}")
     
+    return 
+
     for config_idx, config in enumerate(configs):
         # Calculate actual config index based on history start index
         actual_config_idx = config_idx + args.history_start_idx - 1 if args.history else config_idx
@@ -630,18 +667,11 @@ def main():
                 'fidelity': fidelity,
                 'database': database,
                 'config': config.get_dictionary() if hasattr(config, 'get_dictionary') else config,
-                'objective': result['objective'],
-                'elapsed_time': result['elapsed_time'],
-                'spark_time': result['spark_time'],
-                'overhead': result['overhead'],
-                'timeout': result['timeout'],
-                'success': result['success'],
-                'successful_files': result['successful_files'],
-                'total_files': result['total_files']
             }
             
-            if 'error' in result:
-                result_record['error'] = result['error']
+            for key, value in result.items():
+                if key not in ['config_id', 'fidelity', 'database', 'config']:
+                    result_record[key] = value
             
             results.append(result_record)
             
