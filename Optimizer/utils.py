@@ -49,8 +49,11 @@ def build_optimizer(args, **kwargs):
         )
     elif 'BOHB' in args.opt or 'MFSE' in args.opt or 'FlexHB' in args.opt:
         from Optimizer.BOHB import BOHB
-        R = args.R
-        eta = args.eta
+        scheduler_kwargs = {
+            'R': args.R,
+            'eta': args.eta,
+            'fixed_initial': False
+        }
         optimizer = BOHB(
             config_space=kwargs['config_space'], eval_func=kwargs['eval_func'], meta_feature=meta_feature,
             method_id=args.opt, task_id=args.task, target=kwargs['target'], task_str=task_str,
@@ -59,9 +62,10 @@ def build_optimizer(args, **kwargs):
             cprs_strategy=args.compress, cp_args=cp_args,
             ws_strategy=args.warm_start, ws_args=ws_args, tl_strategy=args.transfer, tl_args=tl_args, source_hpo_data=source_hpo_data,
             backup_flag=args.backup_flag, seed=args.seed, rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            R=R, eta=eta, save_dir=args.save_dir, 
+            save_dir=args.save_dir, 
             config_modifier=kwargs['config_modifier'], expert_modified_space=kwargs['expert_modified_space'],
-            enable_range_compression=kwargs['enable_range_compression']
+            enable_range_compression=kwargs['enable_range_compression'],
+            scheduler_kwargs=scheduler_kwargs
         )
 
 
