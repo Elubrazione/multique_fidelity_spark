@@ -2,22 +2,18 @@ from .base import BaseOptimizer
 
 class SMBO(BaseOptimizer):
     def __init__(self, config_space, eval_func, iter_num=200, per_run_time_limit=None, source_hpo_data=None,
-                 method_id='smbo', task_id='test', target='redis', task_str='run', meta_feature=None,
+                 method_id='smbo', task_id='test', target='redis', meta_feature=None,
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  cprs_strategy='none', cp_args=None,
-                 ep_args=None, ep_strategy='none',
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
-                 config_modifier = None, expert_modified_space=None,
-                 expert_params=[]):
+                 config_modifier = None, expert_modified_space=None, task_manager=None):
 
         super().__init__(config_space=config_space, eval_func=eval_func, iter_num=iter_num,
                          per_run_time_limit=per_run_time_limit, source_hpo_data=source_hpo_data,
-                         method_id=method_id, task_id=task_id, target=target, task_str=task_str,
+                         method_id=method_id, task_id=task_id, target=target,
                          ws_strategy=ws_strategy, ws_args=ws_args, tl_strategy=tl_strategy, tl_args=tl_args,
-                         ep_args=ep_args, ep_strategy=ep_strategy,
                          cprs_strategy=cprs_strategy, cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir, meta_feature=meta_feature,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                         config_modifier = config_modifier, expert_modified_space=expert_modified_space,
-                         expert_params=expert_params)
+                         config_modifier = config_modifier, expert_modified_space=expert_modified_space, task_manager=task_manager)

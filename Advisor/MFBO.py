@@ -15,14 +15,14 @@ class MFBO(BO):
                 cprs_strategy='shap', cp_args=None,
                 ep_args=None, ep_strategy='none', expert_params=[],
                 enable_range_compression=True,
-                safe_flag=False, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
+                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
         super().__init__(config_space, meta_feature=meta_feature,
                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_args=tl_args, source_hpo_data=source_hpo_data,
                         ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
                         cprs_strategy=cprs_strategy, cp_args=cp_args,
-                        safe_flag=safe_flag, seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
+                        seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
                         enable_range_compression=enable_range_compression,
                         **kwargs)
 

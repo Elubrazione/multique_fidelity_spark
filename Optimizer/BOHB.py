@@ -9,25 +9,25 @@ from config import LIST_SPARK_NODES
 class BOHB(BaseOptimizer):
     def __init__(self, config_space, eval_func, iter_num=200, per_run_time_limit=None,
                  source_hpo_data=None, ep_args=None, ep_strategy='none',
-                 method_id='smbo', task_id='test', target='redis', task_str='run',
+                 method_id='smbo', task_id='test', target='redis',
                  cprs_strategy='none', cp_args=None,
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  backup_flag=False, save_dir='./results', meta_feature=None,
                  seed=42, rand_prob=0.15, rand_mode='ran',
                  config_modifier=None, expert_modified_space=None, expert_params=[],
-                 enable_range_compression=False,
+                 enable_range_compression=False, task_manager=None,
                  scheduler_kwargs={}):
 
         super().__init__(config_space=config_space, eval_func=eval_func, iter_num=iter_num,
                          per_run_time_limit=per_run_time_limit, source_hpo_data=source_hpo_data,
-                         method_id=method_id, task_id=task_id, target=target, task_str=task_str,
+                         method_id=method_id, task_id=task_id, target=target,
                          ws_strategy=ws_strategy, ws_args=ws_args, tl_strategy=tl_strategy, tl_args=tl_args,
                          ep_args=ep_args, ep_strategy=ep_strategy,
                          cprs_strategy=cprs_strategy, cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir, meta_feature=meta_feature,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
                          expert_params=expert_params,
-                         enable_range_compression=enable_range_compression)
+                         enable_range_compression=enable_range_compression, task_manager=task_manager)
 
         self.rand_prob = rand_prob
         self.inner_iter_id = 0

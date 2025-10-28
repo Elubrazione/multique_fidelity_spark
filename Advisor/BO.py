@@ -7,49 +7,42 @@ from .base import BaseAdvisor
 from .utils import build_my_surrogate, build_my_acq_func
 from .workload_mapping.rover.transfer import get_transfer_suggestion
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
-from Compressor import SHAPCompressor
 
 
 class BO(BaseAdvisor):
     def __init__(self, config_space: ConfigurationSpace, source_hpo_data=None,
                 surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
                 ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
-                ep_args=None, ep_strategy='none', expert_params=[],
                 cp_args=None, cprs_strategy='shap',
-                safe_flag=False, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
+                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
                 expert_modified_space=None, enable_range_compression=True,
                 **kwargs):
         super().__init__(config_space, task_id=task_id, meta_feature=meta_feature,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_args=tl_args, source_hpo_data=source_hpo_data,
-                        ep_args=ep_args, ep_strategy=ep_strategy,
                         cprs_strategy=cprs_strategy, cp_args=cp_args,
                         seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
 
-        self.safe_flag = safe_flag
-
         self.acq_type = acq_type
         self.surrogate_type = surrogate_type
-        self.extra_dim = 0
-        
+
         self.origin_expert_space = expert_modified_space
         self.expert_modified_space = copy.deepcopy(self.origin_expert_space)
-        self.expert_params = expert_params
 
         self.norm_y = True
         if 'wrk' in acq_type:
             self.norm_y = False
 
         self.init_num = ws_args['init_num']
+
         
-        self.compressor = SHAPCompressor(
-            config_space=self.origin_config_space,
-            expert_params=expert_params,
-            **cp_args,
-        )
-        
-        self.config_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
-        self._setup_optimizer()
+        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space, rng=self.rng,
+                                            transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
+                                            extra_dim=0, norm_y=self.norm_y)
+        self.acq_func = build_my_acq_func(func_str=self.acq_type, model=self.surrogate)
+        self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func,
+                                                            rand_prob=self.rand_prob, rand_mode=self.rand_mode, rng=self.rng,
+                                                            config_space=self.sample_space)
 
     def warm_start(self):
         if self.ws_strategy == 'none':
@@ -181,21 +174,3 @@ class BO(BaseAdvisor):
 
         logger.info("ret conf: %s" % (str(cur_config)))
         return cur_config
-
-    def _setup_optimizer(self):
-        """Setup surrogate model and acquisition optimizer after compression."""
-        self.history.config_space = self.sample_space
-        self.history.meta_info["compressor"] = self.compressor.compression_info
-
-        self.ini_configs = list()
-        self.sample_space.seed(self.seed)
-        self.config_space.seed(self.seed)
-        logger.info("ConfigSpace after whole compression (dimension + range): %s !!!" % (str(self.sample_space)))
-        
-        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space, rng=self.rng,
-                                            transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
-                                            extra_dim=self.extra_dim, norm_y=self.norm_y)
-        self.acq_func = build_my_acq_func(func_str=self.acq_type, model=self.surrogate)
-        self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func,
-                                                            rand_prob=self.rand_prob, rand_mode=self.rand_mode, rng=self.rng,
-                                                            config_space=self.sample_space)

@@ -5,5 +5,6 @@ results/results/*
 exps/spark_session_execute/*
 exps/default_perf/*
 exps/data_volume_correlation/**/*.log
+exps/data_volume_correlation/**/*.json
 exps/data_volume_correlation/**/execution_results.json
 log/*
