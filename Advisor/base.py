@@ -8,14 +8,16 @@ from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
 from .utils import build_observation
+from .task_manager import TaskManager
 
 
 class BaseAdvisor:
-    def __init__(self, config_space: ConfigurationSpace,
+    def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
                 task_id='test',
-                ws_strategy='none', ws_args=None, tl_args=None, source_hpo_data=None,
+                ws_strategy='none', ws_args=None, tl_args=None,
                 cprs_strategy='none', cp_args=None,
-                meta_feature=None, seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
+                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
+                **kwargs):
 
         self._logger_kwargs = kwargs.get('_logger_kwargs', None)
 
@@ -26,40 +28,32 @@ class BaseAdvisor:
             rng = np.random.RandomState(self.seed)
         self.rng = rng
         
-        self.origin_config_space = config_space
-        self.compressor = SHAPCompressor(config_space=self.origin_config_space, **cp_args)
-        self.config_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
-        self.origin_config_space.seed(self.seed)
+        self.task_manager = task_manager
+        self.task_manager.initialize_current_task(task_id=task_id)
+        self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
+        
+        # Get similar tasks and extract only the history list
+        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
+        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+        
         self.sample_space.seed(self.seed)
-        self.config_space.seed(self.seed)
+        self.surrogate_space.seed(self.seed)
         self.ini_configs = list()
 
+        meta_feature = {}
         meta_feature['random'] = {'seed': seed, 'rand_prob': rand_prob, 'rand_mode': rand_mode}
         meta_feature['space'] = {'original': js.loads(write(config_space)),
-                                'dimension': js.loads(write(self.config_space)),
+                                'dimension': js.loads(write(self.surrogate_space)),
                                 'range': js.loads(write(self.sample_space))}
         meta_feature['compressor'] = self.compressor.compression_info
-        self.history = History(task_id=task_id, config_space=self.sample_space, meta_info=meta_feature)
+        self.task_manager.update_history_meta_info(meta_feature)
 
-        self.task_id = task_id
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
         self.tl_args = tl_args
         self.cprs_strategy = cprs_strategy
         self.cp_args = cp_args
-
-        self.source_hpo_data_sims = None
-
-    def filter_source_hpo_data(self, source_hpo_data):
-        filtered, sims = self.task_manager.filter_source_hpo_data(self.history, source_hpo_data)
-        return filtered
-
-    @property
-    def contexts(self):
-        contexts = self.history.observations[0]['last_context']
-        for idx in range(1, len(self.history)):
-            contexts = np.vstack([contexts, self.history.observations[idx]['last_context']])
-        return contexts
+        self.history = self.task_manager.current_task_history
 
 
     def warm_start(self):

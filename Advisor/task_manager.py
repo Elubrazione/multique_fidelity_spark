@@ -56,6 +56,7 @@ class TaskManager:
         self._load_historical_tasks()
         self.calculate_meta_feature(eval_func)
 
+
     def _load_historical_tasks(self):
         if not os.path.exists(self.history_dir):
             logger.warning(f"History directory {self.history_dir} does not exist.")
@@ -205,15 +206,27 @@ class TaskManager:
             logger.info(f"Metrics array shape: {metrics.shape}")
             self.current_meta_feature = metrics
 
+    def update_history_meta_info(self, meta_info: dict):
+        """
+        Update meta information of historical tasks.
+        
+        Args:
+            meta_info: Meta information of historical tasks
+        """
+        self.current_task_history.meta_info.update(meta_info)
 
-    def initialize_current_task(self, task_id: str, meta_info: dict):
+
+    def initialize_current_task(self, task_id: str, meta_info: dict = None):
         """
         Initialize current task, called in Optimizer.base.BaseOptimizer.__init__
 
         Args:
             task_id: Current task identifier, used for history task_id
+            eval_func: Evaluator function
             meta_info: Meta information of current task
         """
+        meta_info = meta_info or {}
+        logger.info(f"Current meta feature: {self.current_meta_feature}")
         meta_info['meta_feature'] = self.current_meta_feature.tolist()
         self.current_task_history = History(task_id=task_id, config_space=self.config_space, meta_info=meta_info)
         logger.info(f"Initialized current task {task_id} with meta feature shape: {self.current_meta_feature.shape}")
@@ -224,6 +237,7 @@ class TaskManager:
         self.similar_tasks_cache = map_source_hpo_data(
             target_his=self.current_task_history,
             source_hpo_data=self.historical_tasks,
+            config_space=self.config_space,
             **self.ws_args,
         )
         

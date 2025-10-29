@@ -5,6 +5,8 @@ from openbox.utils.history import Observation
 from openbox.utils.util_funcs import get_types
 from openbox.utils.constants import SUCCESS, TIMEOUT, FAILED
 
+from .workload_mapping.rover_mapper import RoverMapper
+
 
 def build_my_acq_func(func_str='ei', model=None, **kwargs):
     func_str = func_str.lower()
@@ -85,17 +87,12 @@ def calculate_ranking(score_list, ascending=False):
     return rank_list
 
 
-def map_source_hpo_data(map_strategy, target_his, source_hpo_data, **kwargs):
+def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
     sims = None
-    if 'rover' in map_strategy:
-        from .workload_mapping.rover import RoverMapper
-        inner_sm = kwargs.get('inner_surrogate_model', 'gp')
-        rover = RoverMapper(surrogate_type=inner_sm)
-        rover.fit(source_hpo_data)
-        sims = rover.map(target_his, source_hpo_data)
-    else:
-        raise ValueError('Invalid ws_strategy: %s' % map_strategy)
-
+    inner_sm = kwargs.get('inner_surrogate_model', 'gp')
+    rover = RoverMapper(surrogate_type=inner_sm)
+    rover.fit(source_hpo_data, config_space)
+    sims = rover.map(target_his, source_hpo_data)   # 没有阈值过滤, 返回所有任务的相似度（theta=-float('inf')）
     return sims
 
 

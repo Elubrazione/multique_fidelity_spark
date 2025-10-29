@@ -118,7 +118,7 @@ class MFBO(BO):
                         old_conf = obs_list[rank].config
                         logger.info("Warm start configuration from task %d, rank %d, objective: %s" % 
                                     (task_idx, rank, obs_list[rank].objectives[0]))
-                        new_conf = Configuration(self.config_space, values={
+                        new_conf = Configuration(self.surrogate_space, values={
                             name: old_conf[name] for name in self.sample_space.get_hyperparameter_names()
                         })
                         new_conf.origin = f"mfbo_ws:{self.source_hpo_data[task_idx].task_id}_rank{rank}"

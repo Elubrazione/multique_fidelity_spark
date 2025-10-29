@@ -4,24 +4,23 @@ import numpy as np
 import pickle as pkl
 from datetime import datetime
 from ConfigSpace import ConfigurationSpace
-from openbox.utils.history import Observation, History
 from openbox import logger
 from Advisor.BO import BO
 from Advisor.MFBO import MFBO
 from .utils import run_obj_func
+from Advisor.task_manager import TaskManager
 
 
 class BaseOptimizer:
-    def __init__(self, config_space: ConfigurationSpace, eval_func, 
-                 iter_num=200, per_run_time_limit=None, meta_feature=None,
-                 source_hpo_data=None,
+    def __init__(self, config_space: ConfigurationSpace, eval_func, task_manager: TaskManager,
+                 iter_num=200, per_run_time_limit=None,
                  method_id='advisor', task_id='test', target='redis',
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  cprs_strategy='none', cp_args=None,
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
                  config_modifier=None, expert_modified_space=None,
-                 enable_range_compression=False, task_manager=None):
+                 enable_range_compression=False):
 
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC', 'FlexHB_SMAC']
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
@@ -32,9 +31,6 @@ class BaseOptimizer:
         self.eval_func = eval_func
         self.iter_num = iter_num
         self.iter_id = 0
-        
-        # Store TaskManager for similarity computation and history management
-        self.task_manager = task_manager
 
         ws_str = ws_strategy
         if method_id != 'RS':
@@ -73,11 +69,12 @@ class BaseOptimizer:
         self.result_path = None
         self.ts_backup_file = None
         self.ts_recorder = None
-        self._logger_kwargs = None  # 传给Advisor，避免rgpe_rover创建新的logger
+        self._logger_kwargs = None
         self.build_path()
         
         self.config_modifier = config_modifier
         self.expert_modified_space = expert_modified_space
+
 
         """
             method_id: SMAC, GP / MFSE_SMAC, MFSE_SMAC, BOHB_GP, BOHB_SMAC, FlexHB_SMAC
@@ -98,34 +95,27 @@ class BaseOptimizer:
             if 'acq' in tl_strategy:
                 acq_type = 'wrk_%s' % acq_type  # 'wrk_ei'
 
-        # Use TaskManager to get filtered similar tasks if available
-        advisor_source_hpo_data = source_hpo_data  # Fallback to legacy
-        if self.task_manager:
-            similar_tasks, _ = self.task_manager.get_similar_tasks()
-            if similar_tasks:
-                advisor_source_hpo_data = similar_tasks
-                logger.info(f"Using {len(similar_tasks)} similar tasks from TaskManager")
-
         if method_id in ['SMAC', 'GP'] or 'BOHB' in method_id:
-            self.advisor = BO(config_space, source_hpo_data=advisor_source_hpo_data,
+            self.advisor = BO(config_space,
                               surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                               ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
-                              meta_feature=meta_feature,
                               cprs_strategy=cprs_strategy, cp_args=cp_args,
                               seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                               expert_modified_space=expert_modified_space,
+                              task_manager=task_manager,
                               _logger_kwargs=self._logger_kwargs)
         elif 'MFSE' in method_id or 'FlexHB' in method_id:
             # 对于MFSE，没有tl，就默认用MF集成
             if tl_strategy == 'none':
                 surrogate_type = 'mfse_' + surrogate_type
 
-            self.advisor = MFBO(config_space, source_hpo_data=advisor_source_hpo_data, meta_feature=meta_feature,
+            self.advisor = MFBO(config_space,
                                 surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                                 ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                                 cprs_strategy=cprs_strategy, cp_args=cp_args,
                                 seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                                 enable_range_compression=enable_range_compression,
+                                task_manager=task_manager,
                                 _logger_kwargs=self._logger_kwargs)
 
         self.timeout = per_run_time_limit
@@ -214,41 +204,8 @@ class BaseOptimizer:
             hist_ws = self.advisor.surrogate.hist_ws.copy()
             self.advisor.history.meta_info['tl_ws'] = hist_ws
         
-        if self.iter_id == self.iter_num or self.iter_id % interval == 0:
-            # his = self.advisor.history
-            his = copy.deepcopy(self.advisor.history)
-            
-            if self.cprs_strategy != 'none':
-                param_names = [param.name for param in self.advisor.config_space.get_hyperparameters()]
-                data = {
-                    'task_id': his.task_id,
-                    'num_objectives': his.num_objectives,
-                    'num_constraints': his.num_constraints,
-                    'ref_point': his.ref_point,
-                    'meta_info': his.meta_info,
-                    'global_start_time': his.global_start_time.isoformat(),
-                    'observations': [
-                        obs.to_dict() for obs in his.observations
-                    ]
-                }
-
-                for obs in data['observations']:
-                    new_conf = {}
-                    for name in param_names:
-                        if name in obs['config']:
-                            new_conf[name] = obs['config'][name]
-                    obs['config'] = new_conf
-                    
-                global_start_time = data.pop('global_start_time')
-                global_start_time = datetime.fromisoformat(global_start_time)
-                observations = data.pop('observations')
-                observations = [Observation.from_dict(obs, self.advisor.config_space) for obs in observations]
-
-                his = History(**data)
-                his.global_start_time = global_start_time
-                his.update_observations(observations)
-                
-            his.save_json(self.result_path)
+        if self.iter_id == self.iter_num or self.iter_id % interval == 0:    
+            self.advisor.history.save_json(self.result_path)
             
             if self.iter_id == self.iter_num and self.backup_flag:
                 self.record_task()

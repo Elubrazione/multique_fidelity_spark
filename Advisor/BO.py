@@ -7,19 +7,20 @@ from .base import BaseAdvisor
 from .utils import build_my_surrogate, build_my_acq_func
 from .workload_mapping.rover.transfer import get_transfer_suggestion
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
+from .task_manager import TaskManager
 
 
 class BO(BaseAdvisor):
-    def __init__(self, config_space: ConfigurationSpace, source_hpo_data=None,
-                surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
+    def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
+                surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
                 cp_args=None, cprs_strategy='shap',
                 seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
                 expert_modified_space=None, enable_range_compression=True,
                 **kwargs):
-        super().__init__(config_space, task_id=task_id, meta_feature=meta_feature,
+        super().__init__(config_space, task_manager=task_manager, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_args=tl_args, source_hpo_data=source_hpo_data,
+                        tl_args=tl_args,
                         cprs_strategy=cprs_strategy, cp_args=cp_args,
                         seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
 
@@ -36,7 +37,7 @@ class BO(BaseAdvisor):
         self.init_num = ws_args['init_num']
 
         
-        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space, rng=self.rng,
+        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
                                             transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
                                             extra_dim=0, norm_y=self.norm_y)
         self.acq_func = build_my_acq_func(func_str=self.acq_type, model=self.surrogate)
@@ -149,8 +150,7 @@ class BO(BaseAdvisor):
             
         self.surrogate.train(X, Y)
 
-        incumbent_value = np.sort(Y)[(num_config_evaluated - 1) // 5] \
-            if self.ep_strategy == 'bo_pro' else self.history.get_incumbent_value()
+        incumbent_value = self.history.get_incumbent_value()
         self.acq_func.update(model=self.surrogate, eta=incumbent_value, num_data=num_config_evaluated)
 
         observations = self.history.observations
