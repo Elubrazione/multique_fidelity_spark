@@ -5,7 +5,7 @@ from openbox.utils.config_space.util import convert_configurations_to_array
 from openbox.surrogate.base.build_gp import create_gp_model
 from openbox.utils.util_funcs import get_types
 from catboost import CatBoostRegressor
-
+from openbox import logger
 # 该函数用于从任务的meta_features生成pairwise的训练数据
 # 其中A和B分别是nA * l和nB * l的numpy array, 每行表示一个任务的meta feature，l是meta feature维数
 # S是一个nA * nB的numpy array，表示A和B中的任务两两之间的相似度
@@ -21,9 +21,6 @@ def generate_pairwise_data(A, B, S):
             X.append(np.concatenate([A[i], B[j]]))
             Y.append(S[i, j])
     return np.array(X), np.array(Y)
-
-# 该函数用于计算A，B两个序列中排序关系正确的偏序对比例
-
 
 def calculate_relative(A, B):
     P = 0
@@ -97,8 +94,19 @@ def train_model(src_meta_feature, sim):
 
     注意src_meta_feature和sim中的任务顺序需要对齐
     """
-    train_X, train_Y = generate_pairwise_data(
-        src_meta_feature, src_meta_feature, sim)
+    
+    train_X, train_Y = generate_pairwise_data(src_meta_feature, src_meta_feature, sim)
+    
+    if train_X.shape[1] > 0:
+        feature_std = np.std(train_X, axis=0)
+        constant_features = np.sum(feature_std < 1e-10)
+        logger.warning(f"{constant_features} out of {train_X.shape[1]} features are constant")
+        
+        if constant_features == train_X.shape[1]:
+            logger.error("All features are constant!")
+            # Return a dummy model or handle this case
+            return None
+    
     surrogate_cat = CatBoostRegressor()
     surrogate_cat.fit(train_X, train_Y, silent=True)
 
