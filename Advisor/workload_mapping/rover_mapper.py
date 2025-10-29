@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Tuple
 from openbox.utils.config_space.util import convert_configurations_to_array
+from ConfigSpace import ConfigurationSpace
 from openbox import logger, History
 from sklearn.preprocessing import MinMaxScaler
 
@@ -52,21 +53,35 @@ class RoverMapper(BaseMapper):
 
         return ts_meta_features, ts_his
 
-    def fit(self, source_hpo_data: List[History]):
+    def fit(self, source_hpo_data: List[History], config_space: ConfigurationSpace):
         if self.already_fit:
             logger.warning('RoverMapper has already been fitted!')
             return
 
-        config_space = source_hpo_data[0].config_space
-
         ts_meta_features, ts_his = self.get_src_history(source_hpo_data)
+        
+        logger.info(f"Loaded {len(source_hpo_data)} source tasks")
+        logger.info(f"Meta features shape: {ts_meta_features.shape}")
+        logger.info(f"Meta features stats: min={ts_meta_features.min():.4f}, max={ts_meta_features.max():.4f}, std={ts_meta_features.std():.4f}")
+
+        # 检查是否有足够的历史任务
+        if len(source_hpo_data) < 2:
+            logger.warning(f"Only {len(source_hpo_data)} historical task(s) available. RoverMapper requires at least 2 tasks for similarity calculation.")
+            # 对于单个任务，我们跳过相似度计算和模型训练
+            self.ts_meta_features = ts_meta_features  # 不进行缩放
+            self.model = None
+            self.already_fit = True
+            return
 
         self.scaler.fit(ts_meta_features)
         self.ts_meta_features = self.scaler.transform(ts_meta_features)
+        
+        logger.info(f"Scaled meta features stats: min={self.ts_meta_features.min():.4f}, max={self.ts_meta_features.max():.4f}, std={self.ts_meta_features.std():.4f}")
 
         # 计算相似度矩阵
         sim = calculate_similarity(ts_his, config_space)
-        # print(sim)
+        logger.info(f"Similarity matrix shape: {sim.shape}")
+        logger.info(f"Similarity matrix stats: min={sim.min():.4f}, max={sim.max():.4f}, std={sim.std():.4f}")
 
         # 训练模型并保存
         self.model = train_model(self.ts_meta_features, sim)
@@ -74,8 +89,20 @@ class RoverMapper(BaseMapper):
         self.already_fit = True
 
     def map(self, target_history: History, source_hpo_data: List[History]) -> List[Tuple[int, float]]:
-        # 获取当前任务的context
-        target_meta_feature = target_history.meta_info['meta_feature']
+        target_meta_feature = np.array(target_history.meta_info.get('meta_feature', []))
+
+        if len(target_meta_feature) == 0 or target_meta_feature.size == 0:
+            logger.warning("Target meta_feature is empty, returning all tasks with similarity 1.0")
+            return [(i, 1.0) for i in range(len(source_hpo_data))]
+        
+        if self.model is None:
+            logger.warning("No trained model available (single task case), returning all tasks with similarity 1.0")
+            return [(i, 1.0) for i in range(len(source_hpo_data))]
+        
+        if len(target_meta_feature) != self.ts_meta_features.shape[1]:
+            logger.warning(f"Target meta_feature dimension ({len(target_meta_feature)}) doesn't match trained features ({self.ts_meta_features.shape[1]}), returning all tasks with similarity 1.0")
+            return [(i, 1.0) for i in range(len(source_hpo_data))]
+        
         target_meta_feature = self.scaler.transform([target_meta_feature])[0]
         target_meta_feature[np.isnan(target_meta_feature)] = 0
 

@@ -7,11 +7,12 @@ from ConfigSpace import Configuration
 
 from executor import ExecutorManager
 from space_values import haisi_huge_spaces_from_json, load_space_from_json
-from Compressor.utils import parse_combined_space
+from Compressor.utils import parse_combined_space, load_expert_params
 from Optimizer.utils import build_optimizer
+from Advisor.task_manager import TaskManager
 from utils.spark import analyze_timeout_and_get_fidelity_details
 from config import LOG_DIR, HISTORY_COMPRESS_DIR, \
-    RANGE_COMPRESS_DATA, FILE_SQL_SEGMENTATION, HUGE_SPACE_FILE, OS_CONFIG_SPACE_FILE
+    RANGE_COMPRESS_DATA, FILE_SQL_SEGMENTATION, HUGE_SPACE_FILE, OS_CONFIG_SPACE_FILE, EXPERT_PARAMS_FILE
 
 
 parser = argparse.ArgumentParser()
@@ -29,7 +30,6 @@ parser.add_argument('--target', type=str, default='spark_hstest')
 parser.add_argument('--expert', type=str, default='none', choices=['none', 'pibo', 'bo_pro', 'prior_band'])
 
 parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap'])
-parser.add_argument('--cp_data_dir', type=str, default="nodes_2/huge_80d_addos/")
 parser.add_argument('--cp_topk', type=int, default=40)
 
 parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_cos', 'best_euc', 'best_rover', 'best_all', 'rgpe_rover'])
@@ -42,7 +42,6 @@ parser.add_argument('--tl_topk', type=int, default=3)
 
 parser.add_argument('--src_data_path', type=str, default='')
 parser.add_argument('--backup_flag', action='store_true', default=False)
-parser.add_argument('--safe_flag', action='store_true', default=False)
 
 parser.add_argument('--task', type=str, default='test_ws')
 parser.add_argument('--seed', type=int, default=42)
@@ -77,6 +76,9 @@ fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_detai
     ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
 )
 fidelity_details[round(float(1/64), 5)] = ['q48']
+if args.test_mode:
+    fidelity_details[round(float(1), 5)] = ['q48']
+
 
 os_space = None
 if args.enable_os_tuning:
@@ -94,17 +96,6 @@ executor = ExecutorManager(
     enable_os_tuning=args.enable_os_tuning,
 )
 
-source_hpo_data, source_compress_data = [], []
-compress_history_dir = HISTORY_COMPRESS_DIR + args.cp_data_dir
-for file in os.listdir(compress_history_dir):
-    source_hpo_data.append(History.load_json(filename=os.path.join(compress_history_dir, file), config_space=old_space))
-    with open(os.path.join(compress_history_dir, file), 'r') as f:
-        data = json.load(f)
-    obs = data.pop('observations', [])
-    configs = [Configuration(configuration_space=old_space, values=ob['config']) for ob in obs]
-    objectives = [ob['objectives'][0] if np.isfinite(ob['objectives'][0]) else MAXINT for ob in obs]
-    source_compress_data.append((configs, objectives))
-
 ws_args = {
     'init_num': args.ws_init_num,
     'topk': args.ws_topk,
@@ -113,13 +104,22 @@ ws_args = {
 tl_args = {
     'topk': args.tl_topk
 }
-ep_args = {
-    'prior': None,
-}
+
+task_manager = TaskManager(
+    history_dir=args.src_data_path,
+    eval_func=executor,
+    spark_log_dir="/root/codes/spark-log",
+    ws_args=ws_args,
+    similarity_threshold=0.5,
+    config_space=old_space
+)
+
+
 cp_args = {
     'topk': args.cp_topk,
     'sigma': 2.0,
     'top_ratio': 0.8,
+    'expert_params': [p for p in load_expert_params(EXPERT_PARAMS_FILE) if p in old_space.get_hyperparameter_names()],
 }
 
 
@@ -131,10 +131,8 @@ opt_kwargs = {
     'eval_func': executor,
     'target': args.target,
     'task': args.task,
-    'meta_feature': {'meta_feature': None, 'ini_context': None},
-    'ws_args': ws_args, 'tl_args': tl_args, 'ep_args': ep_args, 'cp_args': cp_args,
-    'source_hpo_data': source_hpo_data,
-    'scene': "spark",
+    'ws_args': ws_args, 'tl_args': tl_args, 'cp_args': cp_args,
+    'task_manager': task_manager,
     'config_modifier': modifier,
     'expert_modified_space': None,
     'enable_range_compression': not args.disable_range_compress,

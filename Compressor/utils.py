@@ -107,7 +107,7 @@ def prepare_historical_data(
         logger.error(f"Error preparing historical data: {e}")
         return [], []
 
-def load_expert_params(expert_config_file: str, key: str) -> List[str]:
+def load_expert_params(expert_config_file: str, key: str = 'spark') -> List[str]:
     """Load expert parameters from configuration file."""
     try:
         with open(expert_config_file, "r") as f:

@@ -10,19 +10,8 @@ from config import EXPERT_PARAMS_FILE
 
 
 def build_optimizer(args, **kwargs):
-    scene_str = kwargs.get('scene', 'none')
-    assert scene_str in ["spark"]
-
-    space_names = set(kwargs['config_space'].get_hyperparameter_names())
-    expert_params = [p for p in load_expert_params(EXPERT_PARAMS_FILE, scene_str) if p in space_names]
-
-    task_str = kwargs.get('task_str', 'run')
-    meta_feature = kwargs.get('meta_feature', None)
-    source_hpo_data = kwargs.get('source_hpo_data', None)
-
     ws_args = kwargs.get('ws_args', None)
     tl_args = kwargs.get('tl_args', None)
-    ep_args = kwargs.get('ep_args', None)
     cp_args = kwargs.get('cp_args', None)
 
     per_run_time_limit = kwargs.get('per_run_time_limit', None)
@@ -31,42 +20,48 @@ def build_optimizer(args, **kwargs):
     if args.opt == 'RS':
         from Optimizer.SMBO import SMBO
         optimizer = SMBO(config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-                         iter_num=args.iter_num, per_run_time_limit=per_run_time_limit, meta_feature=meta_feature,
-                         method_id='RS', task_id=kwargs['task'], target=kwargs['target'], task_str=task_str, 
+                         iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
+                         method_id='RS', task_id=kwargs['task'], target=kwargs['target'],
                          config_modifier=kwargs['config_modifier'], expert_modified_space=kwargs['expert_modified_space'],
-                         save_dir=kwargs['save_dir'])
+                         save_dir=kwargs['save_dir'],
+                         task_manager=kwargs.get('task_manager'))
     if args.opt in ['GP', 'GPF', 'SMAC']:
         from Optimizer.SMBO import SMBO
         optimizer = SMBO(
             config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-            iter_num=args.iter_num, per_run_time_limit=per_run_time_limit, meta_feature=meta_feature,
-            source_hpo_data=source_hpo_data, ep_args=ep_args, ep_strategy=args.expert,
-            method_id=args.opt, task_id=kwargs['task'],target=kwargs['target'], task_str=task_str,
+            iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
+            method_id=args.opt, task_id=kwargs['task'],target=kwargs['target'],
             cprs_strategy=args.compress, cp_args=cp_args,
             ws_strategy=args.warm_start, ws_args=ws_args, tl_strategy=args.transfer, tl_args=tl_args,
-            backup_flag=args.backup_flag, seed=args.seed, rand_prob=args.rand_prob, rand_mode=args.rand_mode, config_modifier=kwargs['config_modifier'],
-            expert_params=expert_params
+            backup_flag=args.backup_flag, seed=args.seed, rand_prob=args.rand_prob, rand_mode=args.rand_mode,
+            config_modifier=kwargs['config_modifier'],
+            task_manager=kwargs.get('task_manager')
         )
     elif 'BOHB' in args.opt or 'MFSE' in args.opt or 'FlexHB' in args.opt:
         from Optimizer.BOHB import BOHB
-        R = args.R
-        eta = args.eta
+        scheduler_kwargs = {
+            'R': args.R,
+            'eta': args.eta,
+            'fixed_initial': False
+        }
         optimizer = BOHB(
-            config_space=kwargs['config_space'], eval_func=kwargs['eval_func'], meta_feature=meta_feature,
-            method_id=args.opt, task_id=args.task, target=kwargs['target'], task_str=task_str,
+            config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
+            method_id=args.opt, task_id=args.task, target=kwargs['target'],
             iter_num=args.iter_num, per_run_time_limit=per_run_time_limit, 
-            ep_args=ep_args, ep_strategy=args.expert, expert_params=expert_params, 
             cprs_strategy=args.compress, cp_args=cp_args,
-            ws_strategy=args.warm_start, ws_args=ws_args, tl_strategy=args.transfer, tl_args=tl_args, source_hpo_data=source_hpo_data,
-            backup_flag=args.backup_flag, seed=args.seed, rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            R=R, eta=eta, save_dir=args.save_dir, 
+            ws_strategy=args.warm_start, ws_args=ws_args, tl_strategy=args.transfer, tl_args=tl_args,
+            backup_flag=args.backup_flag, seed=args.seed,
+            rand_prob=args.rand_prob, rand_mode=args.rand_mode,
+            save_dir=args.save_dir, 
             config_modifier=kwargs['config_modifier'], expert_modified_space=kwargs['expert_modified_space'],
-            enable_range_compression=kwargs['enable_range_compression']
+            enable_range_compression=kwargs['enable_range_compression'],
+            task_manager=kwargs.get('task_manager'),
+            scheduler_kwargs=scheduler_kwargs
         )
 
 
-    logger.info("[opt: {}] [warm_start_strategy: {}] [transfer_strategy: {}] [safe_flag: {}] [backup_flag: {}] [tasks: {}] [seed: {}] [rand_prob: {}]".format(
-        args.opt, args.warm_start, args.transfer, args.safe_flag, args.backup_flag, task_str, args.seed, args.rand_prob)
+    logger.info("[opt: {}] [warm_start_strategy: {}] [transfer_strategy: {}] [backup_flag: {}] [seed: {}] [rand_prob: {}]".format(
+        args.opt, args.warm_start, args.transfer, args.backup_flag, args.seed, args.rand_prob)
     )
 
     logger.info("warm start args: %s: %s" % (args.warm_start, json.dumps(ws_args)))
