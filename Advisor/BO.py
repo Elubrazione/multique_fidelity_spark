@@ -16,7 +16,6 @@ class BO(BaseAdvisor):
                 ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
                 cp_args=None, cprs_strategy='shap',
                 seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
-                expert_modified_space=None, enable_range_compression=True,
                 **kwargs):
         super().__init__(config_space, task_manager=task_manager, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
@@ -26,9 +25,6 @@ class BO(BaseAdvisor):
 
         self.acq_type = acq_type
         self.surrogate_type = surrogate_type
-
-        self.origin_expert_space = expert_modified_space
-        self.expert_modified_space = copy.deepcopy(self.origin_expert_space)
 
         self.norm_y = True
         if 'wrk' in acq_type:

@@ -1,8 +1,6 @@
 import numpy as np
 import json as js
 from openbox import logger
-from openbox.utils.history import History
-from openbox.utils.constants import MAXINT
 from ConfigSpace import ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
@@ -24,15 +22,12 @@ class BaseAdvisor:
         self.seed = seed
         self.rand_prob = rand_prob
         self.rand_mode = rand_mode
-        if rng is None:
-            rng = np.random.RandomState(self.seed)
-        self.rng = rng
+        self.rng = rng if rng is not None else np.random.RandomState(self.seed)
         
         self.task_manager = task_manager
         self.task_manager.initialize_current_task(task_id=task_id)
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
         
-        # Get similar tasks and extract only the history list
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
         self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
         

@@ -24,7 +24,6 @@ def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_lear
     extra_dim = kwargs.get('extra_dim', 0)
     seed = kwargs.get('seed', 42)
     norm_y = kwargs.get('norm_y', True)
-    indices = kwargs.get('indices', None)
 
     assert config_space is not None
     func_str = func_str.lower()
@@ -33,23 +32,9 @@ def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_lear
         types = np.hstack((types, np.zeros(extra_dim, dtype=np.uint)))
         bounds = np.vstack((bounds, np.array([[0, 1]] * extra_dim)))
 
-    if indices and len(indices) == 2 and indices[1]:
-        selected, fixed = indices
-        types = np.concatenate((types[selected], types[fixed]))
-        bounds = np.concatenate((bounds[selected], bounds[fixed]))
-        # logger.warn("Types and bounds: %s and %s" % (types, bounds))
-
     if func_str == 'prf':
-        try:
-            from openbox.surrogate.base.rf_with_instances import RandomForestWithInstances
-            return RandomForestWithInstances(types=types, bounds=bounds, seed=seed)
-        except ModuleNotFoundError:
-            from openbox.surrogate.base.rf_with_instances_sklearn import skRandomForestWithInstances
-            logger.warning('[Build Surrogate] Use probabilistic random forest based on scikit-learn. '
-                           'For better performance, please install pyrfr: '
-                           'https://open-box.readthedocs.io/en/latest/installation/install_pyrfr.html')
-            return skRandomForestWithInstances(types=types, bounds=bounds, seed=seed)
-
+        from openbox.surrogate.base.rf_with_instances_sklearn import skRandomForestWithInstances
+        return skRandomForestWithInstances(types=types, bounds=bounds, seed=seed)
     elif func_str.startswith('gp'):
         from openbox.surrogate.base.build_gp import create_gp_model
         return create_gp_model(model_type=func_str[:2],
@@ -66,13 +51,12 @@ def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_lear
         from .surrogate.mfgpe import MFGPE
         inner_model = func_str.split('_')[1]
         return MFGPE(config_space=config_space, source_hpo_data=transfer_learning_history, seed=seed,
-                     surrogate_type=inner_model, norm_y=norm_y)
+                    surrogate_type=inner_model, norm_y=norm_y)
     elif func_str.startswith('mfse'):   # 没有迁移学习
         from .surrogate.mfgpe import MFGPE
         inner_model = func_str.split('_')[1]
         return MFGPE(config_space=config_space, source_hpo_data=None, seed=seed,
-                     surrogate_type=inner_model, norm_y=norm_y)
-
+                    surrogate_type=inner_model, norm_y=norm_y)
     else:
         raise ValueError('Invalid string %s for surrogate!' % func_str)
 
@@ -111,6 +95,6 @@ def build_observation(config, results, **kwargs):
         trial_state = SUCCESS
 
     obs = Observation(config=config, objectives=[perf], trial_state=trial_state, elapsed_time=elapsed_time,
-                      extra_info={'origin': config.origin})
+                    extra_info={'origin': config.origin})
 
     return obs

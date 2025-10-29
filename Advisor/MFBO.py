@@ -14,7 +14,6 @@ class MFBO(BO):
                 tl_args={'topk': 5}, source_hpo_data=None,
                 cprs_strategy='shap', cp_args=None,
                 ep_args=None, ep_strategy='none', expert_params=[],
-                enable_range_compression=True,
                 seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
         super().__init__(config_space, meta_feature=meta_feature,
                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
@@ -23,7 +22,6 @@ class MFBO(BO):
                         ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
                         cprs_strategy=cprs_strategy, cp_args=cp_args,
                         seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
-                        enable_range_compression=enable_range_compression,
                         **kwargs)
 
         self.history_list: List[History] = list()  # 低精度组的 history -> List[History]

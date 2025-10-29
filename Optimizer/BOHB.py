@@ -13,9 +13,9 @@ class BOHB(BaseOptimizer):
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
-                 config_modifier=None, expert_modified_space=None,
-                 enable_range_compression=False, task_manager=None,
-                 scheduler_kwargs={}):
+                 task_manager=None,
+                 scheduler_kwargs={},
+                 _logger_kwargs=None):
 
         super().__init__(config_space=config_space, eval_func=eval_func, iter_num=iter_num,
                          per_run_time_limit=per_run_time_limit,
@@ -24,7 +24,8 @@ class BOHB(BaseOptimizer):
                          cprs_strategy=cprs_strategy, cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                         enable_range_compression=enable_range_compression, task_manager=task_manager)
+                         task_manager=task_manager,
+                         _logger_kwargs=_logger_kwargs)
 
         self.rand_prob = rand_prob
         self.inner_iter_id = 0

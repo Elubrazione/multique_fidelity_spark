@@ -15,9 +15,8 @@ import time
 from datetime import datetime
 from openbox import logger
 from pyspark.sql import SparkSession
-from ConfigSpace import ConfigurationSpace
 
-from space_values import load_space_from_json
+from Optimizer.utils import load_space_from_json
 from utils.spark import get_full_queries_tasks, clear_cache_on_remote, custom_sort
 from config import HUGE_SPACE_FILE, SPARK_NODES, DATA_DIR
 

@@ -18,15 +18,13 @@ class BaseOptimizer:
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  cprs_strategy='none', cp_args=None,
                  backup_flag=False, save_dir='./results',
-                 seed=42, rand_prob=0.15, rand_mode='ran',
-                 config_modifier=None, expert_modified_space=None,
-                 enable_range_compression=False):
+                 seed=42, rand_prob=0.15, rand_mode='ran', _logger_kwargs=None):
 
-        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC', 'FlexHB_SMAC']
+        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC']
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
         assert cprs_strategy in ['shap', 'expert', 'none']
-        assert rand_mode in ['ran', 'rs']  # 如果是rs，就是返回random search里面排序过后的，而不是纯随机
+        assert rand_mode in ['ran', 'rs']
 
         self.eval_func = eval_func
         self.iter_num = iter_num
@@ -69,15 +67,13 @@ class BaseOptimizer:
         self.result_path = None
         self.ts_backup_file = None
         self.ts_recorder = None
-        self._logger_kwargs = None
+        self._logger_kwargs = _logger_kwargs
+
         self.build_path()
         
-        self.config_modifier = config_modifier
-        self.expert_modified_space = expert_modified_space
-
 
         """
-            method_id: SMAC, GP / MFSE_SMAC, MFSE_SMAC, BOHB_GP, BOHB_SMAC, FlexHB_SMAC
+            method_id: SMAC, GP / MFSE_SMAC, MFSE_SMAC, BOHB_GP, BOHB_SMAC
             ws_strategy: none, best_rover, rgpe_rover
             tl_strategy: none, mce, re, mceacq, reacq
             cprs_strategy: none, shap
@@ -101,10 +97,9 @@ class BaseOptimizer:
                               ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                               cprs_strategy=cprs_strategy, cp_args=cp_args,
                               seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
-                              expert_modified_space=expert_modified_space,
                               task_manager=task_manager,
                               _logger_kwargs=self._logger_kwargs)
-        elif 'MFSE' in method_id or 'FlexHB' in method_id:
+        elif 'MFSE' in method_id:
             # 对于MFSE，没有tl，就默认用MF集成
             if tl_strategy == 'none':
                 surrogate_type = 'mfse_' + surrogate_type
@@ -114,16 +109,12 @@ class BaseOptimizer:
                                 ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                                 cprs_strategy=cprs_strategy, cp_args=cp_args,
                                 seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
-                                enable_range_compression=enable_range_compression,
                                 task_manager=task_manager,
                                 _logger_kwargs=self._logger_kwargs)
 
         self.timeout = per_run_time_limit
 
     def build_path(self):
-
-        # 结果保存
-        # results
         result_dir = os.path.join(self.save_dir, self.target, self.method_id)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
@@ -131,7 +122,7 @@ class BaseOptimizer:
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')
         self.res_dir = os.path.join(result_dir, timestamp)
         os.makedirs(self.res_dir)
-
+        
         self.result_path = os.path.join(self.res_dir, "%s_%s.json" % (self.task_id, timestamp))
 
         # 过去的任务的备份
@@ -146,10 +137,6 @@ class BaseOptimizer:
             self.ts_recorder = []
             logger.warn("File \"%s\" not found, initialize to empty list" % self.ts_backup_file)
 
-        _logger_kwargs = {'name': "%s" % self.task_id, 'logdir': './log/%s/%s' % (self.target, self.method_id)}
-        logger.init(**_logger_kwargs)
-        _logger_kwargs['force_init'] = False
-        self._logger_kwargs = _logger_kwargs
 
     def run(self):
         while self.iter_id < self.iter_num:
@@ -170,16 +157,9 @@ class BaseOptimizer:
         self.iter_id += 1
 
         config = self.advisor.sample()
-        if self.config_modifier is not None:
-            config = self.config_modifier(config)
         obj_args, obj_kwargs = (config,), dict() # 这里只是将参数包装了一下, run_obj_func里面又会将他们解开, 解开后本质上是
-        results = run_obj_func(self.eval_func, obj_args, obj_kwargs, self.timeout) # 返回一个字典, 其中`results`中的内容就是上面的{perf:...}
+        results = run_obj_func(self.eval_func, obj_args, obj_kwargs, self.timeout)
         self.advisor.update(config, results)
-        
-        # Update TaskManager with current task history
-        if self.task_manager:
-            self.task_manager.update_current_task_history(config, results)
-            
         self.log_iteration_results([config], [results['result']['objective']])
         self.save_info()
 
@@ -199,7 +179,6 @@ class BaseOptimizer:
         logger.info("===================================================================================================================================================")
 
     def save_info(self, interval=1):
-        # 将迁移学习的w保存
         if self.tl_strategy != 'none' or 'MFSE' in self.method_id:
             hist_ws = self.advisor.surrogate.hist_ws.copy()
             self.advisor.history.meta_info['tl_ws'] = hist_ws
