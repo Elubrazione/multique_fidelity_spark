@@ -3,7 +3,7 @@ Dimension-based compression for reducing the number of hyperparameters.
 """
 from typing import List, Optional, Tuple
 import numpy as np
-from openbox import logger
+from openbox import History, logger
 from ConfigSpace import ConfigurationSpace, Configuration
 
 from .base import BaseCompressor
@@ -137,7 +137,9 @@ class DimensionCompressor(BaseCompressor):
         
         return compressed_space, selected_indices
 
-    def _algorithm_compression(self, space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, List[int]]:
+    def _algorithm_compression(
+        self, space_history: Optional[List[History]] = None
+    ) -> Tuple[ConfigurationSpace, List[int]]:
         """
         Perform algorithm-based compression using historical data.
         

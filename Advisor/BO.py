@@ -13,15 +13,14 @@ from .task_manager import TaskManager
 class BO(BaseAdvisor):
     def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
                 surrogate_type='prf', acq_type='ei', task_id='test',
-                ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
-                cp_args=None, cprs_strategy='shap',
-                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
+                ws_strategy='none', ws_args={'init_num': 5},
+                tl_args={'topk': 5}, cp_args={},
+                seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
         super().__init__(config_space, task_manager=task_manager, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_args=tl_args,
-                        cprs_strategy=cprs_strategy, cp_args=cp_args,
-                        seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
+                        tl_args=tl_args, cp_args=cp_args,
+                        seed=seed, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
 
         self.acq_type = acq_type
         self.surrogate_type = surrogate_type

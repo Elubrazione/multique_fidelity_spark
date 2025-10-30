@@ -3,7 +3,8 @@ import copy
 import shap
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional, Union
+from openbox.utils.history import History
 from sklearn.ensemble import RandomForestRegressor
 from ConfigSpace import ConfigurationSpace, Configuration
 from openbox import space as sp, logger
@@ -82,30 +83,36 @@ def load_performance_data(data_path: str) -> pd.DataFrame:
         return None
 
 def prepare_historical_data(
-    space_history: List[Tuple[List[Configuration], List[float]]]
+    space_history: Union[List[Tuple[List[Configuration], List[float]]], List[History]] = None
 ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     """
     Prepare historical data for compression analysis.
     
     Args:
         space_history: List of Tuple[List[Configuration], List[float]] tuples
-        
     Returns:
         Tuple of (hist_x, hist_y) where hist_x is list of configurations,
         hist_y is list of objective arrays
     """
-    try:
-        hist_x = []
-        hist_y = []
-        for idx, (X, y) in enumerate(space_history):
-            if not idx:
-                logger.info(f"Processing space_history[0] objectives: {np.array(y)}")
-            hist_x.append(convert_configurations_to_array(X))
-            hist_y.append(np.array(y))
-        return hist_x, hist_y
-    except Exception as e:
-        logger.error(f"Error preparing historical data: {e}")
+    if space_history is None:
         return [], []
+    
+    converted_space_history = []
+    if isinstance(space_history[0], History):
+        for history in space_history:
+            configs = [obs.config for obs in history.observations]
+            objectives = [obs.objectives[0] if obs.objectives and len(obs.objectives) > 0 else float('inf') for obs in history.observations]
+            converted_space_history.append((configs, objectives))
+    else:
+        converted_space_history = space_history
+    
+    hist_x, hist_y = [], []
+    for idx, (X, y) in enumerate(converted_space_history):
+        if not idx:
+            logger.debug(f"Processing space_history[0] objectives: {np.array(y)}")
+        hist_x.append(convert_configurations_to_array(X))
+        hist_y.append(np.array(y))
+    return hist_x, hist_y
 
 def load_expert_params(expert_config_file: str, key: str = 'spark') -> List[str]:
     """Load expert parameters from configuration file."""

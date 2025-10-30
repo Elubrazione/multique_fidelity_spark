@@ -40,13 +40,13 @@ parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--rand_prob', type=float, default=0.15)
 parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'])
 
-parser.add_argument('--test_mode', type=bool, default=False)
+parser.add_argument('--test_mode', action='store_true', default=False)
 
 args = parser.parse_args()
 
 _logger_kwargs = {
     'name': "%s" % args.task,
-    'logdir': './log/%s/%s' % (args.target, args.opt),
+    'logdir': f'./{LOG_DIR}/{args.target}/{args.opt}',
     'level': args.log_level.upper()
 }
 logger.init(**_logger_kwargs)
@@ -59,14 +59,14 @@ fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_detai
     ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
 )
 fidelity_details[round(float(1/64), 5)] = ['q48']
-fidelity_details[round(float(1), 5)] = ['q48']
 
 executor = ExecutorManager(
     sqls=fidelity_details,
     timeout=elapsed_timeout_dicts,
     config_space=config_space,
     executor_cls=SparkSessionTPCDSExecutor,
-    executor_kwargs={'sql_dir': DATA_DIR}
+    executor_kwargs={'sql_dir': DATA_DIR},
+    test_mode=args.test_mode
 )
 
 ws_args = {
@@ -85,11 +85,13 @@ task_manager = TaskManager(
     spark_log_dir="/root/codes/spark-log",
     ws_args=ws_args,
     similarity_threshold=0.5,
-    config_space=config_space
+    config_space=config_space,
+    test_mode=args.test_mode
 )
 
 
 cp_args = {
+    'strategy': args.compress,
     'topk': args.cp_topk,
     'sigma': 2.0,
     'top_ratio': 0.8,
@@ -110,9 +112,5 @@ opt_kwargs = {
 optimizer = build_optimizer(args, **opt_kwargs)
 
 if __name__ == '__main__':
-    if args.test_mode:
-        optimizer.save_info()
-        pass
-    else:
-        for i in range(optimizer.iter_num):
-            optimizer.run_one_iter()
+    for i in range(optimizer.iter_num):
+        optimizer.run_one_iter()

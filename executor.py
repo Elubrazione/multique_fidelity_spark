@@ -7,8 +7,8 @@ from openbox import logger
 from ConfigSpace import Configuration
 from pyspark.sql import SparkSession
 
-from utils.spark import convert_to_spark_params, custom_sort, clear_cache_on_remote
-from config import ENV_SPARK_SQL_PATH, DATABASE, DATA_DIR, RESULT_DIR, \
+from utils.spark import clear_cache_on_remote
+from config import ENV_SPARK_SQL_PATH, DATABASE, DATA_DIR, \
     LIST_SPARK_NODES, LIST_SPARK_SERVER, LIST_SPARK_USERNAME, LIST_SPARK_PASSWORD, \
     SPARK_NODES, SPARK_SERVER_NODE, SPARK_USERNAME, SPARK_PASSWORD
 
@@ -18,7 +18,8 @@ class ExecutorManager:
                  spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=LIST_SPARK_NODES,
                  servers=LIST_SPARK_SERVER, usernames=LIST_SPARK_USERNAME, passwords=LIST_SPARK_PASSWORD,
                  fidelity_database_mapping=None, fixed_sqls=None,
-                 executor_cls=None, executor_kwargs=None):
+                 executor_cls=None, executor_kwargs=None,
+                 **kwargs):
         self.sqls = sqls
         self.timeout = timeout
         self.config_space = config_space
@@ -28,20 +29,16 @@ class ExecutorManager:
         self.fixed_sqls = fixed_sqls
         self.executor_cls = executor_cls or SparkSessionTPCDSExecutor
         self.executor_kwargs = executor_kwargs or {}
+        self._init_child_executor(spark_sql, spark_nodes, servers, usernames, passwords, **kwargs)
         
-        if not os.path.exists(RESULT_DIR):
-            os.makedirs(RESULT_DIR)
-        self.all_queries = sorted(sqls[round(float(1), 5)], key=lambda x: custom_sort(x))
 
-        self._init_child_executor(spark_sql, spark_nodes, servers, usernames, passwords)
-        
-        for item in sqls[round(float(1), 5)]:
-            logger.info("[timeout]: %s, %f" % (item, timeout.get(item, np.inf)))
-
-    def _init_child_executor(self, spark_sql, spark_nodes, servers, usernames, passwords):
+    def _init_child_executor(self, spark_sql, spark_nodes, servers, usernames, passwords, **kwargs):
         self.executors = []
         for idx in range(self.child_num):
             self.executor_queue.put(idx)
+            if kwargs.get('test_mode', True):
+                self.executors.append(TestExecutor())
+                continue
             executor_kwargs = {
                 'sqls': self.sqls,
                 'timeout': self.timeout,
@@ -87,13 +84,6 @@ class ExecutorManager:
         result = result_queue.get()  # 等待结果
         thread.join()
         return result
-    
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.close()
-
 
 
 class SparkSessionTPCDSExecutor:
@@ -117,12 +107,7 @@ class SparkSessionTPCDSExecutor:
         if fixed_sqls is not None:
             self.fixed_sqls = fixed_sqls
         else:
-            try:
-                self.fixed_sqls = self.get_sqls_by_fidelity(resource=1.0)
-            except Exception:
-                # fallback to the largest fidelity available
-                max_fidelity = max(self.sqls.keys()) if self.sqls else 1.0
-                self.fixed_sqls = self.sqls.get(max_fidelity, [])
+            self.fixed_sqls = self.get_sqls_by_fidelity(resource=1.0)
 
     def __call__(self, config, resource_ratio):
         return self.run_spark_session_job(config, resource_ratio)
@@ -133,13 +118,6 @@ class SparkSessionTPCDSExecutor:
         rounded = round(float(fidelity), 5)
         if rounded in self.sqls:
             return rounded
-        for key in self.sqls.keys():
-            try:
-                if abs(float(key) - float(fidelity)) < 1e-8:
-                    return key
-            except (TypeError, ValueError):
-                continue
-        raise KeyError(f"Fidelity {fidelity} not found in SQL definitions")
 
     def _resolve_database(self, fidelity):
         if not self.fidelity_database_mapping:
@@ -162,23 +140,13 @@ class SparkSessionTPCDSExecutor:
                 continue
         return DATABASE
 
-    def get_sqls_by_fidelity(self, resource, use_delta=False):
+    def get_sqls_by_fidelity(self, resource):
         if self.fidelity_database_mapping:
-            try:
-                fidelity_key = self._normalize_fidelity_key(resource)
-            except KeyError:
-                fidelity_key = resource
+            fidelity_key = self._normalize_fidelity_key(resource)
             logger.info(f"[SparkSession] Using fixed SQL set for fidelity {resource}: {len(self.fixed_sqls)} queries")
             return self.fixed_sqls
-
         fidelity_key = self._normalize_fidelity_key(resource)
-        original_sqls = list(self.sqls[fidelity_key])
-        if use_delta:
-            for k, v in self.sqls.items():
-                if k == fidelity_key:
-                    break
-                original_sqls = [i for i in original_sqls if i not in v]
-        return original_sqls
+        return list(self.sqls[fidelity_key])
 
     def get_database_by_fidelity(self, fidelity):
         database = self._resolve_database(fidelity)
@@ -293,13 +261,11 @@ class SparkSessionTPCDSExecutor:
 
         database = self.get_database_by_fidelity(resource)
         config_dict = self._config_to_dict(config)
-
         logger.info(f"[SparkSession] Evaluating fidelity {resource} on database {database}")
         logger.debug(f"[SparkSession] Configuration: {config_dict}")
 
         spark = None
         total_status = True
-
         app_name = f"{self.app_name_prefix}_{resource}"
         try:
             spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
@@ -345,3 +311,15 @@ class SparkSessionTPCDSExecutor:
         }
         result['elapsed_time'] = time.time() - start_time
         return result
+
+class TestExecutor:
+    def __init__(self):
+        pass
+
+    def __call__(self, config, resource_ratio):
+        return {
+            'result': {'objective': np.random.rand()},
+            'timeout': not np.isfinite(np.random.rand()),
+            'traceback': None,
+            'elapsed_time': np.random.rand()
+        }

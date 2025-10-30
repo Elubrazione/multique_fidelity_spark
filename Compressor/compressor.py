@@ -72,15 +72,6 @@ class Compressor:
             'steps': [],
             'timestamp': datetime.now().isoformat()
         }
-        if space_history and len(space_history) > 0 and hasattr(space_history[0], 'observations'):
-            # Convert List[History] to List[Tuple[List[Configuration], List[float]]]
-            converted_space_history = []
-            for history in space_history:
-                configs = [obs.config for obs in history.observations]
-                objectives = [obs.objectives[0] if obs.objectives and len(obs.objectives) > 0 else float('inf') for obs in history.observations]
-                converted_space_history.append((configs, objectives))
-            space_history = converted_space_history
-            logger.info(f"Converted {len(space_history)} History objects to space_history format")
 
         # Step 1: Dimension compression
         logger.info("Performing dimension compression...")
@@ -278,7 +269,7 @@ class Compressor:
             return self.selected_indices
         return None
     
-    def compress_dimension(self, space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, List[int]]:
+    def compress_dimension(self, space_history: Optional[List[History]] = None) -> Tuple[ConfigurationSpace, List[int]]:
         """
         Dimension compression implementation.
         

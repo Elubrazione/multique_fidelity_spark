@@ -9,6 +9,7 @@ from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 from .utils import map_source_hpo_data, build_observation
 
+META_FEATURE = np.random.rand(34)
 
 class TaskManager:
     """
@@ -35,7 +36,8 @@ class TaskManager:
                  spark_log_dir: str = "/root/codes/spark-log",
                  similarity_threshold: float = 0.5,
                  ws_args: Optional[dict] = None, 
-                 config_space: Optional[ConfigurationSpace] = None):
+                 config_space: Optional[ConfigurationSpace] = None,
+                 **kwargs):
         self.history_dir = history_dir
         self.spark_log_dir = spark_log_dir
         self.ws_args = ws_args or {}
@@ -45,17 +47,13 @@ class TaskManager:
         self.historical_tasks: List[History] = []
         self.historical_meta_features: List[np.ndarray] = []
         
-        self.current_task_history: Optional[History] = None # initialized in initialize_current_task, used in _update_similarity
-        self.current_meta_feature: Optional[np.ndarray] = None # initialized in calculate_meta_feature, used in initialize_current_task
-        
-        # For multi-fidelity optimization (MFBO)
-        self.multi_fidelity_history_list: List[History] = []
-        self.resource_identifiers: List[int] = []
+        self.current_task_history: Optional[History] = None
+        self.current_meta_feature: Optional[np.ndarray] = None
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
         
         self._load_historical_tasks()
-        self.calculate_meta_feature(eval_func, task_id)
+        self.calculate_meta_feature(eval_func, task_id, **kwargs)
 
 
     def _load_historical_tasks(self):
@@ -172,7 +170,7 @@ class TaskManager:
             return None
 
 
-    def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default"):
+    def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default", **kwargs):
         """
         Get runtime metric for current task by running default config and parsing latest Spark log.
         
@@ -180,11 +178,17 @@ class TaskManager:
             eval_func: Evaluator function (ExecutorManager)
 
         """
+        if kwargs.get('test_mode', False):
+            logger.info("Using test mode meta feature")
+            self.current_meta_feature = META_FEATURE
+            self.current_task_history = History(task_id=task_id, config_space=self.config_space,
+                                                meta_info={'meta_feature': self.current_meta_feature.tolist()})
+            return
+        
         logger.info("Computing current task meta feature using default config...")
 
         # use default config writen in spark_default.conf
         default_config = self.config_space.get_default_configuration()
-        
         result = eval_func(config=default_config, resource_ratio=1.0)
 
         application_id = self.get_latest_application_id()
@@ -206,11 +210,14 @@ class TaskManager:
         
         logger.info(f"Application run time: {run_time:.2f} seconds")
         logger.info(f"Metrics array shape: {metrics.shape}")
+        logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
+
         self.current_meta_feature = metrics
-        logger.info(f"Initialized current task default with meta feature shape: {self.current_meta_feature.shape}")
-        self.current_task_history = History(task_id=task_id, config_space=self.config_space, meta_info={'meta_feature': self.current_meta_feature.tolist()})
+        self.current_task_history = History(task_id=task_id, config_space=self.config_space,
+                                            meta_info={'meta_feature': self.current_meta_feature.tolist()})
         self.current_task_history.update_observation(build_observation(default_config, result))
         logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
+
 
     def update_history_meta_info(self, meta_info: dict):
         """

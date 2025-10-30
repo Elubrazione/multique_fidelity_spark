@@ -9,8 +9,9 @@ from config import LIST_SPARK_NODES
 class BOHB(BaseOptimizer):
     def __init__(self, config_space, eval_func, iter_num=200, per_run_time_limit=None,
                  method_id='smbo', task_id='test', target='redis',
-                 cprs_strategy='none', cp_args=None,
-                 ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
+                 cp_args={},
+                 ws_strategy='none', ws_args={'init_num': 5}, 
+                 tl_strategy='none', tl_args={'topk': 5},
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
                  task_manager=None,
@@ -20,57 +21,42 @@ class BOHB(BaseOptimizer):
         super().__init__(config_space=config_space, eval_func=eval_func, iter_num=iter_num,
                          per_run_time_limit=per_run_time_limit,
                          method_id=method_id, task_id=task_id, target=target,
-                         ws_strategy=ws_strategy, ws_args=ws_args, tl_strategy=tl_strategy, tl_args=tl_args,
-                         cprs_strategy=cprs_strategy, cp_args=cp_args,
+                         ws_strategy=ws_strategy, ws_args=ws_args,
+                         tl_strategy=tl_strategy, tl_args=tl_args,
+                         cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
                          task_manager=task_manager,
                          _logger_kwargs=_logger_kwargs)
 
-        self.rand_prob = rand_prob
         self.inner_iter_id = 0
-
-        from .scheduler import FidelityScheduler
+        from .scheduler.fidelity import FidelityScheduler
         self.scheduler = FidelityScheduler(**scheduler_kwargs)
-
-    def _gen_candidates(self, num_configs):
-        configs = self.advisor.samples(batch_size=num_configs)
-        if self.config_modifier is not None:
-            for config in configs:
-                config = self.config_modifier(config)
-        return configs
 
     def _update_obs(self, config, results, resource_ratio):
         if 'BOHB' in self.method_id:
             if resource_ratio == 1:
                 self.advisor.update(config=config, results=results)
-        elif 'MFSE' in self.method_id or 'FlexHB' in self.method_id:
+        elif 'MFSE' in self.method_id:
             self.advisor.update(config=config, results=results, resource_ratio=resource_ratio)
         else:
             raise ValueError('Invalid method_id: %s!' % self.method_id)
 
     def _evaluate_configurations(self, candidates, resource_ratio, update=True):
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor
 
-        performances = []
-        futures = []
-        res_dirs = []
-
+        futures, performances = [], []
         with ThreadPoolExecutor(max_workers=len(candidates)) as executor:
             for config in candidates:
-                res_dir = os.path.join(self.res_dir, datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
-                res_dirs.append(res_dir)
-                future = executor.submit(self.eval_func, config=config, resource_ratio=resource_ratio, res_dir=res_dir)
-                futures.append((future, config, res_dir))
+                future = executor.submit(self.eval_func, config=config, resource_ratio=resource_ratio)
+                futures.append((future, config))
 
-            for future, config, res_dir in futures:
+            for future, config in futures:
                 results = future.result()
                 if update:
                     self._update_obs(config, results, resource_ratio=resource_ratio)
                 performances.append(results['result']['objective'])
-
         return performances
-                
 
     def _iterate(self, s):   
         iter_full_eval_configs, iter_full_eval_perfs = [], []
@@ -81,8 +67,8 @@ class BOHB(BaseOptimizer):
             n_configs, n_resource = self.scheduler.get_stage_params(s, i, len(LIST_SPARK_NODES))
             logger.info(f"[BOHB] Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
             
-            if i == 0:
-                candidates = list(set(self._gen_candidates(n_configs * len(LIST_SPARK_NODES))))
+            if not i:
+                candidates = list(set(self.advisor.samples(batch_size=n_configs * len(LIST_SPARK_NODES))))
                 logger.info(f"[BOHB] Generated {len(candidates)} initial candidates")
 
             resource_ratio = self.scheduler.calculate_resource_ratio(n_resource)
@@ -107,7 +93,7 @@ class BOHB(BaseOptimizer):
             max_parallel = min(len(LIST_SPARK_NODES), remaining_configs)
             
             logger.info(f"[BOHB] Initialization phase: need to evaluate {remaining_configs} configs, using {max_parallel} parallel tasks")
-            candidates = self._gen_candidates(max_parallel)
+            candidates = self.advisor.samples(batch_size=max_parallel)
             logger.info(f"[BOHB] Generated {len(candidates)} candidate configurations")
             perfs = self._evaluate_configurations(candidates, round(float(1.0), 5), update=True)
             

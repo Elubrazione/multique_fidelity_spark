@@ -11,32 +11,24 @@ from .task_manager import TaskManager
 
 class BaseAdvisor:
     def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
-                task_id='test',
-                ws_strategy='none', ws_args=None, tl_args=None,
-                cprs_strategy='none', cp_args=None,
-                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
+                task_id='test', ws_strategy='none', ws_args=None,
+                tl_args=None, cp_args=None,
+                seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
-
+        self.task_id = task_id
         self._logger_kwargs = kwargs.get('_logger_kwargs', None)
 
         self.seed = seed
+        self.rng = np.random.RandomState(self.seed)
         self.rand_prob = rand_prob
         self.rand_mode = rand_mode
-        self.rng = rng if rng is not None else np.random.RandomState(self.seed)
         
         self.task_manager = task_manager
         self.task_manager._update_similarity()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
 
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
-
-        # If compression strategy is 'none', skip both dimension and range compression
-        if cprs_strategy == 'none':
-            self.surrogate_space = config_space
-            self.sample_space = config_space
-            logger.info("Compression strategy is 'none'. Using original space for surrogate and sampling.")
-        else:
-            self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
         
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)
@@ -53,7 +45,6 @@ class BaseAdvisor:
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
         self.tl_args = tl_args
-        self.cprs_strategy = cprs_strategy
         self.cp_args = cp_args
         self.history = self.task_manager.current_task_history
 

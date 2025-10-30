@@ -10,7 +10,6 @@ import pandas as pd
 from typing import List, Optional, Dict, Any, Tuple
 from openbox import logger
 from ConfigSpace import ConfigurationSpace
-from xgboost import XGBRegressor
 
 from .compressor import Compressor
 from .dimension import DimensionCompressor

@@ -8,20 +8,16 @@ from .utils import build_observation
 
 
 class MFBO(BO):
-    def __init__(self, config_space: ConfigurationSpace,
-                surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
+    def __init__(self, config_space: ConfigurationSpace, task_manager=None,
+                surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
-                tl_args={'topk': 5}, source_hpo_data=None,
-                cprs_strategy='shap', cp_args=None,
-                ep_args=None, ep_strategy='none', expert_params=[],
-                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
-        super().__init__(config_space, meta_feature=meta_feature,
+                tl_args={'topk': 5}, cp_args={},
+                seed=42, rand_prob=0.15, rand_mode='ran', **kwargs):
+        super().__init__(config_space, task_manager=task_manager,
                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_args=tl_args, source_hpo_data=source_hpo_data,
-                        ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
-                        cprs_strategy=cprs_strategy, cp_args=cp_args,
-                        seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
+                        tl_args=tl_args, cp_args=cp_args,
+                        seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
                         **kwargs)
 
         self.history_list: List[History] = list()  # 低精度组的 history -> List[History]
@@ -213,7 +209,6 @@ class MFBO(BO):
                                   num_constraints=self.history.num_constraints,
                                   config_space=self.sample_space)
                 self.history_list.append(history)
-                self.early_stop_histories.append([])
             self.history_list[self.get_resource_index(resource_ratio)].update_observation(obs)
             # self.history.update_observation(obs)
         else:

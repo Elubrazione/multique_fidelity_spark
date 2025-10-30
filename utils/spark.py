@@ -62,7 +62,7 @@ def analyze_timeout_and_get_fidelity_details(file_path=FILE_TIMEOUT_CSV, percent
         excluded_sqls.update(selected_queries.keys())
     fidelity_details[round(1, round_num)] = list(elapsed_timeout_dicts.keys())
     
-    logger.info(fidelity_details)
+    logger.debug(fidelity_details)
     return fidelity_details, elapsed_timeout_dicts
 
 def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33, add_on_ratio=1.5):

@@ -29,7 +29,7 @@ def build_optimizer(args, **kwargs):
             config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
             iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
             method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
-            cprs_strategy=args.compress, cp_args=cp_args,
+            cp_args=cp_args,
             ws_strategy=args.warm_start, ws_args=ws_args,
             tl_strategy=args.transfer, tl_args=tl_args,
             backup_flag=args.backup_flag, seed=args.seed,
@@ -46,14 +46,14 @@ def build_optimizer(args, **kwargs):
         }
         optimizer = BOHB(
             config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-            method_id=args.opt, task_id=args.task, target=kwargs['target'],
+            method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
             iter_num=args.iter_num, per_run_time_limit=per_run_time_limit, 
-            cprs_strategy=args.compress, cp_args=cp_args,
+            cp_args=cp_args,
             ws_strategy=args.warm_start, ws_args=ws_args,
             tl_strategy=args.transfer, tl_args=tl_args,
             backup_flag=args.backup_flag, seed=args.seed,
             rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            save_dir=args.save_dir, 
+            save_dir=args.save_dir,
             task_manager=kwargs.get('task_manager'),
             scheduler_kwargs=scheduler_kwargs,
             _logger_kwargs=kwargs.get('_logger_kwargs', None)

@@ -16,14 +16,13 @@ class BaseOptimizer:
                  iter_num=200, per_run_time_limit=None,
                  method_id='advisor', task_id='test', target='redis',
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
-                 cprs_strategy='none', cp_args=None,
+                 cp_args=None,
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran', _logger_kwargs=None):
 
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC']
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
-        assert cprs_strategy in ['shap', 'expert', 'none']
         assert rand_mode in ['ran', 'rs']
 
         self.eval_func = eval_func
@@ -41,9 +40,9 @@ class BaseOptimizer:
 
         tl_topk = tl_args['topk'] if tl_strategy != 'none' else -1
         tl_str = '%sk%d' % (tl_strategy, tl_topk)            
-        cp_topk = cp_args['topk'] if cprs_strategy != 'none' and cp_args['topk'] > 0 \
+        cp_topk = cp_args['topk'] if cp_args['strategy'] != 'none' and cp_args['topk'] > 0 \
                                     else len(config_space)
-        cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (cprs_strategy, cp_topk, cp_args['sigma'], cp_args['top_ratio'])
+        cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (cp_args['strategy'], cp_topk, cp_args['sigma'], cp_args['top_ratio'])
 
         self.method_id = method_id
         if rand_mode == 'rs':
@@ -55,7 +54,6 @@ class BaseOptimizer:
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
         self.tl_strategy = tl_strategy
-        self.cprs_strategy = cprs_strategy
         self.cp_args = cp_args
 
         self.seed = seed
@@ -76,7 +74,6 @@ class BaseOptimizer:
             method_id: SMAC, GP / MFSE_SMAC, MFSE_SMAC, BOHB_GP, BOHB_SMAC
             ws_strategy: none, best_rover, rgpe_rover
             tl_strategy: none, mce, re, mceacq, reacq
-            cprs_strategy: none, shap
         """
         surrogate_type = 'prf'
         if method_id == 'GP':
@@ -95,7 +92,7 @@ class BaseOptimizer:
             self.advisor = BO(config_space,
                               surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                               ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
-                              cprs_strategy=cprs_strategy, cp_args=cp_args,
+                              cp_args=cp_args,
                               seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                               task_manager=task_manager,
                               _logger_kwargs=self._logger_kwargs)
@@ -107,7 +104,7 @@ class BaseOptimizer:
             self.advisor = MFBO(config_space,
                                 surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                                 ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
-                                cprs_strategy=cprs_strategy, cp_args=cp_args,
+                                cp_args=cp_args,
                                 seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
                                 task_manager=task_manager,
                                 _logger_kwargs=self._logger_kwargs)
@@ -125,11 +122,9 @@ class BaseOptimizer:
         
         self.result_path = os.path.join(self.res_dir, "%s_%s.json" % (self.task_id, timestamp))
 
-        # 过去的任务的备份
         self.ts_backup_file = "./backup/ts_backup_%s.pkl" % self.target
         if not os.path.exists("./backup"):
             os.makedirs("./backup")
-        # log
         try:
             self.ts_recorder = pkl.load(open(self.ts_backup_file, 'rb'))
             logger.warn("Successfully initialize from %s !" % self.ts_backup_file)
