@@ -153,11 +153,10 @@ class BaseOptimizer:
             logger.warn("Failed to record the task because the number of iterations was less than 25!")
 
     def run_one_iter(self):
-
         self.iter_id += 1
-
+        res_dir = os.path.join(self.res_dir, datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
         config = self.advisor.sample()
-        obj_args, obj_kwargs = (config,), dict() # 这里只是将参数包装了一下, run_obj_func里面又会将他们解开, 解开后本质上是
+        obj_args, obj_kwargs = (config,), {'resource_ratio': 1.0, 'res_dir': res_dir}
         results = run_obj_func(self.eval_func, obj_args, obj_kwargs, self.timeout)
         self.advisor.update(config, results)
         self.log_iteration_results([config], [results['result']['objective']])
@@ -166,7 +165,7 @@ class BaseOptimizer:
     def log_iteration_results(self, configs, performances, iteration_id=None):
         iter_id = iteration_id if iteration_id is not None else self.iter_id
         
-        logger.info("[{}] iter ------------------------------------------------ {:5d}".format(iter_id))
+        logger.info("[{}] iter ------------------------------------------------".format(iter_id))
         
         for idx, config in enumerate(configs):
             if hasattr(config, 'origin') and config.origin:

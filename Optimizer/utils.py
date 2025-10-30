@@ -103,14 +103,8 @@ def run_without_time_limit(obj_func, obj_args, obj_kwargs):
     try:
         ret = obj_func(*obj_args, **obj_kwargs)
     except Exception:
-        result = {'result': {'objective': np.Inf}, 'timeout': False, 'traceback': traceback.format_exc()}
-    else:
-        if np.isfinite(ret['objective']):
-            result = {'result': ret, 'timeout': False, 'traceback': None}
-        else:
-            result = {'result': ret, 'timeout': True, 'traceback': None}
-    result['elapsed_time'] = time.time() - start_time
-    return result
+        ret = {'result': {'objective': np.Inf}, 'timeout': False, 'traceback': traceback.format_exc()}
+    return ret
 
 
 def run_with_time_limit(obj_func, obj_args, obj_kwargs, timeout):

@@ -8,6 +8,41 @@ from openbox.utils.constants import SUCCESS, TIMEOUT, FAILED
 from .workload_mapping.rover_mapper import RoverMapper
 
 
+def _to_dict(config):
+    try:
+        if hasattr(config, 'get_dictionary'):
+            return config.get_dictionary()
+        return dict(config)
+    except Exception:
+        return {}
+
+
+def is_valid_spark_config(config) -> bool:
+    d = _to_dict(config)
+    try:
+        exec_cores = int(float(d.get('spark.executor.cores', 2)))
+        task_cpus = int(float(d.get('spark.task.cpus', 1)))
+        return exec_cores >= task_cpus and exec_cores >= 1 and task_cpus >= 1
+    except Exception:
+        return True
+
+
+def sanitize_spark_config(config):
+    try:
+        d = _to_dict(config)
+        exec_cores = int(float(d.get('spark.executor.cores', 2)))
+        task_cpus = int(float(d.get('spark.task.cpus', 1)))
+        if exec_cores < 1:
+            exec_cores = 1
+        if task_cpus < 1:
+            task_cpus = 1
+        if exec_cores < task_cpus:
+            config['spark.task.cpus'] = exec_cores
+    except Exception:
+        pass
+    return config
+
+
 def build_my_acq_func(func_str='ei', model=None, **kwargs):
     func_str = func_str.lower()
     if func_str.startswith('wrk'):
@@ -75,6 +110,9 @@ def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
     sims = None
     inner_sm = kwargs.get('inner_surrogate_model', 'gp')
     rover = RoverMapper(surrogate_type=inner_sm)
+    if not source_hpo_data:
+        logger.warning('No source HPO data available. Returning empty similarity list.')
+        return []
     rover.fit(source_hpo_data, config_space)
     sims = rover.map(target_his, source_hpo_data)   # 没有阈值过滤, 返回所有任务的相似度（theta=-float('inf')）
     return sims

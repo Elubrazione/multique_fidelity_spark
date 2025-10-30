@@ -5,7 +5,7 @@ from ConfigSpace import ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
-from .utils import build_observation
+from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
 from .task_manager import TaskManager
 
 
@@ -25,11 +25,18 @@ class BaseAdvisor:
         self.rng = rng if rng is not None else np.random.RandomState(self.seed)
         
         self.task_manager = task_manager
-        self.task_manager.initialize_current_task(task_id=task_id)
+        self.task_manager._update_similarity()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
-        
+
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
-        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+
+        # If compression strategy is 'none', skip both dimension and range compression
+        if cprs_strategy == 'none':
+            self.surrogate_space = config_space
+            self.sample_space = config_space
+            logger.info("Compression strategy is 'none'. Using original space for surrogate and sampling.")
+        else:
+            self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
         
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)
@@ -82,18 +89,28 @@ class BaseAdvisor:
 
         configs = set()
 
-        while len(configs) < num_configs:
+        _is_valid = is_valid_spark_config
+        _sanitize = sanitize_spark_config
+
+        trials = 0
+        max_trials = max(100, num_configs * 20)
+        while len(configs) < num_configs and trials < max_trials:
+            trials += 1
             sub_config = config_space.sample_configuration()
+            if not _is_valid(sub_config):
+                sub_config = _sanitize(sub_config)
+                if not _is_valid(sub_config):
+                    continue
 
             if sub_config not in configs and sub_config not in excluded_configs:
                 sub_config.origin = "Random Sample!"
                 configs.add(sub_config)
             else:
-                logger.warning("Duplicate configuration found or excluded, retrying.")
+                continue
 
         sampled_configs = list(configs)
         return sampled_configs
 
     def update(self, config, results):
-        obs = build_observation(config, results, last_context=self.last_context)
+        obs = build_observation(config, results)
         self.history.update_observation(obs)

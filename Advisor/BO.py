@@ -4,7 +4,7 @@ from openbox import logger
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from .base import BaseAdvisor
-from .utils import build_my_surrogate, build_my_acq_func
+from .utils import build_my_surrogate, build_my_acq_func, is_valid_spark_config, sanitize_spark_config
 from .workload_mapping.rover.transfer import get_transfer_suggestion
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
 from .task_manager import TaskManager
@@ -155,18 +155,29 @@ class BO(BaseAdvisor):
         if return_list:
             return challengers.challengers
 
-        cur_config = challengers.challengers[0]
+        # select first valid, non-duplicate config; sanitize if necessary
+        _is_valid = is_valid_spark_config
+        _sanitize = sanitize_spark_config
+
+        cur_config = None
         recommend_flag = False
         for config in challengers.challengers:
-            if config not in self.history.configurations:
-                cur_config = config
+            if config in self.history.configurations:
+                continue
+            candidate = config
+            if not _is_valid(candidate):
+                candidate = _sanitize(candidate)
+            if _is_valid(candidate):
+                cur_config = candidate
                 recommend_flag = True
                 break
+        if cur_config is None:
+            cur_config = self.sample_random_configs(self.sample_space, 1, excluded_configs=self.history.configurations)[0]
         if recommend_flag:
             logger.warn("Successfully recommend a configuration through Advisor!")
         else:
             logger.error("Failed to recommend am unique configuration ! Return a random config")
             cur_config = self.sample_random_configs(self.sample_space, 1, excluded_configs=self.history.configurations)
 
-        logger.info("ret conf: %s" % (str(cur_config)))
+        logger.debug("ret conf: %s" % (str(cur_config)))
         return cur_config

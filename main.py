@@ -1,17 +1,17 @@
 import argparse
 from openbox import logger
 
-from executor import ExecutorManager
+from executor import ExecutorManager, SparkSessionTPCDSExecutor
 from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
 from Advisor.task_manager import TaskManager
 from utils.spark import analyze_timeout_and_get_fidelity_details
-from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE
+from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--opt', type=str, default='MFSE_SMAC',
-                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFSE_GP', 'MFSE_SMAC'])
+                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFSE_GP', 'MFSE_SMAC', 'SMAC', 'GP'])
 parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
 parser.add_argument('--fidelity', type=float, default=1/9)
 parser.add_argument('--iter_num', type=int, default=40)
@@ -42,7 +42,6 @@ parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'
 
 parser.add_argument('--test_mode', type=bool, default=False)
 
-
 args = parser.parse_args()
 
 _logger_kwargs = {
@@ -60,11 +59,14 @@ fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_detai
     ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
 )
 fidelity_details[round(float(1/64), 5)] = ['q48']
-if args.test_mode:
-    fidelity_details[round(float(1), 5)] = ['q48']
+fidelity_details[round(float(1), 5)] = ['q48']
 
 executor = ExecutorManager(
-    sqls=fidelity_details, timeout=elapsed_timeout_dicts, config_space=config_space,
+    sqls=fidelity_details,
+    timeout=elapsed_timeout_dicts,
+    config_space=config_space,
+    executor_cls=SparkSessionTPCDSExecutor,
+    executor_kwargs={'sql_dir': DATA_DIR}
 )
 
 ws_args = {
@@ -79,6 +81,7 @@ tl_args = {
 task_manager = TaskManager(
     history_dir=args.src_data_path,
     eval_func=executor,
+    task_id=args.task,
     spark_log_dir="/root/codes/spark-log",
     ws_args=ws_args,
     similarity_threshold=0.5,

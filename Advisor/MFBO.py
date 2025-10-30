@@ -202,7 +202,7 @@ class MFBO(BO):
         return batch
 
     def update(self, config, results, resource_ratio=1):
-        obs = build_observation(config, results, last_context=self.last_context)
+        obs = build_observation(config, results)
         resource_ratio = round(resource_ratio, 5)
         if resource_ratio != 1:
         # if resource_ratio ==  round(float(1/64), 5):
