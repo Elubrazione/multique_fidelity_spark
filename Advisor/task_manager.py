@@ -185,31 +185,32 @@ class TaskManager:
         # use default config writen in spark_default.conf
         default_config = self.config_space.get_default_configuration()
         
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            result = eval_func(config=default_config, resource_ratio=1.0, res_dir=tmp_dir)
+        result = eval_func(config=default_config, resource_ratio=1.0)
 
-            application_id = self.get_latest_application_id()
-            if not application_id:
-                logger.warning("No application_id found, using fallback metrics")
-                raise ValueError("No application_id found")
-            zstd_file = os.path.join(self.spark_log_dir, f"{application_id}.zstd")
-            if not os.path.exists(zstd_file):
-                logger.warning(f"Zstd file not found: {zstd_file}")
-                raise ValueError(f"Zstd file not found: {zstd_file}")
-            logger.info(f"Found zstd file: {zstd_file}")
-            json_file = os.path.join(tmp_dir, "app.json")
-            subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
-            with open(json_file, 'r') as f:
-                json_content = f.read()
-            run_time, metrics = self.decode_results_spark(json_content)
-            
-            logger.info(f"Application run time: {run_time:.2f} seconds")
-            logger.info(f"Metrics array shape: {metrics.shape}")
-            self.current_meta_feature = metrics
-            logger.info(f"Initialized current task default with meta feature shape: {self.current_meta_feature.shape}")
-            self.current_task_history = History(task_id=task_id, config_space=self.config_space, meta_info={'meta_feature': self.current_meta_feature.tolist()})
-            self.current_task_history.update_observation(build_observation(default_config, result))
-            logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
+        application_id = self.get_latest_application_id()
+        if not application_id:
+            logger.warning("No application_id found, using fallback metrics")
+            raise ValueError("No application_id found")
+        zstd_file = os.path.join(self.spark_log_dir, f"{application_id}.zstd")
+        if not os.path.exists(zstd_file):
+            logger.warning(f"Zstd file not found: {zstd_file}")
+            raise ValueError(f"Zstd file not found: {zstd_file}")
+        logger.info(f"Found zstd file: {zstd_file}")
+        json_file = os.path.join(self.spark_log_dir, "app.json")
+        subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
+        with open(json_file, 'r') as f:
+            json_content = f.read()
+        run_time, metrics = self.decode_results_spark(json_content)
+        os.remove(zstd_file)
+        os.remove(json_file)
+        
+        logger.info(f"Application run time: {run_time:.2f} seconds")
+        logger.info(f"Metrics array shape: {metrics.shape}")
+        self.current_meta_feature = metrics
+        logger.info(f"Initialized current task default with meta feature shape: {self.current_meta_feature.shape}")
+        self.current_task_history = History(task_id=task_id, config_space=self.config_space, meta_info={'meta_feature': self.current_meta_feature.tolist()})
+        self.current_task_history.update_observation(build_observation(default_config, result))
+        logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
 
     def update_history_meta_info(self, meta_info: dict):
         """

@@ -154,9 +154,8 @@ class BaseOptimizer:
 
     def run_one_iter(self):
         self.iter_id += 1
-        res_dir = os.path.join(self.res_dir, datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
         config = self.advisor.sample()
-        obj_args, obj_kwargs = (config,), {'resource_ratio': 1.0, 'res_dir': res_dir}
+        obj_args, obj_kwargs = (config,), {'resource_ratio': 1.0}
         results = run_obj_func(self.eval_func, obj_args, obj_kwargs, self.timeout)
         self.advisor.update(config, results)
         self.log_iteration_results([config], [results['result']['objective']])
@@ -165,7 +164,7 @@ class BaseOptimizer:
     def log_iteration_results(self, configs, performances, iteration_id=None):
         iter_id = iteration_id if iteration_id is not None else self.iter_id
         
-        logger.info("[{}] iter ------------------------------------------------".format(iter_id))
+        logger.info("iter {:5d} ---------------------------------------------------------".format(iter_id))
         
         for idx, config in enumerate(configs):
             if hasattr(config, 'origin') and config.origin:
@@ -175,7 +174,7 @@ class BaseOptimizer:
             logger.info('Obj: {}'.format(performances[idx]))
         
         logger.info('best obj: {}'.format(self.advisor.history.get_incumbent_value()))
-        logger.info("===================================================================================================================================================")
+        logger.info("===========================================================================")
 
     def save_info(self, interval=1):
         if self.tl_strategy != 'none' or 'MFSE' in self.method_id:

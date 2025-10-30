@@ -28,11 +28,9 @@ class ExecutorManager:
         self.executor_queue = Queue()
         self.fidelity_database_mapping = fidelity_database_mapping or {}
         self.fixed_sqls = fixed_sqls
-        # Default to SparkSession-based executor
         self.executor_cls = executor_cls or SparkSessionTPCDSExecutor
         self.executor_kwargs = executor_kwargs or {}
         
-        # Global setting for csv_file and csv_writer
         if not os.path.exists(RESULT_DIR):
             os.makedirs(RESULT_DIR)
         self.csv_path = os.path.join(RESULT_DIR, datetime.now().strftime('%Y%m%d-%H%M%S') + ".csv")
@@ -89,18 +87,26 @@ class ExecutorManager:
             self.csv_file.flush()
             self.write_queue.task_done()
 
-    def __call__(self, config, resource_ratio, res_dir):
+    def __call__(self, config, resource_ratio):
         idx = self.executor_queue.get()  # 阻塞直到有空闲 executor
         logger.info(f"Got free executor: {idx}")
 
         result_queue = Queue()
 
         def run():
+            start_time = time.time()
             try:
-                result = self.executors[idx](config, resource_ratio, res_dir)
-                result_queue.put(result)
-                logger.info(f"[Executor {idx}] Result: {result}")
+                result = self.executors[idx](config, resource_ratio)
+            except Exception:
+                result = {
+                    'result': {'objective': float('inf')},
+                    'timeout': True,
+                    'traceback': None,
+                    'elapsed_time': time.time() - start_time,
+                }
+                logger.error(f"[Executor {idx}] Execution raised exception, continue with INF objective.")
             finally:
+                result_queue.put(result)
                 self.executor_queue.put(idx)  # 标记为“空闲”
                 logger.info(f"[Executor {idx}] Marked as free again.")
 
@@ -165,8 +171,8 @@ class SparkSessionTPCDSExecutor:
                 max_fidelity = max(self.sqls.keys()) if self.sqls else 1.0
                 self.fixed_sqls = self.sqls.get(max_fidelity, [])
 
-    def __call__(self, config, resource_ratio, res_dir):
-        return self.run_spark_session_job(res_dir, config, resource_ratio)
+    def __call__(self, config, resource_ratio):
+        return self.run_spark_session_job(config, resource_ratio)
 
     def _normalize_fidelity_key(self, fidelity):
         if fidelity in self.sqls:
@@ -328,9 +334,8 @@ class SparkSessionTPCDSExecutor:
             'status': status
         }
 
-    def run_spark_session_job(self, res_dir, config, resource):
+    def run_spark_session_job(self, config, resource):
         start_time = time.time()
-        os.makedirs(res_dir, exist_ok=True)
         queries = self.get_sqls_by_fidelity(resource=resource)
 
         database = self.get_database_by_fidelity(resource)
@@ -346,7 +351,11 @@ class SparkSessionTPCDSExecutor:
         total_status = True
 
         app_name = f"{self.app_name_prefix}_{resource}"
-        spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
+        try:
+            spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
+        except Exception:
+            logger.error("[SparkSession] Failed to create Spark session, skip remaining queries.")
+            return self.build_ret_dict(float('inf'), start_time)
 
         total_spark_time = 0.0
         for sql in queries:
