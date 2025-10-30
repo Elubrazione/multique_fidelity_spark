@@ -39,9 +39,11 @@ class BaseOptimizer:
                 ws_str = '%s%dk%d' % (ws_strategy, init_num, ws_topk)
 
         tl_topk = tl_args['topk'] if tl_strategy != 'none' else -1
-        tl_str = '%sk%d' % (tl_strategy, tl_topk)            
-        cp_topk = cp_args['topk'] if cp_args['strategy'] != 'none' and cp_args['topk'] > 0 \
-                                    else len(config_space)
+        tl_str = '%sk%d' % (tl_strategy, tl_topk)
+
+        cp_topk = len(cp_args['expert_params']) if cp_args['strategy'] == 'expert' \
+                    else len(config_space) if cp_args['strategy'] == 'none' or cp_args['topk'] <= 0 \
+                        else cp_args['topk']
         cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (cp_args['strategy'], cp_topk, cp_args['sigma'], cp_args['top_ratio'])
 
         self.method_id = method_id
@@ -57,7 +59,6 @@ class BaseOptimizer:
         self.cp_args = cp_args
 
         self.seed = seed
-        self.rng = np.random.RandomState(seed)
 
         self.backup_flag = backup_flag
         self.save_dir = save_dir
@@ -93,7 +94,7 @@ class BaseOptimizer:
                               surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                               ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                               cp_args=cp_args,
-                              seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
+                              seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
                               task_manager=task_manager,
                               _logger_kwargs=self._logger_kwargs)
         elif 'MFSE' in method_id:
@@ -105,7 +106,7 @@ class BaseOptimizer:
                                 surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
                                 ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                                 cp_args=cp_args,
-                                seed=seed, rng=self.rng, rand_prob=rand_prob, rand_mode=rand_mode,
+                                seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
                                 task_manager=task_manager,
                                 _logger_kwargs=self._logger_kwargs)
 

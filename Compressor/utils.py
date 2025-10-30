@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, Tuple, List, Optional, Union
 from openbox.utils.history import History
-from sklearn.ensemble import RandomForestRegressor
 from ConfigSpace import ConfigurationSpace, Configuration
 from openbox import space as sp, logger
 from openbox.utils.config_space.util import convert_configurations_to_array
@@ -94,7 +93,7 @@ def prepare_historical_data(
         Tuple of (hist_x, hist_y) where hist_x is list of configurations,
         hist_y is list of objective arrays
     """
-    if space_history is None:
+    if not space_history:
         return [], []
     
     converted_space_history = []

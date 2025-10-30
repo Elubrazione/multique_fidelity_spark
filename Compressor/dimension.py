@@ -149,7 +149,7 @@ class DimensionCompressor(BaseCompressor):
         Returns:
             Tuple of (compressed_space, selected_indices)
         """
-        if space_history is None:
+        if not space_history:
             return self._use_original_space("No space history provided")
             
         hist_x, hist_y = prepare_historical_data(space_history)

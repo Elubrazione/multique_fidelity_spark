@@ -22,7 +22,7 @@ parser.add_argument('--timeout', type=int, default=100)
 parser.add_argument('--save_dir', type=str, default=LOG_DIR)
 parser.add_argument('--target', type=str, default='spark_hstest')
 
-parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap'])
+parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
 parser.add_argument('--cp_topk', type=int, default=40)
 parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_cos', 'best_euc', 'best_rover', 'best_all', 'rgpe_rover'])
 parser.add_argument('--ws_init_num', type=int, default=4)
