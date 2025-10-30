@@ -15,8 +15,8 @@ parser.add_argument('--opt', type=str, default='MFSE_SMAC',
 parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
 parser.add_argument('--fidelity', type=float, default=1/9)
 parser.add_argument('--iter_num', type=int, default=40)
-parser.add_argument('--R', type=int, default=64)
-parser.add_argument('--eta', type=int, default=4)
+parser.add_argument('--R', type=int, default=27)
+parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--timeout', type=int, default=100)
 
 parser.add_argument('--save_dir', type=str, default=LOG_DIR)

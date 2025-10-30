@@ -68,14 +68,14 @@ class BOHB(BaseOptimizer):
             logger.info(f"[BOHB] Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
             
             if not i:
-                candidates = list(set(self.advisor.samples(batch_size=n_configs * len(LIST_SPARK_NODES))))
+                candidates = list(set(self.advisor.samples(batch_size=n_configs)))
                 logger.info(f"[BOHB] Generated {len(candidates)} initial candidates")
 
             resource_ratio = self.scheduler.calculate_resource_ratio(n_resource)
             perfs = self._evaluate_configurations(candidates, resource_ratio)
             logger.info(f"[BOHB] Stage {i}: evaluated {len(perfs)} configs, resource_ratio={resource_ratio}")
             
-            candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s, i)
+            candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s, i, len(LIST_SPARK_NODES))
             logger.info(f"[BOHB] Stage {i}: after elimination, {len(candidates)} candidates remain")
             
             if int(n_resource) == self.scheduler.R or i == s:

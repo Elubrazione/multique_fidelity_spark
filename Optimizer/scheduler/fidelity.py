@@ -50,7 +50,7 @@ class FidelityScheduler:
             n_configs = self.initial_n_list[0] * num_nodes
             n_resource = self.initial_r_list[0]
         else:
-            n_configs = int(ceil(self.B / self.R / (s + 1) * self.eta ** s))
+            n_configs = int(ceil(self.B / self.R / (s + 1) * self.eta ** s)) * num_nodes
             n_resource = int(self.R * self.eta ** (-s))
         
         return n_configs, n_resource
@@ -70,7 +70,7 @@ class FidelityScheduler:
         n_configs, base_resource = self.get_bracket_params(s, num_nodes)
         
         if self.fixed_initial and len(self.initial_n_list) and len(self.initial_r_list):
-            n_configs_stage = self.initial_n_list[stage] * num_nodes
+            n_configs_stage = self.initial_n_list[stage]
             n_resource_stage = self.initial_r_list[stage]
         else:
             n_configs_stage = int(n_configs * self.eta ** (-stage))
@@ -116,7 +116,7 @@ class FidelityScheduler:
     def get_fidelity_levels(self) -> List[float]:
         return self.fidelity_levels
     
-    def eliminate_candidates(self, candidates: List, perfs: List, s: int, stage: int) -> Tuple[List, List]:
+    def eliminate_candidates(self, candidates: List, perfs: List, s: int, stage: int, num_nodes: int = 1) -> Tuple[List, List]:
         """
         Eliminate candidates based on performance (Successive Halving logic).
         
@@ -129,7 +129,7 @@ class FidelityScheduler:
         Returns:
             Tuple of (remaining_candidates, remaining_perfs)
         """
-        reduced_num = self.get_elimination_count(s, stage)
+        reduced_num = self.get_elimination_count(s, stage) * num_nodes
         
         indices = np.argsort(perfs)
         sorted_candidates = [candidates[i] for i in indices]

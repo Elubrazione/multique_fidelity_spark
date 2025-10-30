@@ -57,7 +57,7 @@ class ExecutorManager:
             
     def __call__(self, config, resource_ratio):
         idx = self.executor_queue.get()  # 阻塞直到有空闲 executor
-        logger.info(f"Got free executor: {idx}")
+        logger.debug(f"Got free executor: {idx}")
 
         result_queue = Queue()
 
@@ -76,7 +76,7 @@ class ExecutorManager:
             finally:
                 result_queue.put(result)
                 self.executor_queue.put(idx)  # 标记为“空闲”
-                logger.info(f"[Executor {idx}] Marked as free again.")
+                logger.debug(f"[Executor {idx}] Marked as free again.")
 
         thread = threading.Thread(target=run)
         thread.start()
