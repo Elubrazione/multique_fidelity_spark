@@ -1,10 +1,8 @@
 
-from typing import Dict, Any, List
-import re, os, time, csv, json
+import os, time
 from queue import Queue
 import threading
 import numpy as np
-from datetime import datetime
 from openbox import logger
 from ConfigSpace import Configuration
 from pyspark.sql import SparkSession
@@ -33,22 +31,7 @@ class ExecutorManager:
         
         if not os.path.exists(RESULT_DIR):
             os.makedirs(RESULT_DIR)
-        self.csv_path = os.path.join(RESULT_DIR, datetime.now().strftime('%Y%m%d-%H%M%S') + ".csv")
-        self.csv_file = open(self.csv_path, 'a', newline='')
-        self.csv_writer = csv.writer(self.csv_file)
         self.all_queries = sorted(sqls[round(float(1), 5)], key=lambda x: custom_sort(x))
-        self.header = ['resource', 'query_time', 'elapsed_time', 'overhead'] + \
-                      [f'qt_{q}' for q in self.all_queries] + \
-                      [f'et_{q}' for q in self.all_queries] + \
-                      [f'{k.name}_param' for k in config_space.get_hyperparameters()]
-
-        if os.stat(self.csv_path).st_size == 0:
-            self.csv_writer.writerow(self.header)
-
-        self.write_queue = Queue()
-        self.write_thread = threading.Thread(target=self._writer_loop, daemon=True)
-        self.write_thread.start()
-        self.closed = False
 
         self._init_child_executor(spark_sql, spark_nodes, servers, usernames, passwords)
         
@@ -62,8 +45,6 @@ class ExecutorManager:
             executor_kwargs = {
                 'sqls': self.sqls,
                 'timeout': self.timeout,
-                'write_queue': self.write_queue,
-                'all_queries': self.all_queries,
                 'spark_sql': spark_sql,
                 'spark_nodes': spark_nodes[idx],
                 'server': servers[idx],
@@ -77,16 +58,6 @@ class ExecutorManager:
                 self.executor_cls(**executor_kwargs)
             )
             
-    def _writer_loop(self):
-        while True:
-            row_dict = self.write_queue.get()
-            if row_dict is None:
-                break
-            row = [row_dict.get(h, 0) for h in self.header]
-            self.csv_writer.writerow(row)
-            self.csv_file.flush()
-            self.write_queue.task_done()
-
     def __call__(self, config, resource_ratio):
         idx = self.executor_queue.get()  # 阻塞直到有空闲 executor
         logger.info(f"Got free executor: {idx}")
@@ -117,22 +88,6 @@ class ExecutorManager:
         thread.join()
         return result
     
-    def __del__(self):
-        self.close()
-
-    def close(self):
-        if self.closed:
-            return
-        try:
-            self.write_queue.put(None)
-            self.write_thread.join()
-        finally:
-            try:
-                self.csv_file.close()
-            finally:
-                self.closed = True
-                logger.info("ExecutorManager closed and CSV file saved.")
-
     def __enter__(self):
         return self
 
@@ -142,15 +97,13 @@ class ExecutorManager:
 
 
 class SparkSessionTPCDSExecutor:
-    def __init__(self, sqls: dict, timeout: dict, write_queue: Queue, all_queries=None,
+    def __init__(self, sqls: dict, timeout: dict,
                  spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=SPARK_NODES,
                  server=SPARK_SERVER_NODE, username=SPARK_USERNAME, password=SPARK_PASSWORD,
                  config_space=None, fidelity_database_mapping=None, fixed_sqls=None,
                  sql_dir=DATA_DIR, app_name_prefix="SparkSessionTPCDSExecutor"):
         self.sqls = sqls
         self.timeout = timeout
-        self.write_queue = write_queue
-        self.all_queries = all_queries or []
         self.spark_nodes = spark_nodes or []
         if isinstance(self.spark_nodes, str):
             self.spark_nodes = [self.spark_nodes]
@@ -345,9 +298,6 @@ class SparkSessionTPCDSExecutor:
         logger.debug(f"[SparkSession] Configuration: {config_dict}")
 
         spark = None
-        results = []
-        elapsed_time_map = {sql: np.inf for sql in queries}
-        qtime_details = {sql: np.inf for sql in queries}
         total_status = True
 
         app_name = f"{self.app_name_prefix}_{resource}"
@@ -369,11 +319,7 @@ class SparkSessionTPCDSExecutor:
                     sql_content = f.read()
 
             result = self.execute_sql_with_timing(spark, sql_content, sql)
-            results.append(result)
-
-            elapsed_time_map[sql] = result['total_elapsed_time']
             per_sql_time = result.get('per_sql_time', 0.0)
-            qtime_details[sql] = per_sql_time if result['status'] == 'success' else float('inf')
 
             if result['status'] == 'success':
                 total_spark_time += per_sql_time
@@ -384,27 +330,8 @@ class SparkSessionTPCDSExecutor:
 
         spark.stop()
 
-        elapsed_total_time = sum(v for v in elapsed_time_map.values() if np.isfinite(v))
         if not total_status:
             total_spark_time = float('inf')
-
-        row_dict = {
-            'resource': resource,
-            'query_time': total_spark_time if np.isfinite(total_spark_time) else float('inf'),
-            'elapsed_time': elapsed_total_time if np.isfinite(elapsed_total_time) else float('inf'),
-            'overhead': (elapsed_total_time - total_spark_time)
-            if np.isfinite(total_spark_time) and np.isfinite(elapsed_total_time) else float('inf')
-        }
-
-        for sql in self.all_queries:
-            row_dict[f'qt_{sql}'] = qtime_details.get(sql, 0)
-            row_dict[f'et_{sql}'] = elapsed_time_map.get(sql, 0)
-
-        for key, value in config_dict.items():
-            row_dict[f'{key}_param'] = value
-
-        if self.write_queue is not None:
-            self.write_queue.put(row_dict)
 
         objective = total_spark_time if np.isfinite(total_spark_time) else float('inf')
         return self.build_ret_dict(objective, start_time)
