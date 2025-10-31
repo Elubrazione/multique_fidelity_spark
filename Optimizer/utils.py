@@ -11,6 +11,7 @@ def build_optimizer(args, **kwargs):
     ws_args = kwargs.get('ws_args', None)
     tl_args = kwargs.get('tl_args', None)
     cp_args = kwargs.get('cp_args', None)
+    random_kwargs = kwargs.get('random_kwargs', {})
 
     per_run_time_limit = kwargs.get('per_run_time_limit', None)
 
@@ -19,7 +20,7 @@ def build_optimizer(args, **kwargs):
         'R': args.R,
         'eta': args.eta,
     }
-    scheduler_type = 'mfes' if 'MFSE' in args.opt else 'bohb' if 'BOHB' in args.opt else 'full'
+    scheduler_type = 'mfes' if 'MFES' in args.opt else 'bohb' if 'BOHB' in args.opt else 'full'
 
     optimizer = BaseOptimizer(
         config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
@@ -28,9 +29,9 @@ def build_optimizer(args, **kwargs):
         cp_args=cp_args,
         ws_strategy=args.warm_start, ws_args=ws_args,
         tl_strategy=args.transfer, tl_args=tl_args,
-        backup_flag=args.backup_flag, seed=args.seed,
-        rand_prob=args.rand_prob, rand_mode=args.rand_mode,
+        backup_flag=args.backup_flag,
         _logger_kwargs=kwargs.get('_logger_kwargs', None),
+        random_kwargs=random_kwargs,
         scheduler_type=scheduler_type,
         scheduler_kwargs=scheduler_kwargs,
     )

@@ -5,7 +5,7 @@ from openbox.utils.history import Observation
 from openbox.utils.util_funcs import get_types
 from openbox.utils.constants import SUCCESS, TIMEOUT, FAILED
 
-from .workload_mapping.rover_mapper import RoverMapper
+from .workload_mapping.rov import RoverMapper
 
 
 def _to_dict(config):
@@ -87,7 +87,7 @@ def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_lear
         inner_model = func_str.split('_')[1]
         return MFGPE(config_space=config_space, source_hpo_data=transfer_learning_history, seed=seed,
                     surrogate_type=inner_model, norm_y=norm_y)
-    elif func_str.startswith('mfse'):   # 没有迁移学习
+    elif func_str.startswith('mfes'):   # 没有迁移学习
         from .surrogate.mfgpe import MFGPE
         inner_model = func_str.split('_')[1]
         return MFGPE(config_space=config_space, source_hpo_data=None, seed=seed,

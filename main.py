@@ -10,8 +10,8 @@ from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--opt', type=str, default='MFSE_SMAC',
-                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFSE_GP', 'MFSE_SMAC', 'SMAC', 'GP', 'BOHB_SMAC'])
+parser.add_argument('--opt', type=str, default='MFES_SMAC',
+                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC'])
 parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
 parser.add_argument('--fidelity', type=float, default=1/9)
 parser.add_argument('--iter_num', type=int, default=40)
@@ -99,6 +99,11 @@ cp_args = {
                         if p in config_space.get_hyperparameter_names()],
 }
 
+random_kwargs = {
+    'seed': args.seed,
+    'rand_prob': args.rand_prob,
+    'rand_mode': args.rand_mode,
+}
 
 opt_kwargs = {
     'config_space': config_space,
@@ -106,6 +111,7 @@ opt_kwargs = {
     'target': args.target,
     'task': args.task,
     'ws_args': ws_args, 'tl_args': tl_args, 'cp_args': cp_args,
+    'random_kwargs': random_kwargs,
     '__logger_kwargs': _logger_kwargs
 }
 optimizer = build_optimizer(args, **opt_kwargs)
