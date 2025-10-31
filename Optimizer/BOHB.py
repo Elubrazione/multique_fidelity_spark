@@ -14,7 +14,7 @@ class BOHB(BaseOptimizer):
                  tl_strategy='none', tl_args={'topk': 5},
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
-                 task_manager=None,
+                 scheduler_type='bohb',
                  scheduler_kwargs={},
                  _logger_kwargs=None):
 
@@ -26,12 +26,10 @@ class BOHB(BaseOptimizer):
                          cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                         task_manager=task_manager,
                          _logger_kwargs=_logger_kwargs)
 
-        self.inner_iter_id = 0
-        from .scheduler.fidelity import FidelityScheduler
-        self.scheduler = FidelityScheduler(**scheduler_kwargs)
+        from .scheduler import schedulers
+        self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **scheduler_kwargs)
 
     def _update_obs(self, config, results, resource_ratio):
         if 'BOHB' in self.method_id:
@@ -58,27 +56,27 @@ class BOHB(BaseOptimizer):
                 performances.append(results['result']['objective'])
         return performances
 
-    def _iterate(self, s):   
+    def _iterate(self):   
         iter_full_eval_configs, iter_full_eval_perfs = [], []
         candidates = []
 
-        # Run each bracket.
+        s = self.scheduler.get_bracket_index(self.iter_id - self.advisor.init_num)
+
         for i in range(s + 1):
-            n_configs, n_resource = self.scheduler.get_stage_params(s, i, len(LIST_SPARK_NODES))
-            logger.info(f"[BOHB] Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
+            n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
+            logger.info(f"Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
             
             if not i:
                 candidates = list(set(self.advisor.samples(batch_size=n_configs)))
-                logger.info(f"[BOHB] Generated {len(candidates)} initial candidates")
+                logger.info(f"Generated {len(candidates)} initial candidates")
 
             resource_ratio = self.scheduler.calculate_resource_ratio(n_resource)
             perfs = self._evaluate_configurations(candidates, resource_ratio)
-            logger.info(f"[BOHB] Stage {i}: evaluated {len(perfs)} configs, resource_ratio={resource_ratio}")
+            logger.info(f"Stage {i}: evaluated {len(perfs)} configs, resource_ratio={resource_ratio}")
             
-            candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s, i, len(LIST_SPARK_NODES))
-            logger.info(f"[BOHB] Stage {i}: after elimination, {len(candidates)} candidates remain")
+            candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s=s, stage=i)
             
-            if int(n_resource) == self.scheduler.R or i == s:
+            if i == s:
                 iter_full_eval_configs.extend(candidates)
                 iter_full_eval_perfs.extend(perfs)
 
@@ -89,20 +87,11 @@ class BOHB(BaseOptimizer):
         self.iter_id += 1
         num_config_evaluated = len(self.advisor.history)
         if num_config_evaluated < self.advisor.init_num:
-            remaining_configs = self.advisor.init_num - num_config_evaluated
-            max_parallel = min(len(LIST_SPARK_NODES), remaining_configs)
-            
-            logger.info(f"[BOHB] Initialization phase: need to evaluate {remaining_configs} configs, using {max_parallel} parallel tasks")
-            candidates = self.advisor.samples(batch_size=max_parallel)
-            logger.info(f"[BOHB] Generated {len(candidates)} candidate configurations")
-            perfs = self._evaluate_configurations(candidates, round(float(1.0), 5), update=True)
-            
-            iter_full_eval_configs = candidates
-            iter_full_eval_perfs = perfs
+            candidates = self.advisor.samples(batch_size=self.scheduler.num_nodes)
+            logger.info(f"Initialization phase: need to evaluate {self.scheduler.num_nodes} configs, generated {len(candidates)} initial candidates")
+            perfs = self._evaluate_configurations(candidates, resource_ratio=round(float(1.0), 5), update=True)
         else:
-            s = self.scheduler.s_values[self.inner_iter_id]
-            iter_full_eval_configs, iter_full_eval_perfs = self._iterate(s)
-            self.inner_iter_id = (self.inner_iter_id + 1) % (self.scheduler.s_max + 1)
+            candidates, perfs = self._iterate()
 
-        self.log_iteration_results(iter_full_eval_configs, iter_full_eval_perfs)
+        self.log_iteration_results(candidates, perfs)
         self.save_info(interval=1)

@@ -6,11 +6,11 @@ from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
 from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
-from .task_manager import TaskManager
+from task_manager import TaskManager
 
 
 class BaseAdvisor:
-    def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
+    def __init__(self, config_space: ConfigurationSpace,
                 task_id='test', ws_strategy='none', ws_args=None,
                 tl_args=None, cp_args=None,
                 seed=42, rand_prob=0.15, rand_mode='ran', 
@@ -23,7 +23,7 @@ class BaseAdvisor:
         self.rand_prob = rand_prob
         self.rand_mode = rand_mode
         
-        self.task_manager = task_manager
+        self.task_manager = TaskManager.instance()
         self.task_manager._update_similarity()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
 

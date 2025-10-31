@@ -21,7 +21,6 @@ def build_optimizer(args, **kwargs):
                         iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
                         method_id='RS', task_id=kwargs['task'], target=kwargs['target'],
                         save_dir=kwargs['save_dir'],
-                        task_manager=kwargs.get('task_manager'),
                         _logger_kwargs=kwargs.get('_logger_kwargs', None))
     if args.opt in ['GP', 'GPF', 'SMAC']:
         from Optimizer.SMBO import SMBO
@@ -34,7 +33,6 @@ def build_optimizer(args, **kwargs):
             tl_strategy=args.transfer, tl_args=tl_args,
             backup_flag=args.backup_flag, seed=args.seed,
             rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            task_manager=kwargs.get('task_manager'),
             _logger_kwargs=kwargs.get('_logger_kwargs', None)
         )
     elif 'BOHB' in args.opt or 'MFSE' in args.opt:
@@ -42,7 +40,6 @@ def build_optimizer(args, **kwargs):
         scheduler_kwargs = {
             'R': args.R,
             'eta': args.eta,
-            'fixed_initial': False
         }
         optimizer = BOHB(
             config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
@@ -54,7 +51,6 @@ def build_optimizer(args, **kwargs):
             backup_flag=args.backup_flag, seed=args.seed,
             rand_prob=args.rand_prob, rand_mode=args.rand_mode,
             save_dir=args.save_dir,
-            task_manager=kwargs.get('task_manager'),
             scheduler_kwargs=scheduler_kwargs,
             _logger_kwargs=kwargs.get('_logger_kwargs', None)
         )

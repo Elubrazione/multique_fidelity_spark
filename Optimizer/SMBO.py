@@ -7,7 +7,7 @@ class SMBO(BaseOptimizer):
                  cp_args=None,
                  backup_flag=False, save_dir='./results',
                  seed=42, rand_prob=0.15, rand_mode='ran',
-                 task_manager=None, _logger_kwargs=None):
+                 _logger_kwargs=None):
 
         super().__init__(config_space=config_space, eval_func=eval_func, iter_num=iter_num,
                          per_run_time_limit=per_run_time_limit,
@@ -16,4 +16,4 @@ class SMBO(BaseOptimizer):
                          cp_args=cp_args,
                          backup_flag=backup_flag, save_dir=save_dir,
                          seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                         task_manager=task_manager, _logger_kwargs=_logger_kwargs)
+                         _logger_kwargs=_logger_kwargs)

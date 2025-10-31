@@ -8,11 +8,10 @@ from openbox import logger
 from Advisor.BO import BO
 from Advisor.MFBO import MFBO
 from .utils import run_obj_func
-from Advisor.task_manager import TaskManager
 
 
 class BaseOptimizer:
-    def __init__(self, config_space: ConfigurationSpace, eval_func, task_manager: TaskManager,
+    def __init__(self, config_space: ConfigurationSpace, eval_func,
                  iter_num=200, per_run_time_limit=None,
                  method_id='advisor', task_id='test', target='redis',
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
@@ -95,7 +94,6 @@ class BaseOptimizer:
                               ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                               cp_args=cp_args,
                               seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                              task_manager=task_manager,
                               _logger_kwargs=self._logger_kwargs)
         elif 'MFSE' in method_id:
             # 对于MFSE，没有tl，就默认用MF集成
@@ -107,7 +105,6 @@ class BaseOptimizer:
                                 ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
                                 cp_args=cp_args,
                                 seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                                task_manager=task_manager,
                                 _logger_kwargs=self._logger_kwargs)
 
         self.timeout = per_run_time_limit
@@ -138,9 +135,7 @@ class BaseOptimizer:
         while self.iter_id < self.iter_num:
             self.run_one_iter()
 
-    """
-    将任务的关键信息保存
-    """
+
     def record_task(self):
         if self.iter_id >= 25:
             self.ts_recorder.append(copy.deepcopy(self.advisor.history))

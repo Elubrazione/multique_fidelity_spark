@@ -4,7 +4,7 @@ from openbox import logger
 from executor import ExecutorManager, SparkSessionTPCDSExecutor
 from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
-from Advisor.task_manager import TaskManager
+from task_manager import TaskManager
 from utils.spark import analyze_timeout_and_get_fidelity_details
 from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR
 
@@ -78,7 +78,7 @@ tl_args = {
     'topk': args.tl_topk
 }
 
-task_manager = TaskManager(
+task_manager = TaskManager.instance(
     history_dir=args.src_data_path,
     eval_func=executor,
     task_id=args.task,
@@ -106,7 +106,6 @@ opt_kwargs = {
     'target': args.target,
     'task': args.task,
     'ws_args': ws_args, 'tl_args': tl_args, 'cp_args': cp_args,
-    'task_manager': task_manager,
     '__logger_kwargs': _logger_kwargs
 }
 optimizer = build_optimizer(args, **opt_kwargs)

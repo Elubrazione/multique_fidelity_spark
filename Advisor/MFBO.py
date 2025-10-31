@@ -8,12 +8,12 @@ from .utils import build_observation
 
 
 class MFBO(BO):
-    def __init__(self, config_space: ConfigurationSpace, task_manager=None,
+    def __init__(self, config_space: ConfigurationSpace,
                 surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_args={'topk': 5}, cp_args={},
                 seed=42, rand_prob=0.15, rand_mode='ran', **kwargs):
-        super().__init__(config_space, task_manager=task_manager,
+        super().__init__(config_space,
                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_args=tl_args, cp_args=cp_args,
@@ -161,7 +161,7 @@ class MFBO(BO):
             return batch
 
         self.surrogate.update_mf_trials(self.history_list)
-        self.surrogate.build_source_surrogates()
+        # self.surrogate.build_source_surrogates()
         candidates = super().sample(return_list=True)
 
         idx = 0

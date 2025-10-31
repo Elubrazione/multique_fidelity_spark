@@ -1,13 +1,12 @@
 import os
 import json
 import subprocess
-import tempfile
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any, Callable
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
-from .utils import map_source_hpo_data, build_observation
+from Advisor.utils import map_source_hpo_data, build_observation
 
 META_FEATURE = np.random.rand(34)
 
@@ -29,6 +28,14 @@ class TaskManager:
         - config_space: Original configuration space without compression
     """
 
+    _instance = None
+
+    @classmethod
+    def instance(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = cls(*args, **kwargs)
+        return cls._instance
+
     def __init__(self, 
                  history_dir: str,
                  eval_func: Callable,
@@ -38,6 +45,9 @@ class TaskManager:
                  ws_args: Optional[dict] = None, 
                  config_space: Optional[ConfigurationSpace] = None,
                  **kwargs):
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+        self._initialized = True
         self.history_dir = history_dir
         self.spark_log_dir = spark_log_dir
         self.ws_args = ws_args or {}

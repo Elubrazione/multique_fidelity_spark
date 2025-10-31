@@ -7,17 +7,17 @@ from .base import BaseAdvisor
 from .utils import build_my_surrogate, build_my_acq_func, is_valid_spark_config, sanitize_spark_config
 from .workload_mapping.rover.transfer import get_transfer_suggestion
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
-from .task_manager import TaskManager
+from config import LIST_SPARK_NODES
 
 
 class BO(BaseAdvisor):
-    def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
+    def __init__(self, config_space: ConfigurationSpace,
                 surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_args={'topk': 5}, cp_args={},
                 seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
-        super().__init__(config_space, task_manager=task_manager, task_id=task_id,
+        super().__init__(config_space, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_args=tl_args, cp_args=cp_args,
                         seed=seed, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
