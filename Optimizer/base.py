@@ -1,5 +1,6 @@
 import os
 import copy
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pickle as pkl
 from datetime import datetime
@@ -7,7 +8,10 @@ from ConfigSpace import ConfigurationSpace
 from openbox import logger
 from Advisor.BO import BO
 from Advisor.MFBO import MFBO
+from typing import List
 from .utils import run_obj_func
+from .scheduler import schedulers
+from config import LIST_SPARK_NODES
 
 
 class BaseOptimizer:
@@ -17,8 +21,10 @@ class BaseOptimizer:
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
                  cp_args=None,
                  backup_flag=False, save_dir='./results',
-                 seed=42, rand_prob=0.15, rand_mode='ran', _logger_kwargs=None):
+                 seed=42, rand_prob=0.15, rand_mode='ran', _logger_kwargs=None,
+                 scheduler_type='bohb', scheduler_kwargs={}):
 
+        assert scheduler_type in ['bohb', 'mfes', 'full', 'fixed']
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC']
         assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
@@ -56,6 +62,8 @@ class BaseOptimizer:
         self.ws_args = ws_args
         self.tl_strategy = tl_strategy
         self.cp_args = cp_args
+
+        self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **scheduler_kwargs)
 
         self.seed = seed
 
@@ -143,14 +151,63 @@ class BaseOptimizer:
         else:
             logger.warn("Failed to record the task because the number of iterations was less than 25!")
 
+    def _evaluate_configurations(
+        self, candidates,
+        resource_ratio=round(float(1.0), 5)
+    ) -> List[float]:
+
+        futures, performances = [], []
+        with ThreadPoolExecutor(max_workers=len(candidates)) as executor:
+            for config in candidates:
+                future = executor.submit(self.eval_func, config=config, resource_ratio=resource_ratio)
+                futures.append((future, config))
+
+            for future, config in futures:
+                results = future.result()
+                self.advisor.update(
+                    config=config, results=results,
+                    resource_ratio=resource_ratio,
+                    update=self.scheduler.should_update_history(resource_ratio)
+                )
+                performances.append(results['result']['objective'])
+        return performances
+    
+    def _iterate(self):   
+        iter_full_eval_configs, iter_full_eval_perfs = [], []
+        candidates = []
+
+        s = self.scheduler.get_bracket_index(self.iter_id - self.advisor.init_num)
+
+        for i in range(s + 1):
+            n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
+            logger.info(f"Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
+            if not i:
+                candidates = list(set(self.advisor.sample(batch_size=n_configs)))
+                logger.info(f"Generated {len(candidates)} initial candidates")
+            resource_ratio = self.scheduler.calculate_resource_ratio(n_resource=n_resource)
+            perfs = self._evaluate_configurations(candidates, resource_ratio)            
+            candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s=s, stage=i)
+            
+            if i == s:
+                iter_full_eval_configs.extend(candidates)
+                iter_full_eval_perfs.extend(perfs)
+
+        return iter_full_eval_configs, iter_full_eval_perfs
+
     def run_one_iter(self):
         self.iter_id += 1
-        config = self.advisor.sample()
-        obj_args, obj_kwargs = (config,), {'resource_ratio': 1.0}
-        results = run_obj_func(self.eval_func, obj_args, obj_kwargs, self.timeout)
-        self.advisor.update(config, results)
-        self.log_iteration_results([config], [results['result']['objective']])
-        self.save_info()
+        num_config_evaluated = len(self.advisor.history)
+        if num_config_evaluated < self.advisor.init_num:
+            candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
+            if not isinstance(candidates, list):
+                candidates = [candidates]
+            logger.info(f"Initialization phase: need to evaluate {self.scheduler.num_nodes} configs, generated {len(candidates)} initial candidates")
+            perfs = self._evaluate_configurations(candidates, resource_ratio=round(float(1.0), 5))
+        else:
+            candidates, perfs = self._iterate()
+
+        self.log_iteration_results(candidates, perfs)
+        self.save_info(interval=1)
 
     def log_iteration_results(self, configs, performances, iteration_id=None):
         iter_id = iteration_id if iteration_id is not None else self.iter_id

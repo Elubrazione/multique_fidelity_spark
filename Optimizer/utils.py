@@ -14,46 +14,27 @@ def build_optimizer(args, **kwargs):
 
     per_run_time_limit = kwargs.get('per_run_time_limit', None)
 
-    optimizer = None
-    if args.opt == 'RS':
-        from Optimizer.SMBO import SMBO
-        optimizer = SMBO(config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-                        iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
-                        method_id='RS', task_id=kwargs['task'], target=kwargs['target'],
-                        save_dir=kwargs['save_dir'],
-                        _logger_kwargs=kwargs.get('_logger_kwargs', None))
-    if args.opt in ['GP', 'GPF', 'SMAC']:
-        from Optimizer.SMBO import SMBO
-        optimizer = SMBO(
-            config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-            iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
-            method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
-            cp_args=cp_args,
-            ws_strategy=args.warm_start, ws_args=ws_args,
-            tl_strategy=args.transfer, tl_args=tl_args,
-            backup_flag=args.backup_flag, seed=args.seed,
-            rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            _logger_kwargs=kwargs.get('_logger_kwargs', None)
-        )
-    elif 'BOHB' in args.opt or 'MFSE' in args.opt:
-        from Optimizer.BOHB import BOHB
-        scheduler_kwargs = {
-            'R': args.R,
-            'eta': args.eta,
-        }
-        optimizer = BOHB(
-            config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-            method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
-            iter_num=args.iter_num, per_run_time_limit=per_run_time_limit, 
-            cp_args=cp_args,
-            ws_strategy=args.warm_start, ws_args=ws_args,
-            tl_strategy=args.transfer, tl_args=tl_args,
-            backup_flag=args.backup_flag, seed=args.seed,
-            rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            save_dir=args.save_dir,
-            scheduler_kwargs=scheduler_kwargs,
-            _logger_kwargs=kwargs.get('_logger_kwargs', None)
-        )
+    from Optimizer.base import BaseOptimizer
+    scheduler_kwargs = {
+        'R': args.R,
+        'eta': args.eta,
+    }
+    scheduler_type = 'mfes' if 'MFSE' in args.opt else 'bohb' if 'BOHB' in args.opt else 'full'
+
+    optimizer = BaseOptimizer(
+        config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
+        iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
+        method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
+        cp_args=cp_args,
+        ws_strategy=args.warm_start, ws_args=ws_args,
+        tl_strategy=args.transfer, tl_args=tl_args,
+        backup_flag=args.backup_flag, seed=args.seed,
+        rand_prob=args.rand_prob, rand_mode=args.rand_mode,
+        _logger_kwargs=kwargs.get('_logger_kwargs', None),
+        scheduler_type=scheduler_type,
+        scheduler_kwargs=scheduler_kwargs,
+    )
+
     logger.info("[opt: {}] [warm_start_strategy: {}] [transfer_strategy: {}] [backup_flag: {}] [seed: {}] [rand_prob: {}]".format(
         args.opt, args.warm_start, args.transfer, args.backup_flag, args.seed, args.rand_prob)
     )
@@ -142,17 +123,6 @@ def run_obj_func(obj_func, obj_args, obj_kwargs, timeout=None):
         result = run_with_time_limit(obj_func, obj_args, obj_kwargs, timeout)
     return result
 
-
-def process_src_data(his):
-    default = his.observations[0].objectives[0]
-    # 用默认配置的五倍弱来填inf
-    fill_val = default * 5 if default > 0 else default / 5
-    for obs in his.observations:
-        if not np.isfinite(obs.objectives[0]):
-            obs.objectives[0] = fill_val
-            print("find inf objective in %s, fill %f" % (his.task_id, fill_val))
-
-    return his
 
 def load_space_from_json(json_file=None):
     

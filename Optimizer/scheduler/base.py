@@ -34,13 +34,23 @@ class BaseScheduler(abc.ABC):
     def get_stage_params(self, **kwargs) -> Tuple[int, int]:
         return self.num_nodes, 1
 
+    def should_update_history(self, resource_ratio: float) -> bool:
+        """
+        Determine whether observations should be updated to advisor.history.
+        Notes:
+            - For SMBO (FullFidelityScheduler): always returns True
+            - For BOHB: only returns True when resource_ratio == 1.0
+            - For MFSE: returns True
+        """
+        return True
+
 
 class FullFidelityScheduler(BaseScheduler):
-    def __init__(self, num_nodes: int = 1):
+    def __init__(self, num_nodes: int = 1, **kwargs):
         super().__init__(num_nodes)
 
     def calculate_resource_ratio(self, **kwargs) -> float:
         return round(float(1.0), 5)
 
     def get_elimination_count(self, **kwargs) -> int:
-        return 0
+        return self.num_nodes

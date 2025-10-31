@@ -102,6 +102,8 @@ class BaseAdvisor:
         sampled_configs = list(configs)
         return sampled_configs
 
-    def update(self, config, results):
+    def update(self, config, results, **kwargs):
+        if not kwargs.get('update', True):
+            return
         obs = build_observation(config, results)
         self.history.update_observation(obs)

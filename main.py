@@ -11,7 +11,7 @@ from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--opt', type=str, default='MFSE_SMAC',
-                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFSE_GP', 'MFSE_SMAC', 'SMAC', 'GP'])
+                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFSE_GP', 'MFSE_SMAC', 'SMAC', 'GP', 'BOHB_SMAC'])
 parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
 parser.add_argument('--fidelity', type=float, default=1/9)
 parser.add_argument('--iter_num', type=int, default=40)

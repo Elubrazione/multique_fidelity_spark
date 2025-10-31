@@ -25,12 +25,14 @@ class FixedFidelityScheduler(BaseScheduler):
         return self.n_resources[stage] * self.num_nodes, self.r_resources[stage]
 
     def get_elimination_count(self, stage: int, **kwargs) -> int:
-        reduced_num = self.n_resources[stage + 1] if stage + 1 < len(self.n_resources) else 0
+        reduced_num = self.n_resources[stage + 1] if stage + 1 < len(self.n_resources) else self.n_resources[-1]
         return reduced_num * self.num_nodes
 
     def calculate_resource_ratio(self, n_resource: int) -> float:
         return round(float(n_resource), 5)
     
+    def should_update_history(self, resource_ratio: float) -> bool:
+        return True
 
 class BOHBFidelityScheduler(BaseScheduler):
     """
@@ -61,7 +63,7 @@ class BOHBFidelityScheduler(BaseScheduler):
                     % (len(self.s_values), self.get_fidelity_levels(), self.s_max, self.R, self.eta))
     
     def get_bracket_index(self, iter_id: int) -> int:
-        return self.s_values[iter_id % len(self.s_values)]
+        return self.s_values[iter_id % len(self.s_values) - 1]
 
     def get_bracket_params(self, s: int) -> Tuple[int, int]:
         """
@@ -118,5 +120,20 @@ class BOHBFidelityScheduler(BaseScheduler):
         Returns:
             Number of configurations to keep
         """
-        n_configs, _ = self.get_stage_params(s, stage)
-        return int(n_configs / self.eta)
+        n_configs, r_resource = self.get_stage_params(s, stage)
+        return int(n_configs / self.eta) if int(r_resource) != self.R else int(n_configs)
+    
+    def should_update_history(self, resource_ratio: float) -> bool:
+        # only update history when resource_ratio == 1.0
+        return resource_ratio == round(float(1.0), 5)
+
+
+class MFSEFidelityScheduler(BOHBFidelityScheduler):
+    def __init__(self, 
+                 num_nodes: int = 1,
+                 R: int = 9, eta: int = 3):
+        super().__init__(num_nodes=num_nodes, R=R, eta=eta)
+
+    def should_update_history(self, resource_ratio: float) -> bool:
+        # always return True for MFSE - let MFBO.update decide history vs history_list
+        return True
