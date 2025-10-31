@@ -59,10 +59,17 @@ class RoverMapper(BaseMapper):
             return
 
         ts_meta_features, ts_his = self.get_src_history(source_hpo_data)
-        
+
         logger.info(f"Loaded {len(source_hpo_data)} source tasks")
         logger.info(f"Meta features shape: {ts_meta_features.shape}")
-        logger.info(f"Meta features stats: min={ts_meta_features.min():.4f}, max={ts_meta_features.max():.4f}, std={ts_meta_features.std():.4f}")
+        if ts_meta_features.size > 0:
+            logger.info(f"Meta features stats: min={ts_meta_features.min():.4f}, max={ts_meta_features.max():.4f}, std={ts_meta_features.std():.4f}")
+        else:
+            logger.warning("No meta features available from source tasks. Skipping stats and model training.")
+            self.ts_meta_features = ts_meta_features
+            self.model = None
+            self.already_fit = True
+            return
 
         # 检查是否有足够的历史任务
         if len(source_hpo_data) < 2:

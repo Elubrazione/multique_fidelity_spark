@@ -65,7 +65,7 @@ class RangeCompressor(BaseCompressor):
         if base_space is None:  # if base_space is not provided, range compress original space
             base_space = copy.deepcopy(self.origin_config_space)
 
-        if space_history is not None:
+        if space_history is not None and len(space_history) > 0:
             logger.info("Computing range compression from new space history...")
             hist_x, hist_y = prepare_historical_data(space_history)
             self.computed_space = self._compute_range_compression(hist_x, hist_y)

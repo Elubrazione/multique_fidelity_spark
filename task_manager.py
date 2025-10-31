@@ -1,14 +1,14 @@
 import os
 import json
 import subprocess
-import tempfile
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any, Callable
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
-from .utils import map_source_hpo_data
+from Advisor.utils import map_source_hpo_data, build_observation
 
+META_FEATURE = np.random.rand(34)
 
 class TaskManager:
     """
@@ -28,13 +28,26 @@ class TaskManager:
         - config_space: Original configuration space without compression
     """
 
+    _instance = None
+
+    @classmethod
+    def instance(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = cls(*args, **kwargs)
+        return cls._instance
+
     def __init__(self, 
                  history_dir: str,
                  eval_func: Callable,
+                 task_id: str = "default",
                  spark_log_dir: str = "/root/codes/spark-log",
                  similarity_threshold: float = 0.5,
                  ws_args: Optional[dict] = None, 
-                 config_space: Optional[ConfigurationSpace] = None):
+                 config_space: Optional[ConfigurationSpace] = None,
+                 **kwargs):
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+        self._initialized = True
         self.history_dir = history_dir
         self.spark_log_dir = spark_log_dir
         self.ws_args = ws_args or {}
@@ -44,17 +57,13 @@ class TaskManager:
         self.historical_tasks: List[History] = []
         self.historical_meta_features: List[np.ndarray] = []
         
-        self.current_task_history: Optional[History] = None # initialized in initialize_current_task, used in _update_similarity
-        self.current_meta_feature: Optional[np.ndarray] = None # initialized in calculate_meta_feature, used in initialize_current_task
-        
-        # For multi-fidelity optimization (MFBO)
-        self.multi_fidelity_history_list: List[History] = []
-        self.resource_identifiers: List[int] = []
+        self.current_task_history: Optional[History] = None
+        self.current_meta_feature: Optional[np.ndarray] = None
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
         
         self._load_historical_tasks()
-        self.calculate_meta_feature(eval_func)
+        self.calculate_meta_feature(eval_func, task_id, **kwargs)
 
 
     def _load_historical_tasks(self):
@@ -171,7 +180,7 @@ class TaskManager:
             return None
 
 
-    def calculate_meta_feature(self, eval_func: Callable):
+    def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default", **kwargs):
         """
         Get runtime metric for current task by running default config and parsing latest Spark log.
         
@@ -179,32 +188,46 @@ class TaskManager:
             eval_func: Evaluator function (ExecutorManager)
 
         """
+        if kwargs.get('test_mode', False):
+            logger.info("Using test mode meta feature")
+            self.current_meta_feature = META_FEATURE
+            self.current_task_history = History(task_id=task_id, config_space=self.config_space,
+                                                meta_info={'meta_feature': self.current_meta_feature.tolist()})
+            return
+        
         logger.info("Computing current task meta feature using default config...")
 
         # use default config writen in spark_default.conf
-        default_config = {}
-        
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            _ = eval_func(config=default_config, resource_ratio=1.0, res_dir=tmp_dir)
+        default_config = self.config_space.get_default_configuration()
+        result = eval_func(config=default_config, resource_ratio=1.0)
 
-            application_id = self.get_latest_application_id()
-            if not application_id:
-                logger.warning("No application_id found, using fallback metrics")
-                raise ValueError("No application_id found")
-            zstd_file = os.path.join(self.spark_log_dir, f"{application_id}.zstd")
-            if not os.path.exists(zstd_file):
-                logger.warning(f"Zstd file not found: {zstd_file}")
-                raise ValueError(f"Zstd file not found: {zstd_file}")
-            logger.info(f"Found zstd file: {zstd_file}")
-            json_file = os.path.join(tmp_dir, "app.json")
-            subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
-            with open(json_file, 'r') as f:
-                json_content = f.read()
-            run_time, metrics = self.decode_results_spark(json_content)
-            
-            logger.info(f"Application run time: {run_time:.2f} seconds")
-            logger.info(f"Metrics array shape: {metrics.shape}")
-            self.current_meta_feature = metrics
+        application_id = self.get_latest_application_id()
+        if not application_id:
+            logger.warning("No application_id found, using fallback metrics")
+            raise ValueError("No application_id found")
+        zstd_file = os.path.join(self.spark_log_dir, f"{application_id}.zstd")
+        if not os.path.exists(zstd_file):
+            logger.warning(f"Zstd file not found: {zstd_file}")
+            raise ValueError(f"Zstd file not found: {zstd_file}")
+        logger.info(f"Found zstd file: {zstd_file}")
+        json_file = os.path.join(self.spark_log_dir, "app.json")
+        subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
+        with open(json_file, 'r') as f:
+            json_content = f.read()
+        run_time, metrics = self.decode_results_spark(json_content)
+        os.remove(zstd_file)
+        os.remove(json_file)
+        
+        logger.info(f"Application run time: {run_time:.2f} seconds")
+        logger.info(f"Metrics array shape: {metrics.shape}")
+        logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
+
+        self.current_meta_feature = metrics
+        self.current_task_history = History(task_id=task_id, config_space=self.config_space,
+                                            meta_info={'meta_feature': self.current_meta_feature.tolist()})
+        self.current_task_history.update_observation(build_observation(default_config, result))
+        logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
+
 
     def update_history_meta_info(self, meta_info: dict):
         """
@@ -214,23 +237,6 @@ class TaskManager:
             meta_info: Meta information of historical tasks
         """
         self.current_task_history.meta_info.update(meta_info)
-
-
-    def initialize_current_task(self, task_id: str, meta_info: dict = None):
-        """
-        Initialize current task, called in Optimizer.base.BaseOptimizer.__init__
-
-        Args:
-            task_id: Current task identifier, used for history task_id
-            eval_func: Evaluator function
-            meta_info: Meta information of current task
-        """
-        meta_info = meta_info or {}
-        logger.info(f"Current meta feature: {self.current_meta_feature}")
-        meta_info['meta_feature'] = self.current_meta_feature.tolist()
-        self.current_task_history = History(task_id=task_id, config_space=self.config_space, meta_info=meta_info)
-        logger.info(f"Initialized current task {task_id} with meta feature shape: {self.current_meta_feature.shape}")
-        self._update_similarity() # update similarity between current task and historical tasks
 
 
     def _update_similarity(self):

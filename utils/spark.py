@@ -11,21 +11,22 @@ def convert_to_spark_params(config: dict):
         'spark.executor.memory': 'g',
         'spark.driver.memory': 'g',
         'spark.executor.memoryOverhead': 'm',
+        'spark.driver.memoryOverhead': 'm',
         'spark.driver.maxResultSize': 'm',
         'spark.broadcast.blockSize': 'm',
-        'spark.io.compression.lz4.blockSize': 'k',
         'spark.io.compression.snappy.blockSize': 'k',
-        'spark.io.compression.zstd.bufferSize': 'k',
         'spark.shuffle.service.index.cache.size': 'm',
-        
+        'spark.sql.autoBroadcastJoinThreshold': 'm',
+        'spark.memory.offHeap.size': 'g',
+        'spark.storage.memoryMapThreshold': 'g',
+        'spark.kryoserializer.buffer.max': 'm',
+        'spark.shuffle.file.buffer': 'k',
+        'spark.shuffle.unsafe.file.output.buffer': 'k',
     }
     spark_params = []
     for k, v in config.items():
         if k in memory_params:
             spark_params.extend(["--conf", f"{k}={v}{memory_params[k]}"])
-        elif k == 'spark.sql.autoBroadcastJoinThreshold':
-            bytes_val = int(v) * 1024 ** 2
-            spark_params.extend(["--conf", f"{k}={bytes_val}"])
         else:
             spark_params.extend(["--conf", f"{k}={v}"])
     return spark_params
@@ -61,7 +62,7 @@ def analyze_timeout_and_get_fidelity_details(file_path=FILE_TIMEOUT_CSV, percent
         excluded_sqls.update(selected_queries.keys())
     fidelity_details[round(1, round_num)] = list(elapsed_timeout_dicts.keys())
     
-    logger.info(fidelity_details)
+    logger.debug(fidelity_details)
     return fidelity_details, elapsed_timeout_dicts
 
 def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33, add_on_ratio=1.5):

@@ -10,7 +10,6 @@ import pandas as pd
 from typing import List, Optional, Dict, Any, Tuple
 from openbox import logger
 from ConfigSpace import ConfigurationSpace
-from xgboost import XGBRegressor
 
 from .compressor import Compressor
 from .dimension import DimensionCompressor
@@ -43,8 +42,8 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         super(RangeCompressor, self).__init__(config_space, **kwargs)
         
         # Set strategy and other attributes
-        self.strategy = 'shap'
-        self.topk = kwargs.get('topk', 5)
+        self.strategy = kwargs.get('strategy', 'shap')
+        self.topk = 0 if self.strategy == 'none' else kwargs.get('topk', 5)
         self.expert_params = kwargs.get('expert_params', [])
         self.expert_config_file = kwargs.get('expert_config_file', None)
         self.top_ratio = kwargs.get('top_ratio', 0.8)
@@ -86,6 +85,11 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         importances = []
         shap_values = []
 
+        # No historical data -> skip SHAP computation
+        if len(hist_x) == 0:
+            logger.warning("No historical data provided for SHAP; skipping SHAP-based selection.")
+            return models, None, shap_values
+
         for i in range(len(hist_x)):
             # Check if hist_x[i] is already numeric data or full data
             if hist_x[i].shape[1] == len(self.numeric_hyperparameter_names):
@@ -114,6 +118,9 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
             shap_values.append(shap_value)
         
         # all tasks' importances are averaged
+        if len(importances) == 0:
+            logger.warning("No SHAP importances computed; skipping SHAP-based selection.")
+            return models, None, shap_values
         importances = np.mean(np.array(importances), axis=0)
 
         self._shap_cache.update({
@@ -141,11 +148,24 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
         Returns:
             List of selected parameter indices
         """
+        # If no valid historical data, keep all parameters (no compression)
+        if len(hist_x) == 0 or len(hist_y) == 0:
+            logger.warning("No valid historical data for SHAP selection; keeping all parameters.")
+            return list(range(len(self.origin_config_space.get_hyperparameters())))
+
+        # May log generic check from base but don't rely on its return
         super()._select_parameters(hist_x, hist_y)
-        
+
         _, importances, _ = self._fetch_shap_cache(hist_x, hist_y)
-        
+        if importances is None or np.size(importances) == 0:
+            logger.warning("SHAP importances unavailable; keeping all parameters.")
+            return list(range(len(self.origin_config_space.get_hyperparameters())))
+
         top_k = min(self.topk, len(self.numeric_hyperparameter_names))
+        if top_k == 0:
+            logger.warning("No numeric hyperparameters detected; keeping all parameters.")
+            return list(range(len(self.origin_config_space.get_hyperparameters())))
+
         selected_numeric_indices = np.argsort(importances)[: top_k].tolist()
         selected_param_names = [self.numeric_hyperparameter_names[i] for i in selected_numeric_indices]
         importances_selected = importances[selected_numeric_indices]
@@ -171,8 +191,16 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
             Compressed configuration space with adjusted ranges
         """
         super()._compute_range_compression(hist_x, hist_y)
-        
+
+        # If no historical data, skip range compression and return original space
+        if len(hist_x) == 0 or len(hist_y) == 0:
+            logger.warning("No historical data for SHAP range compression; returning original space.")
+            return self.origin_config_space
+
         _, _, shap_values = self._fetch_shap_cache(hist_x, hist_y)
+        if shap_values is None or len(shap_values) == 0:
+            logger.warning("No SHAP values available; returning original space.")
+            return self.origin_config_space
 
         all_x = []
         all_y = []

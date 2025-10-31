@@ -1,38 +1,32 @@
 import numpy as np
 import json as js
 from openbox import logger
-from openbox.utils.history import History
-from openbox.utils.constants import MAXINT
 from ConfigSpace import ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
-from .utils import build_observation
-from .task_manager import TaskManager
+from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
+from task_manager import TaskManager
 
 
 class BaseAdvisor:
-    def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
-                task_id='test',
-                ws_strategy='none', ws_args=None, tl_args=None,
-                cprs_strategy='none', cp_args=None,
-                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
+    def __init__(self, config_space: ConfigurationSpace,
+                task_id='test', ws_strategy='none', ws_args=None,
+                tl_args=None, cp_args=None,
+                seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
-
+        self.task_id = task_id
         self._logger_kwargs = kwargs.get('_logger_kwargs', None)
 
         self.seed = seed
+        self.rng = np.random.RandomState(self.seed)
         self.rand_prob = rand_prob
         self.rand_mode = rand_mode
-        if rng is None:
-            rng = np.random.RandomState(self.seed)
-        self.rng = rng
         
-        self.task_manager = task_manager
-        self.task_manager.initialize_current_task(task_id=task_id)
+        self.task_manager = TaskManager.instance()
+        self.task_manager._update_similarity()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
-        
-        # Get similar tasks and extract only the history list
+
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
         self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
         
@@ -51,7 +45,6 @@ class BaseAdvisor:
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
         self.tl_args = tl_args
-        self.cprs_strategy = cprs_strategy
         self.cp_args = cp_args
         self.history = self.task_manager.current_task_history
 
@@ -87,18 +80,30 @@ class BaseAdvisor:
 
         configs = set()
 
-        while len(configs) < num_configs:
+        _is_valid = is_valid_spark_config
+        _sanitize = sanitize_spark_config
+
+        trials = 0
+        max_trials = max(100, num_configs * 20)
+        while len(configs) < num_configs and trials < max_trials:
+            trials += 1
             sub_config = config_space.sample_configuration()
+            if not _is_valid(sub_config):
+                sub_config = _sanitize(sub_config)
+                if not _is_valid(sub_config):
+                    continue
 
             if sub_config not in configs and sub_config not in excluded_configs:
                 sub_config.origin = "Random Sample!"
                 configs.add(sub_config)
             else:
-                logger.warning("Duplicate configuration found or excluded, retrying.")
+                continue
 
         sampled_configs = list(configs)
         return sampled_configs
 
-    def update(self, config, results):
-        obs = build_observation(config, results, last_context=self.last_context)
+    def update(self, config, results, **kwargs):
+        if not kwargs.get('update', True):
+            return
+        obs = build_observation(config, results)
         self.history.update_observation(obs)

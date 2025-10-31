@@ -4,10 +4,8 @@ import traceback
 import numpy as np
 from queue import Empty
 from multiprocessing import Process, Queue
-from openbox import logger
-from Compressor.utils import load_expert_params
-from config import EXPERT_PARAMS_FILE
-
+from openbox import logger, space as sp
+from config import HUGE_SPACE_FILE
 
 def build_optimizer(args, **kwargs):
     ws_args = kwargs.get('ws_args', None)
@@ -16,58 +14,33 @@ def build_optimizer(args, **kwargs):
 
     per_run_time_limit = kwargs.get('per_run_time_limit', None)
 
-    optimizer = None
-    if args.opt == 'RS':
-        from Optimizer.SMBO import SMBO
-        optimizer = SMBO(config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-                         iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
-                         method_id='RS', task_id=kwargs['task'], target=kwargs['target'],
-                         config_modifier=kwargs['config_modifier'], expert_modified_space=kwargs['expert_modified_space'],
-                         save_dir=kwargs['save_dir'],
-                         task_manager=kwargs.get('task_manager'))
-    if args.opt in ['GP', 'GPF', 'SMAC']:
-        from Optimizer.SMBO import SMBO
-        optimizer = SMBO(
-            config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-            iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
-            method_id=args.opt, task_id=kwargs['task'],target=kwargs['target'],
-            cprs_strategy=args.compress, cp_args=cp_args,
-            ws_strategy=args.warm_start, ws_args=ws_args, tl_strategy=args.transfer, tl_args=tl_args,
-            backup_flag=args.backup_flag, seed=args.seed, rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            config_modifier=kwargs['config_modifier'],
-            task_manager=kwargs.get('task_manager')
-        )
-    elif 'BOHB' in args.opt or 'MFSE' in args.opt or 'FlexHB' in args.opt:
-        from Optimizer.BOHB import BOHB
-        scheduler_kwargs = {
-            'R': args.R,
-            'eta': args.eta,
-            'fixed_initial': False
-        }
-        optimizer = BOHB(
-            config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
-            method_id=args.opt, task_id=args.task, target=kwargs['target'],
-            iter_num=args.iter_num, per_run_time_limit=per_run_time_limit, 
-            cprs_strategy=args.compress, cp_args=cp_args,
-            ws_strategy=args.warm_start, ws_args=ws_args, tl_strategy=args.transfer, tl_args=tl_args,
-            backup_flag=args.backup_flag, seed=args.seed,
-            rand_prob=args.rand_prob, rand_mode=args.rand_mode,
-            save_dir=args.save_dir, 
-            config_modifier=kwargs['config_modifier'], expert_modified_space=kwargs['expert_modified_space'],
-            enable_range_compression=kwargs['enable_range_compression'],
-            task_manager=kwargs.get('task_manager'),
-            scheduler_kwargs=scheduler_kwargs
-        )
+    from Optimizer.base import BaseOptimizer
+    scheduler_kwargs = {
+        'R': args.R,
+        'eta': args.eta,
+    }
+    scheduler_type = 'mfes' if 'MFSE' in args.opt else 'bohb' if 'BOHB' in args.opt else 'full'
 
+    optimizer = BaseOptimizer(
+        config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
+        iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
+        method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
+        cp_args=cp_args,
+        ws_strategy=args.warm_start, ws_args=ws_args,
+        tl_strategy=args.transfer, tl_args=tl_args,
+        backup_flag=args.backup_flag, seed=args.seed,
+        rand_prob=args.rand_prob, rand_mode=args.rand_mode,
+        _logger_kwargs=kwargs.get('_logger_kwargs', None),
+        scheduler_type=scheduler_type,
+        scheduler_kwargs=scheduler_kwargs,
+    )
 
     logger.info("[opt: {}] [warm_start_strategy: {}] [transfer_strategy: {}] [backup_flag: {}] [seed: {}] [rand_prob: {}]".format(
         args.opt, args.warm_start, args.transfer, args.backup_flag, args.seed, args.rand_prob)
     )
-
     logger.info("warm start args: %s: %s" % (args.warm_start, json.dumps(ws_args)))
-
-
     return optimizer
+
 
 def wrapper_func(obj_func, queue, obj_args, obj_kwargs):
     try:
@@ -107,20 +80,13 @@ def run_without_time_limit(obj_func, obj_args, obj_kwargs):
     try:
         ret = obj_func(*obj_args, **obj_kwargs)
     except Exception:
-        result = {'result': {'objective': np.Inf}, 'timeout': False, 'traceback': traceback.format_exc()}
-    else:
-        if np.isfinite(ret['objective']):
-            result = {'result': ret, 'timeout': False, 'traceback': None}
-        else:
-            result = {'result': ret, 'timeout': True, 'traceback': None}
-    result['elapsed_time'] = time.time() - start_time
-    return result
+        ret = {'result': {'objective': np.Inf}, 'timeout': False, 'traceback': traceback.format_exc()}
+    return ret
 
 
 def run_with_time_limit(obj_func, obj_args, obj_kwargs, timeout):
     start_time = time.time()
     queue = Queue()
-    # Todo: 这里本来是多进程，但是多进程传入的参数要是可序列化的（SparkExecutor不满足），所以暂时改成多线程
     p = Process(target=wrapper_func, args=(obj_func, queue, obj_args, obj_kwargs))
     p.start()
     # wait until the process is finished or timeout is reached
@@ -158,13 +124,41 @@ def run_obj_func(obj_func, obj_args, obj_kwargs, timeout=None):
     return result
 
 
-def process_src_data(his):
-    default = his.observations[0].objectives[0]
-    # 用默认配置的五倍弱来填inf
-    fill_val = default * 5 if default > 0 else default / 5
-    for obs in his.observations:
-        if not np.isfinite(obs.objectives[0]):
-            obs.objectives[0] = fill_val
-            print("find inf objective in %s, fill %f" % (his.task_id, fill_val))
-
-    return his
+def load_space_from_json(json_file=None):
+    
+    if json_file is None:
+        json_file = HUGE_SPACE_FILE
+    
+    with open(json_file, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    
+    space = sp.Space()
+    
+    for param_name, param_config in config.items():
+        param_type = param_config["type"]
+        default_value = param_config["default"]
+        
+        if param_type == "integer":
+            space.add_variable(sp.Int(
+                param_name,
+                lower=param_config["min"],
+                upper=param_config["max"],
+                default_value=default_value
+            ))
+        elif param_type == "float":
+            q = param_config.get("q", 0.05)
+            space.add_variable(sp.Real(
+                param_name,
+                lower=param_config["min"],
+                upper=param_config["max"],
+                default_value=default_value,
+                q=q
+            ))
+        elif param_type == "categorical":
+            space.add_variable(sp.Categorical(
+                param_name,
+                choices=param_config["choice_values"],
+                default_value=default_value
+            ))
+    
+    return space

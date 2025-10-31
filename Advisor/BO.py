@@ -4,31 +4,26 @@ from openbox import logger
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from .base import BaseAdvisor
-from .utils import build_my_surrogate, build_my_acq_func
+from .utils import build_my_surrogate, build_my_acq_func, is_valid_spark_config, sanitize_spark_config
 from .workload_mapping.rover.transfer import get_transfer_suggestion
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
-from .task_manager import TaskManager
+from config import LIST_SPARK_NODES
 
 
 class BO(BaseAdvisor):
-    def __init__(self, config_space: ConfigurationSpace, task_manager: TaskManager,
+    def __init__(self, config_space: ConfigurationSpace,
                 surrogate_type='prf', acq_type='ei', task_id='test',
-                ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
-                cp_args=None, cprs_strategy='shap',
-                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', 
-                expert_modified_space=None, enable_range_compression=True,
+                ws_strategy='none', ws_args={'init_num': 5},
+                tl_args={'topk': 5}, cp_args={},
+                seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
-        super().__init__(config_space, task_manager=task_manager, task_id=task_id,
+        super().__init__(config_space, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_args=tl_args,
-                        cprs_strategy=cprs_strategy, cp_args=cp_args,
-                        seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
+                        tl_args=tl_args, cp_args=cp_args,
+                        seed=seed, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
 
         self.acq_type = acq_type
         self.surrogate_type = surrogate_type
-
-        self.origin_expert_space = expert_modified_space
-        self.expert_modified_space = copy.deepcopy(self.origin_expert_space)
 
         self.norm_y = True
         if 'wrk' in acq_type:
@@ -115,7 +110,7 @@ class BO(BaseAdvisor):
     采样(使用ini_configs进行热启动和普通采样)
     以及安全约束 (40轮后阈值为 0.85 * incumbent_value)
     """
-    def sample(self, return_list=False):
+    def sample(self, batch_size=1):
         num_config_evaluated = len(self.history)
         if len(self.ini_configs) == 0 and (
             (self.init_num > 0 and num_config_evaluated < self.init_num)
@@ -127,16 +122,19 @@ class BO(BaseAdvisor):
         logger.info("num_config_evaluated: [%d], init_num: [%d], init_configs: [%d]" % (num_config_evaluated, self.init_num, len(self.ini_configs)))
         if num_config_evaluated < self.init_num or (not self.init_num and not num_config_evaluated):
         # if num_config_evaluated <= self.init_num:
-            if len(self.ini_configs) > 0:
-                config = self.ini_configs[-1]
-                self.ini_configs.pop()
-            else:
-                config = self.sample_random_configs(self.sample_space, 1,
-                                                    excluded_configs=self.history.configurations)[0]
-            if return_list:
-                return [config]
-            else:
-                return config
+            batch = []
+            for _ in range(batch_size):
+                if len(self.ini_configs) > 0:
+                    config = self.ini_configs[-1]
+                    self.ini_configs.pop()
+                else:
+                    config = self.sample_random_configs(self.sample_space, 1,
+                                                        excluded_configs=self.history.configurations)[0]
+                config.origin = 'BO Random Sample'
+                batch.append(config)
+            if batch_size == 1:
+                return batch[0]
+            return batch
     
         X = self.history.get_config_array()
         Y = self.history.get_objectives()
@@ -156,21 +154,29 @@ class BO(BaseAdvisor):
         observations = self.history.observations
         challengers = self.acq_optimizer.maximize(observations=observations, num_points=2000)
     
-        if return_list:
-            return challengers.challengers
+        # select first valid, non-duplicate config; sanitize if necessary
+        _is_valid = is_valid_spark_config
+        _sanitize = sanitize_spark_config
 
-        cur_config = challengers.challengers[0]
-        recommend_flag = False
+        batch = []
         for config in challengers.challengers:
-            if config not in self.history.configurations:
-                cur_config = config
-                recommend_flag = True
-                break
-        if recommend_flag:
-            logger.warn("Successfully recommend a configuration through Advisor!")
-        else:
-            logger.error("Failed to recommend am unique configuration ! Return a random config")
-            cur_config = self.sample_random_configs(self.sample_space, 1, excluded_configs=self.history.configurations)
-
-        logger.info("ret conf: %s" % (str(cur_config)))
-        return cur_config
+            if config in self.history.configurations:
+                continue
+            if not _is_valid(config):
+                config = _sanitize(config)
+            if _is_valid(config):
+                config.origin = 'BO Acquisition'
+                batch.append(config)
+                if len(batch) >= batch_size:
+                    break
+        if len(batch) < batch_size:
+            random_configs = self.sample_random_configs(
+                self.sample_space, batch_size - len(batch),
+                excluded_configs=self.history.configurations + batch
+            )
+            for config in random_configs:
+                config.origin = 'BO Random Sample'
+                batch.append(config)
+        if batch_size == 1:
+            return batch[0]
+        return batch

@@ -9,21 +9,15 @@ from .utils import build_observation
 
 class MFBO(BO):
     def __init__(self, config_space: ConfigurationSpace,
-                surrogate_type='prf', acq_type='ei', task_id='test', meta_feature=None,
+                surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
-                tl_args={'topk': 5}, source_hpo_data=None,
-                cprs_strategy='shap', cp_args=None,
-                ep_args=None, ep_strategy='none', expert_params=[],
-                enable_range_compression=True,
-                seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
-        super().__init__(config_space, meta_feature=meta_feature,
+                tl_args={'topk': 5}, cp_args={},
+                seed=42, rand_prob=0.15, rand_mode='ran', **kwargs):
+        super().__init__(config_space,
                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_args=tl_args, source_hpo_data=source_hpo_data,
-                        ep_args=ep_args, ep_strategy=ep_strategy, expert_params=expert_params,
-                        cprs_strategy=cprs_strategy, cp_args=cp_args,
-                        seed=seed, rng=rng, rand_prob=rand_prob, rand_mode=rand_mode,
-                        enable_range_compression=enable_range_compression,
+                        tl_args=tl_args, cp_args=cp_args,
+                        seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
                         **kwargs)
 
         self.history_list: List[History] = list()  # 低精度组的 history -> List[History]
@@ -131,7 +125,7 @@ class MFBO(BO):
         logger.info("Successfully warm start %d configurations with %s!" % (len(self.ini_configs), self.ws_strategy))
 
 
-    def samples(self, batch_size):
+    def sample(self, batch_size):
         num_config_evaluated = len(self.history)
         if len(self.ini_configs) == 0 and (
             (self.init_num > 0 and num_config_evaluated < self.init_num)
@@ -167,47 +161,15 @@ class MFBO(BO):
             return batch
 
         self.surrogate.update_mf_trials(self.history_list)
-        self.surrogate.build_source_surrogates()
-        candidates = super().sample(return_list=True)
+        # self.surrogate.build_source_surrogates()
+        return super().sample(batch_size=batch_size)
 
-        idx = 0
-        while len(batch) < batch_size and idx < len(candidates):
-            conf = candidates[idx]
-            idx += 1
-            
-            if self.rng.random() < self.rand_prob:
-                random_config = self.sample_random_configs(
-                    self.sample_space, 1,
-                    excluded_configs=self.history.configurations + batch
-                )[0]
-                random_config.origin = 'MFBO Random Sample'
-                batch.append(random_config)
-                continue
-            if conf not in batch and conf not in self.history.configurations:
-                conf.origin = 'MFBO Acquisition'
-                batch.append(conf)
-
-        # when candidates are not enough, random sample to fill the batch
-        remaining = batch_size - len(batch)
-        if remaining > 0:
-            random_configs = self.sample_random_configs(
-                self.sample_space, remaining, excluded_configs=self.history.configurations + batch
-            )
-            for config in random_configs:
-                config.origin = 'MFBO Random Sample'
-            batch.extend(random_configs)
-            
-        logger.info(f"[MFBO] Generated {len(batch)} candidates: "
-                    f"{sum(1 for c in batch if 'Random' in c.origin)} random, "
-                    f"{sum(1 for c in batch if 'Acquisition' in c.origin)} acquisition")
-
-        return batch
-
-    def update(self, config, results, resource_ratio=1):
-        obs = build_observation(config, results, last_context=self.last_context)
+    def update(self, config, results, resource_ratio=1, update=True):
+        if not update:
+            return
+        obs = build_observation(config, results)
         resource_ratio = round(resource_ratio, 5)
         if resource_ratio != 1:
-        # if resource_ratio ==  round(float(1/64), 5):
             if resource_ratio not in self.resource_identifiers:
                 self.resource_identifiers.append(resource_ratio)
                 history = History(task_id="res%.5f_%s" % (resource_ratio, self.task_id),
@@ -215,9 +177,7 @@ class MFBO(BO):
                                   num_constraints=self.history.num_constraints,
                                   config_space=self.sample_space)
                 self.history_list.append(history)
-                self.early_stop_histories.append([])
             self.history_list[self.get_resource_index(resource_ratio)].update_observation(obs)
-            # self.history.update_observation(obs)
         else:
             self.history.update_observation(obs)
 
