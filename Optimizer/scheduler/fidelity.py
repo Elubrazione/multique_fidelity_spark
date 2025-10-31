@@ -128,7 +128,7 @@ class BOHBFidelityScheduler(BaseScheduler):
         return resource_ratio == round(float(1.0), 5)
 
 
-class MFSEFidelityScheduler(BOHBFidelityScheduler):
+class MFESFidelityScheduler(BOHBFidelityScheduler):
     def __init__(self, 
                  num_nodes: int = 1,
                  R: int = 9, eta: int = 3):
