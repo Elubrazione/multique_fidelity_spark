@@ -7,9 +7,9 @@ class BaseScheduler(abc.ABC):
         self.num_nodes = num_nodes
         self.fidelity_levels = []
 
-    @abc.abstractmethod
-    def get_bracket_params(self) -> Tuple[int, int]:
-        pass
+    def get_bracket_index(self, iter_id: int) -> int:
+        # always return 0 when using full fidelity scheduler
+        return iter_id % (len(self.fidelity_levels) + 1)
 
     @abc.abstractmethod
     def get_elimination_count(self) -> int:
@@ -18,7 +18,7 @@ class BaseScheduler(abc.ABC):
     def eliminate_candidates(
         self, candidates: List, perfs: List, **kwargs
     ) -> Tuple[List, List]:
-        reduced_num = self.get_elimination_count(**kwargs) * self.num_nodes
+        reduced_num = self.get_elimination_count(**kwargs)
         indices = np.argsort(perfs)
         sorted_candidates = [candidates[i] for i in indices]
         sorted_perfs = [perfs[i] for i in indices]
@@ -31,15 +31,16 @@ class BaseScheduler(abc.ABC):
     def calculate_resource_ratio(self) -> float:
         pass
 
+    def get_stage_params(self, **kwargs) -> Tuple[int, int]:
+        return self.num_nodes, 1
+
+
 class FullFidelityScheduler(BaseScheduler):
     def __init__(self, num_nodes: int = 1):
         super().__init__(num_nodes)
 
-    def calculate_resource_ratio(self) -> float:
+    def calculate_resource_ratio(self, **kwargs) -> float:
         return round(float(1.0), 5)
 
-    def get_bracket_params(self) -> Tuple[int, int]:
-        return self.num_nodes, 1
-
-    def get_elimination_count(self) -> int:
-        return self.num_nodes
+    def get_elimination_count(self, **kwargs) -> int:
+        return 0

@@ -20,15 +20,13 @@ class FixedFidelityScheduler(BaseScheduler):
             if r not in self.fidelity_levels:
                 raise ValueError(f"r_resource {r} not in fidelity_levels {self.fidelity_levels}")
 
-    def get_bracket_params(self) -> Tuple[int, int]:
-        return self.get_stage_params(stage=0)
-
-    def get_stage_params(self, stage: int) -> Tuple[int, int]:
+    def get_stage_params(self, stage: int, **kwargs) -> Tuple[int, int]:
         assert stage < len(self.n_resources) and stage < len(self.r_resources), "Stage index out of range"
         return self.n_resources[stage] * self.num_nodes, self.r_resources[stage]
 
-    def get_elimination_count(self, stage: int) -> int:
-        return self.n_resources[stage + 1] if stage + 1 < len(self.n_resources) else 0
+    def get_elimination_count(self, stage: int, **kwargs) -> int:
+        reduced_num = self.n_resources[stage + 1] if stage + 1 < len(self.n_resources) else 0
+        return reduced_num * self.num_nodes
 
     def calculate_resource_ratio(self, n_resource: int) -> float:
         return round(float(n_resource), 5)
@@ -57,10 +55,13 @@ class BOHBFidelityScheduler(BaseScheduler):
         self.s_values = list(reversed(range(self.s_max + 1)))
 
         self.fidelity_levels = [int(x) for x in np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)]
-        
+        assert len(self.fidelity_levels) == self.s_max + 1, "Fidelity levels length mismatch"
+    
         logger.info("FidelityScheduler: run %d brackets with fidelity levels %s. s_max = [%d]. R = [%d], eta = [%d]" 
                     % (len(self.s_values), self.get_fidelity_levels(), self.s_max, self.R, self.eta))
     
+    def get_bracket_index(self, iter_id: int) -> int:
+        return self.s_values[iter_id % len(self.s_values)]
 
     def get_bracket_params(self, s: int) -> Tuple[int, int]:
         """
