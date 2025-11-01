@@ -210,6 +210,7 @@ class TaskManager:
 
         # use default config writen in spark_default.conf
         default_config = self.config_space.get_default_configuration()
+        default_config.origin = 'Default Configuration'
         if not kwargs.get('debug', False):
             result = eval_func(config=default_config, resource_ratio=1.0)
 

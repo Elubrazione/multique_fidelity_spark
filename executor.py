@@ -63,19 +63,30 @@ class ExecutorManager:
 
         def run():
             start_time = time.time()
+            result = None
             try:
                 result = self.executors[idx](config, resource_ratio)
-            except Exception:
+            except Exception as e:
                 result = {
                     'result': {'objective': float('inf')},
                     'timeout': True,
                     'traceback': None,
                     'elapsed_time': time.time() - start_time,
                 }
-                logger.error(f"[Executor {idx}] Execution raised exception, continue with INF objective.")
+                logger.error(f"[Executor {idx}] Execution raised exception, continue with INF objective. Exception: {type(e).__name__}: {str(e)}")
             finally:
-                result_queue.put(result)
-                self.executor_queue.put(idx)  # 标记为“空闲”
+                if result is not None:
+                    result_queue.put(result)
+                else:
+                    default_result = {
+                        'result': {'objective': float('inf')},
+                        'timeout': True,
+                        'traceback': None,
+                        'elapsed_time': time.time() - start_time,
+                    }
+                    result_queue.put(default_result)
+                    logger.error(f"[Executor {idx}] Result was None, using default INF result.")
+                self.executor_queue.put(idx)  # 标记为"空闲"
                 logger.debug(f"[Executor {idx}] Marked as free again.")
 
         thread = threading.Thread(target=run)
@@ -391,8 +402,13 @@ class SparkSessionTPCDSExecutor:
             try:
                 spark.stop()
                 logger.info("SparkSession closed")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[SparkSession] Exception while stopping SparkSession: {type(e).__name__}: {str(e)}")
+                try:
+                    if hasattr(spark, 'sparkContext') and spark.sparkContext is not None:
+                        spark.sparkContext.stop()
+                except Exception:
+                    pass
 
     @staticmethod
     def build_ret_dict(perf, start_time, extra_info={'qt_time': {}, 'et_time': {}}):
