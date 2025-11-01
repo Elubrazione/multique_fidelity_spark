@@ -250,8 +250,8 @@ class SparkSessionTPCDSExecutor:
         total_elapsed = time.time() - total_start_time
         return {
             'sql_file': sql_file,
-            'total_elapsed_time': total_elapsed,
-            'per_sql_time': per_sql_time,
+            'per_et_time': total_elapsed,
+            'per_qt_time': per_sql_time if status == 'success' else float('inf'),
             'status': status
         }
 
@@ -274,6 +274,7 @@ class SparkSessionTPCDSExecutor:
             return self.build_ret_dict(float('inf'), start_time)
 
         total_spark_time = 0.0
+        extra_info = {'qt_time': {}, 'et_time': {}}
         for sql in queries:
             sql_path = os.path.join(self.sql_dir, f"{sql}.sql")
             if not os.path.exists(sql_path):
@@ -285,13 +286,18 @@ class SparkSessionTPCDSExecutor:
                     sql_content = f.read()
 
             result = self.execute_sql_with_timing(spark, sql_content, sql)
-            per_sql_time = result.get('per_sql_time', 0.0)
+            per_qt_time = result.get('per_qt_time', float('inf'))
+            per_et_time = result.get('per_et_time', float('inf'))
 
             if result['status'] == 'success':
-                total_spark_time += per_sql_time
+                total_spark_time += per_qt_time
+                extra_info['qt_time'][sql] = per_qt_time
+                extra_info['et_time'][sql] = per_et_time
 
             if result['status'] != 'success':
                 total_status = False
+                extra_info['qt_time'][sql] = float('inf')
+                extra_info['et_time'][sql] = float('inf')
                 break
 
         spark.stop()
@@ -300,16 +306,17 @@ class SparkSessionTPCDSExecutor:
             total_spark_time = float('inf')
 
         objective = total_spark_time if np.isfinite(total_spark_time) else float('inf')
-        return self.build_ret_dict(objective, start_time)
+        return self.build_ret_dict(objective, start_time, extra_info)
 
     @staticmethod
-    def build_ret_dict(perf, start_time):
+    def build_ret_dict(perf, start_time, extra_info={'qt_time': {}, 'et_time': {}}):
         result = {
             'result': {'objective': perf},
             'timeout': not np.isfinite(perf),
-            'traceback': None
+            'traceback': None,
+            'extra_info': extra_info,
+            'elapsed_time': time.time() - start_time
         }
-        result['elapsed_time'] = time.time() - start_time
         return result
 
 class TestExecutor:
@@ -317,9 +324,15 @@ class TestExecutor:
         pass
 
     def __call__(self, config, resource_ratio):
+        extra_info = {'qt_time': {}, 'et_time': {}}
+        sql_list = ['q10', 'q11', 'q12', 'q13', 'q14a', 'q14b', 'q15', 'q16', 'q17', 'q18', 'q19', 'q1', 'q20', 'q21', 'q22', 'q23a', 'q23b', 'q24a', 'q24b', 'q25', 'q26', 'q27', 'q28', 'q29', 'q2', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36', 'q37', 'q38', 'q39a', 'q39b', 'q3', 'q40', 'q41', 'q42', 'q43', 'q44', 'q45', 'q46', 'q47', 'q48', 'q49', 'q4', 'q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q5', 'q60', 'q61', 'q62', 'q63', 'q64', 'q65', 'q66', 'q67', 'q68', 'q69', 'q6', 'q70', 'q71', 'q72', 'q73', 'q74', 'q75', 'q76', 'q77', 'q78', 'q79', 'q7', 'q80', 'q81', 'q82', 'q83', 'q84', 'q85', 'q86', 'q87', 'q88', 'q89', 'q8', 'q90', 'q91', 'q92', 'q93', 'q94', 'q95', 'q96', 'q97', 'q98', 'q99', 'q9']
+        for it in sql_list:
+            extra_info['qt_time'][it] = np.random.rand()
+            extra_info['et_time'][it] = np.random.rand()
         return {
-            'result': {'objective': np.random.rand()},
+            'result': {'objective': sum(extra_info['qt_time'].values())},
             'timeout': not np.isfinite(np.random.rand()),
             'traceback': None,
+            'extra_info': extra_info,
             'elapsed_time': np.random.rand()
         }

@@ -119,9 +119,8 @@ def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
 
 
 def build_observation(config, results, **kwargs):
-    ret, timeout_status, traceback_msg, elapsed_time = (
-        results['result'], results['timeout'], results['traceback'], results['elapsed_time'])
-
+    ret, timeout_status, traceback_msg, elapsed_time, extra_info = (
+        results['result'], results['timeout'], results['traceback'], results['elapsed_time'], results['extra_info'])
     perf = ret['objective']
 
     if timeout_status:
@@ -133,6 +132,6 @@ def build_observation(config, results, **kwargs):
         trial_state = SUCCESS
 
     obs = Observation(config=config, objectives=[perf], trial_state=trial_state, elapsed_time=elapsed_time,
-                    extra_info={'origin': config.origin})
+                    extra_info={'origin': config.origin, **extra_info})
 
     return obs

@@ -5,11 +5,11 @@ from typing import List, Tuple
 class BaseScheduler(abc.ABC):
     def __init__(self, num_nodes: int = 1):
         self.num_nodes = num_nodes
-        self.fidelity_levels = []
+        self.fidelity_levels = [round(float(1.0), 5)]
 
     def get_bracket_index(self, iter_id: int) -> int:
-        # always return 0 when using full fidelity scheduler
-        return iter_id % (len(self.fidelity_levels) + 1)
+        # always return 0 when using full fidelity scheduler since there is only one fidelity level
+        return iter_id % len(self.fidelity_levels)
 
     @abc.abstractmethod
     def get_elimination_count(self) -> int:
