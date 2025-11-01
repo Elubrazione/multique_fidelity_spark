@@ -46,7 +46,7 @@ args = parser.parse_args()
 
 _logger_kwargs = {
     'name': "%s" % args.task,
-    'logdir': f'./{LOG_DIR}/{args.target}/{args.opt}',
+    'logdir': f'{LOG_DIR}/{args.target}/{args.opt}',
     'level': args.log_level.upper()
 }
 logger.init(**_logger_kwargs)

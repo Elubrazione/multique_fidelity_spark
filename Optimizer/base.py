@@ -7,9 +7,8 @@ from datetime import datetime
 from ConfigSpace import ConfigurationSpace
 from openbox import logger
 from typing import List
-from .utils import run_obj_func
+from .utils import run_obj_func, get_advisor_config
 from .scheduler import schedulers
-from .config import get_advisor_config
 from Advisor import advisors
 from config import LIST_SPARK_NODES
 
@@ -86,7 +85,7 @@ class BaseOptimizer:
         self.timeout = per_run_time_limit
 
     def build_path(self):
-        result_dir = os.path.join(self.save_dir, self.target, self.method_id)
+        result_dir = os.path.join(self.save_dir, self.target)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
 

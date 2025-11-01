@@ -1,7 +1,7 @@
 {
-    "log_dir": "results/details",
-    "result_dir": "results/results",
-    "database": "tpcds_3000g",
+    "log_dir": "log",
+    "result_dir": "results",
+    "database": "tpcds_100g",
     "spark": {
       "nodes": ["agent1", "agent2", "server1"],
       "server_node": "server1",
@@ -9,12 +9,11 @@
       "password": "rootroot"
     },
     "multi_cluster": {
-      "usernames": ["root", "root"],
-      "passwords": ["root", "rootroot"],
-      "servers": ["192.168.90.76", "192.168.90.153"],
+      "usernames": ["root"],
+      "passwords": ["root"],
+      "servers": ["192.168.90.76"],
       "nodes": [
-        ["192.168.90.76", "192.168.90.77", "192.168.90.78"],
-        ["192.168.90.151", "192.168.90.152", "192.168.90.153"]
+        ["192.168.90.76", "192.168.90.77", "192.168.90.78"]
       ]
     },
     "env": {
@@ -33,5 +32,6 @@
       "range_compress_data_single": "results/history/nodes_2/huge_80d/node2_results.json"
     },
     "config_space": "configs/config_space/huge_space.json",
-    "os_config_space": "configs/config_space/os_params.json"
+    "os_config_space": "configs/config_space/os_params.json",
+    "expert_space": "configs/config_space/expert_space.json"
   }
