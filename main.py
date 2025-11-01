@@ -40,6 +40,8 @@ parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--rand_prob', type=float, default=0.15)
 parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'])
 
+# debug mode: debug in server which has spark cluster, for quick testing
+# test_mode: code development mode when coding in local machine which has no spark cluster
 parser.add_argument('--test_mode', action='store_true', default=False)
 parser.add_argument('--debug', action='store_true', default=False)
 
@@ -90,7 +92,8 @@ task_manager = TaskManager.instance(
     ws_args=ws_args,
     similarity_threshold=0.5,
     config_space=config_space,
-    test_mode=args.test_mode
+    test_mode=args.test_mode,
+    debug=args.debug
 )
 
 
