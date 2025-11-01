@@ -1,7 +1,7 @@
 import argparse
 from openbox import logger
 
-from executor import ExecutorManager, SparkSessionTPCDSExecutor
+from Evaluator.executor import ExecutorManager, SparkSessionTPCDSExecutor
 from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
 from task_manager import TaskManager
