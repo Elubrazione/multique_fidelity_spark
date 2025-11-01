@@ -133,18 +133,20 @@ class TaskManager:
                     else:
                         task_metrics[key] = task_metrics.get(key, 0) + value
 
-        run_time = (end_time - start_time) / 1000
+        if start_time is None or end_time is None:
+            logger.warning('Cannot find start or end time in log')
+        else:
+            run_time = (end_time - start_time) / 1000
+            logger.info(f"Application run time: {run_time:.2f} seconds")
 
         keys = list(task_metrics.keys())
         keys.sort()
         for k, v in task_metrics.items():
             logger.debug(f"{k}: {v / cnt}")
         metrics = np.array([task_metrics[key] / cnt for key in keys])
+        logger.info(f"Metrics array shape: {metrics.shape}")
 
-        if start_time is None or end_time is None:
-            raise ValueError('Cannot find start or end time in log')
-
-        return run_time, metrics
+        return metrics
 
     def get_latest_application_id(self) -> Optional[str]:
         """
@@ -210,16 +212,22 @@ class TaskManager:
             logger.warning(f"Zstd file not found: {zstd_file}")
             raise ValueError(f"Zstd file not found: {zstd_file}")
         logger.info(f"Found zstd file: {zstd_file}")
+
         json_file = os.path.join(self.spark_log_dir, "app.json")
+        if os.path.exists(json_file):
+            os.remove(json_file)
+            logger.info(f"Removed existing json file: {json_file}")
+        logger.info(f"Decoding zstd file: {zstd_file} to json file: {json_file}")
         subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
+
+        json_content = ""
         with open(json_file, 'r') as f:
             json_content = f.read()
-        run_time, metrics = self.decode_results_spark(json_content)
+        logger.info(f"Read json file: {json_file}")
+        metrics = self.decode_results_spark(json_content)
         os.remove(zstd_file)
         os.remove(json_file)
         
-        logger.info(f"Application run time: {run_time:.2f} seconds")
-        logger.info(f"Metrics array shape: {metrics.shape}")
         logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
 
         self.current_meta_feature = metrics

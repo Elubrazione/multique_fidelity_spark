@@ -41,6 +41,7 @@ parser.add_argument('--rand_prob', type=float, default=0.15)
 parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'])
 
 parser.add_argument('--test_mode', action='store_true', default=False)
+parser.add_argument('--debug', action='store_true', default=False)
 
 args = parser.parse_args()
 
@@ -59,7 +60,9 @@ fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_detai
     ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
 )
 fidelity_details[round(float(1/64), 5)] = ['q48']
-# fidelity_details[round(float(1.0), 5)] = ['q10', 'q12', 'q11']
+
+if args.debug:
+    fidelity_details[round(float(1.0), 5)] = ['q10', 'q12', 'q11']
 
 executor = ExecutorManager(
     sqls=fidelity_details,
