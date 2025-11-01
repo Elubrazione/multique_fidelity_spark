@@ -177,13 +177,8 @@ class SparkSessionTPCDSExecutor:
         }
         suffix = memory_params.get(key, '')
         return f"{value}{suffix}" if suffix and not str(value).endswith(suffix) else str(value)
-
-    def create_spark_session(self, config_dict, app_name, database=None):
-        spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
-        for key, value in config_dict.items():
-            if str(key).startswith('spark.'):
-                spark_builder = spark_builder.config(key, self._format_config_value(key, value))
-        spark = spark_builder.getOrCreate()
+    
+    def use_database(self, spark, database):
         if database is not None:
             db_name = str(database).strip()
             if db_name:
@@ -200,6 +195,14 @@ class SparkSessionTPCDSExecutor:
                     logger.warning(f"[SparkSession] Failed to set database to '{db_name}'. Continuing without changing database.")
             else:
                 logger.warning("[SparkSession] Empty database name resolved; skipping USE.")
+
+    def create_spark_session(self, config_dict, app_name, database=None):
+        spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
+        for key, value in config_dict.items():
+            if str(key).startswith('spark.'):
+                spark_builder = spark_builder.config(key, self._format_config_value(key, value))
+        spark = spark_builder.getOrCreate()
+        self.use_database(spark, database)
         return spark
 
     def _clear_cluster_cache(self):
@@ -211,51 +214,87 @@ class SparkSessionTPCDSExecutor:
             except Exception as exc:
                 logger.error(f"[SparkSession] Failed to clear cache on {node}: {exc}")
 
+    def _check_spark_context_valid(self, spark):
+        try:
+            sc = spark.sparkContext
+            if sc is None or sc._jsc is None:
+                return False
+            _ = sc.version
+            return True
+        except Exception:
+            return False
+
     def execute_sql_with_timing(self, spark, sql_content, sql_file):
-        logger.info(f"[SparkSession] Execute SQL file: {sql_file}")
         queries = [q.strip() for q in sql_content.split(';') if q.strip()]
 
         total_start_time = time.time()
-        per_sql_time = 0.0
+        per_qt_time = 0.0
         status = 'success'
 
         for idx, query in enumerate(queries):
             if not query:
                 continue
             logger.debug(f"  execute query {idx + 1}/{len(queries)}: {query[:50]}...")
+            
+            if not self._check_spark_context_valid(spark):
+                logger.error(f"     {sql_file} query {idx + 1} failed: SparkContext was shut down")
+                status = 'error'
+                per_qt_time = float('inf')
+                raise RuntimeError("SparkContext was shut down")
+            
             query_start_time = time.time()
             try:
                 result = spark.sql(query)
                 collected = result.collect()
-                logger.debug(f"      query returned {len(collected)} rows")
-                per_sql_time += (time.time() - query_start_time)
-                logger.info(f"      query {idx + 1} completed")
+                logger.debug(f"     {sql_file} query {idx + 1} returned {len(collected)} rows")
+                per_qt_time += (time.time() - query_start_time)
+                logger.info(f"     {sql_file} query {idx + 1} completed")
             except Exception as exc:
                 _ = time.time() - query_start_time
                 status = 'error'
                 py_err = type(exc).__name__
-                jvm_err = None
+                jvm_info = ""
                 try:
                     java_exc = getattr(exc, 'java_exception', None)
                     if java_exc is not None:
                         jvm_err = java_exc.getClass().getName()
+                        try:
+                            jvm_msg = str(java_exc.getMessage()) or ""
+                            jvm_info = f", jvm={jvm_err}, msg={jvm_msg[:150]}"
+                        except Exception:
+                            jvm_info = f", jvm={jvm_err}"
                 except Exception:
-                    jvm_err = None
-                if jvm_err:
-                    logger.error(f"      query {idx + 1} failed (py_err={py_err}, jvm_err={jvm_err})")
-                else:
-                    logger.error(f"      query {idx + 1} failed (py_err={py_err})")
+                    pass
+                logger.error(f"     {sql_file} query {idx + 1} failed (py_err={py_err}{jvm_info})")
+                
+                error_msg = str(exc).lower()
+                if 'sparkcontext' in error_msg and ('shut down' in error_msg or 'cancelled' in error_msg):
+                    logger.warning(f"     SparkContext was shut down, will attempt to recreate SparkSession")
+                    raise RuntimeError("SparkContext was shut down")
+                
                 break
 
         total_elapsed = time.time() - total_start_time
         return {
             'sql_file': sql_file,
             'per_et_time': total_elapsed,
-            'per_qt_time': per_sql_time if status == 'success' else float('inf'),
+            'per_qt_time': per_qt_time if status == 'success' else float('inf'),
             'status': status
         }
 
     def run_spark_session_job(self, config, resource):
+        """
+        Workflow:
+        - if query executed successfully: continue to next query
+        - if query executed failed (not SparkContext problem): set status to False and break the loop
+        - if SparkContext is closed and can be retried:
+            - stop old session
+            - try to create new session
+                - if successful: retry the query
+                - if failed: set status to False and break the loop
+        - if SparkContext is closed and cannot be retried: set status to False and break the loop
+        - if other exception: set status to False and break the loop
+        """
         start_time = time.time()
         queries = self.get_sqls_by_fidelity(resource=resource)
 
@@ -275,6 +314,8 @@ class SparkSessionTPCDSExecutor:
 
         total_spark_time = 0.0
         extra_info = {'qt_time': {}, 'et_time': {}}
+        max_retry_attempts = 1
+        
         for sql in queries:
             sql_path = os.path.join(self.sql_dir, f"{sql}.sql")
             if not os.path.exists(sql_path):
@@ -283,30 +324,75 @@ class SparkSessionTPCDSExecutor:
                 break
 
             with open(sql_path, 'r', encoding='utf-8') as f:
-                    sql_content = f.read()
+                sql_content = f.read()
 
-            result = self.execute_sql_with_timing(spark, sql_content, sql)
-            per_qt_time = result.get('per_qt_time', float('inf'))
-            per_et_time = result.get('per_et_time', float('inf'))
+            retry_count = 0
+            query_executed = False
+            result = None
+            
+            while retry_count <= max_retry_attempts and not query_executed:
+                try:
+                    result = self.execute_sql_with_timing(spark, sql_content, sql)
+                    per_qt_time = result.get('per_qt_time', float('inf'))
+                    per_et_time = result.get('per_et_time', float('inf'))
 
-            if result['status'] == 'success':
-                total_spark_time += per_qt_time
-                extra_info['qt_time'][sql] = per_qt_time
-                extra_info['et_time'][sql] = per_et_time
+                    if result['status'] == 'success':
+                        total_spark_time += per_qt_time
+                        extra_info['qt_time'][sql] = per_qt_time
+                        extra_info['et_time'][sql] = per_et_time
+                        query_executed = True
+                    else:
+                        total_status = False
+                        extra_info['qt_time'][sql] = float('inf')
+                        extra_info['et_time'][sql] = float('inf')
+                        query_executed = True
+                        
+                except RuntimeError as e:
+                    if "SparkContext was shut down" in str(e) and retry_count < max_retry_attempts:
+                        logger.warning(f"[SparkSession] SparkContext was shut down during {sql}, attempting to recreate (retry {retry_count + 1}/{max_retry_attempts})")
 
-            if result['status'] != 'success':
-                total_status = False
-                extra_info['qt_time'][sql] = float('inf')
-                extra_info['et_time'][sql] = float('inf')
+                        self.stop_spark_session(spark)
+                        try:
+                            spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
+                            logger.info(f"[SparkSession] Successfully recreated SparkSession, retrying {sql}")
+                            retry_count += 1
+                        except Exception as recreate_exc:
+                            logger.error(f"[SparkSession] Failed to recreate SparkSession: {recreate_exc}")
+                            total_status = False
+                            extra_info['qt_time'][sql] = float('inf')
+                            extra_info['et_time'][sql] = float('inf')
+                            query_executed = True
+                    else:
+                        logger.error(f"[SparkSession] Failed to execute {sql}: {e}")
+                        total_status = False
+                        extra_info['qt_time'][sql] = float('inf')
+                        extra_info['et_time'][sql] = float('inf')
+                        query_executed = True
+                        
+                except Exception as unexpected_exc:
+                    logger.error(f"[SparkSession] Unexpected error during {sql}: {unexpected_exc}")
+                    total_status = False
+                    extra_info['qt_time'][sql] = float('inf')
+                    extra_info['et_time'][sql] = float('inf')
+                    query_executed = True
+            
+            if not query_executed or (result is not None and result['status'] != 'success'):
                 break
 
-        spark.stop()
+        self.stop_spark_session(spark)
 
         if not total_status:
             total_spark_time = float('inf')
-
         objective = total_spark_time if np.isfinite(total_spark_time) else float('inf')
         return self.build_ret_dict(objective, start_time, extra_info)
+
+    def stop_spark_session(self, spark):
+        if spark is not None:
+            try:
+                spark.stop()
+                logger.info("SparkSession closed")
+            except Exception:
+                pass
 
     @staticmethod
     def build_ret_dict(perf, start_time, extra_info={'qt_time': {}, 'et_time': {}}):

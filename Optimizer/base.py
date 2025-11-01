@@ -85,14 +85,11 @@ class BaseOptimizer:
         self.timeout = per_run_time_limit
 
     def build_path(self):
-        result_dir = os.path.join(self.save_dir, self.target)
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
+        self.res_dir = os.path.join(self.save_dir, self.target)
+        if not os.path.exists(self.res_dir):
+            os.makedirs(self.res_dir)
 
-        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')
-        self.res_dir = os.path.join(result_dir, timestamp)
-        os.makedirs(self.res_dir)
-        
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')       
         self.result_path = os.path.join(self.res_dir, "%s_%s.json" % (self.task_id, timestamp))
 
         self.ts_backup_file = "./backup/ts_backup_%s.pkl" % self.target

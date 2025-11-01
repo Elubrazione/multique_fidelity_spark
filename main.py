@@ -59,6 +59,7 @@ fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_detai
     ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
 )
 fidelity_details[round(float(1/64), 5)] = ['q48']
+# fidelity_details[round(float(1.0), 5)] = ['q10', 'q12', 'q11']
 
 executor = ExecutorManager(
     sqls=fidelity_details,
