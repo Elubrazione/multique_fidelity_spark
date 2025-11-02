@@ -85,6 +85,7 @@ def build_optimizer(args, **kwargs):
         random_kwargs=random_kwargs,
         scheduler_type=scheduler_type,
         scheduler_kwargs=scheduler_kwargs,
+        resume=args.resume,
     )
 
     logger.info("[opt: {}] [warm_start_strategy: {}] [transfer_strategy: {}] [backup_flag: {}] [seed: {}] [rand_prob: {}]".format(

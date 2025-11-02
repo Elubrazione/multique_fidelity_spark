@@ -200,11 +200,16 @@ class TaskManager:
 
         """
         # skip meta_feature collecting and default config evaluation
-        if kwargs.get('skip', False):
-            self.current_meta_feature = META_FEATURE
-            self.current_task_history = History(task_id=task_id, config_space=self.config_space,
-                                                meta_info={'meta_feature': self.current_meta_feature.tolist()})
+        if kwargs.get('resume', None) is not None:
+            self.current_task_history = History.load_json(
+                                        filename=kwargs.get('resume'),
+                                        config_space=self.config_space)
+            self.current_meta_feature = np.array(self.current_task_history.meta_info.get('meta_feature'))
+            logger.info(f"Current task meta feature: {self.current_meta_feature}")
+            logger.info(f"Current task history: {self.current_task_history.objectives}")
+            logger.info(f"Loaded current task history from {kwargs.get('resume')}")
             return
+
         # use default config writen in spark_default.conf
         default_config = self.config_space.get_default_configuration()
         default_config.origin = 'Default Configuration'

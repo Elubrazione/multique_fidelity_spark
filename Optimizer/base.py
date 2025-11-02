@@ -6,10 +6,11 @@ import pickle as pkl
 from datetime import datetime
 from ConfigSpace import ConfigurationSpace
 from openbox import logger
-from typing import List
+from typing import List, Optional
 from .utils import run_obj_func, get_advisor_config
 from .scheduler import schedulers
 from Advisor import advisors
+from task_manager import TaskManager
 from config import LIST_SPARK_NODES
 
 
@@ -20,7 +21,8 @@ class BaseOptimizer:
                  ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None, cp_args=None,
                  backup_flag=False, save_dir='./results',
                  random_kwargs={}, _logger_kwargs={},
-                 scheduler_type='bohb', scheduler_kwargs={}):
+                 scheduler_type='bohb', scheduler_kwargs={},
+                 resume: Optional[str] = None):
 
         assert scheduler_type in ['bohb', 'mfes', 'full', 'fixed']
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
@@ -29,7 +31,9 @@ class BaseOptimizer:
 
         self.eval_func = eval_func
         self.iter_num = iter_num
-        self.iter_id = 0
+
+        task_mgr = TaskManager.instance()
+        self.iter_id = len(task_mgr.current_task_history) - 1 if resume is not None else 0
 
         ws_str = ws_strategy
         if method_id != 'RS':
@@ -83,6 +87,7 @@ class BaseOptimizer:
         )
         self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **scheduler_kwargs)
         self.timeout = per_run_time_limit
+        self.save_info()
 
     def build_path(self):
         self.res_dir = os.path.join(self.save_dir, self.target)

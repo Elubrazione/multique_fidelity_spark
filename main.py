@@ -44,7 +44,7 @@ parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'
 # test_mode: code development mode when coding in local machine which has no spark cluster
 parser.add_argument('--test_mode', action='store_true', default=False)
 parser.add_argument('--debug', action='store_true', default=False)
-parser.add_argument('--skip_first', action='store_true', default=False)
+parser.add_argument('--resume', type=str, default=None)
 
 args = parser.parse_args()
 
@@ -94,7 +94,7 @@ task_manager = TaskManager.instance(
     similarity_threshold=0.5,
     config_space=config_space,
     test_mode=args.test_mode,
-    skip=args.skip_first
+    resume=args.resume
 )
 
 
