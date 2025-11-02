@@ -67,6 +67,7 @@ fidelity_details[round(float(1/64), 5)] = ['q48']
 if args.debug:
     fidelity_details[round(float(1.0), 5)] = ['q10', 'q12', 'q11']
 
+
 executor = ExecutorManager(
     sqls=fidelity_details,
     timeout=elapsed_timeout_dicts,
@@ -84,20 +85,6 @@ ws_args = {
 tl_args = {
     'topk': args.tl_topk
 }
-
-task_manager = TaskManager.instance(
-    history_dir=args.src_data_path,
-    eval_func=executor,
-    task_id=args.task,
-    spark_log_dir="/root/codes/spark-log",
-    ws_args=ws_args,
-    similarity_threshold=0.5,
-    config_space=config_space,
-    test_mode=args.test_mode,
-    resume=args.resume
-)
-
-
 cp_args = {
     'strategy': args.compress,
     'topk': args.cp_topk,
@@ -106,21 +93,38 @@ cp_args = {
     'expert_params': [p for p in load_expert_params(EXPERT_PARAMS_FILE) \
                         if p in config_space.get_hyperparameter_names()],
 }
-
 random_kwargs = {
     'seed': args.seed,
     'rand_prob': args.rand_prob,
     'rand_mode': args.rand_mode,
 }
 
+scheduler_kwargs = {
+    'R': args.R,
+    'eta': args.eta,
+}
+task_manager = TaskManager.instance(
+    history_dir=args.src_data_path,
+    eval_func=executor,
+    task_id=args.task,
+    spark_log_dir="/root/codes/spark-log",
+    ws_args=ws_args,
+    tl_args=tl_args,
+    cp_args=cp_args,
+    scheduler_kwargs=scheduler_kwargs,
+    logger_kwargs=_logger_kwargs,
+    random_kwargs=random_kwargs,
+    similarity_threshold=0.5,
+    config_space=config_space,
+    test_mode=args.test_mode,
+    resume=args.resume
+)
+
 opt_kwargs = {
     'config_space': config_space,
     'eval_func': executor,
     'target': args.target,
     'task': args.task,
-    'ws_args': ws_args, 'tl_args': tl_args, 'cp_args': cp_args,
-    'random_kwargs': random_kwargs,
-    '__logger_kwargs': _logger_kwargs
 }
 optimizer = build_optimizer(args, **opt_kwargs)
 

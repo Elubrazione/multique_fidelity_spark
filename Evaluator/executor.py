@@ -5,6 +5,7 @@ import time
 import traceback
 from queue import Queue
 import threading
+from typing import Optional
 import numpy as np
 from openbox import logger
 from ConfigSpace import Configuration
@@ -53,7 +54,13 @@ class ExecutorManager:
         for idx in range(self.child_num):
             self.executor_queue.put(idx)
             if kwargs.get('test_mode', True):
-                self.executors.append(TestExecutor())
+                base_seed = kwargs.get('seed')
+                if base_seed is None:
+                    base_seed = time.time_ns()
+                else:
+                    base_seed = int(base_seed) + time.time_ns()
+
+                self.executors.append(TestExecutor(seed=base_seed + idx))
                 continue
             executor_kwargs = {
                 'sqls': self.sqls,
@@ -499,19 +506,23 @@ class SparkSessionTPCDSExecutor:
         return result
 
 class TestExecutor:
-    def __init__(self):
-        pass
+    def __init__(self, seed: Optional[int] = None):
+        self.rng = np.random.default_rng(seed)
+        self.sql_list = ['q10', 'q11', 'q12', 'q13', 'q14a', 'q14b', 'q15', 'q16', 'q17', 'q18', 'q19', 'q1', 'q20', 'q21', 'q22', 'q23a', 'q23b', 'q24a', 'q24b', 'q25', 'q26', 'q27', 'q28', 'q29', 'q2', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36', 'q37', 'q38', 'q39a', 'q39b', 'q3', 'q40', 'q41', 'q42', 'q43', 'q44', 'q45', 'q46', 'q47', 'q48', 'q49', 'q4', 'q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q5', 'q60', 'q61', 'q62', 'q63', 'q64', 'q65', 'q66', 'q67', 'q68', 'q69', 'q6', 'q70', 'q71', 'q72', 'q73', 'q74', 'q75', 'q76', 'q77', 'q78', 'q79', 'q7', 'q80', 'q81', 'q82', 'q83', 'q84', 'q85', 'q86', 'q87', 'q88', 'q89', 'q8', 'q90', 'q91', 'q92', 'q93', 'q94', 'q95', 'q96', 'q97', 'q98', 'q99', 'q9']
 
     def __call__(self, config, resource_ratio):
         extra_info = copy.deepcopy(_DEFAULT_EXTRA_INFO)
-        sql_list = ['q10', 'q11', 'q12', 'q13', 'q14a', 'q14b', 'q15', 'q16', 'q17', 'q18', 'q19', 'q1', 'q20', 'q21', 'q22', 'q23a', 'q23b', 'q24a', 'q24b', 'q25', 'q26', 'q27', 'q28', 'q29', 'q2', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36', 'q37', 'q38', 'q39a', 'q39b', 'q3', 'q40', 'q41', 'q42', 'q43', 'q44', 'q45', 'q46', 'q47', 'q48', 'q49', 'q4', 'q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q5', 'q60', 'q61', 'q62', 'q63', 'q64', 'q65', 'q66', 'q67', 'q68', 'q69', 'q6', 'q70', 'q71', 'q72', 'q73', 'q74', 'q75', 'q76', 'q77', 'q78', 'q79', 'q7', 'q80', 'q81', 'q82', 'q83', 'q84', 'q85', 'q86', 'q87', 'q88', 'q89', 'q8', 'q90', 'q91', 'q92', 'q93', 'q94', 'q95', 'q96', 'q97', 'q98', 'q99', 'q9']
-        for it in sql_list:
-            extra_info['qt_time'][it] = np.random.rand()
-            extra_info['et_time'][it] = np.random.rand()
+
+        for sql_name in self.sql_list:
+            extra_info['qt_time'][sql_name] = float(self.rng.random())
+            extra_info['et_time'][sql_name] = float(self.rng.random())
+
+        result_objective = float(sum(extra_info['qt_time'].values()))
+
         return {
-            'result': {'objective': sum(extra_info['qt_time'].values())},
-            'timeout': not np.isfinite(np.random.rand()),
+            'result': {'objective': result_objective},
+            'timeout': not np.isfinite(self.rng.random()),
             'traceback': None,
             'extra_info': extra_info,
-            'elapsed_time': np.random.rand()
+            'elapsed_time': float(self.rng.random()),
         }

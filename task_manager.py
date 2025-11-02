@@ -42,7 +42,6 @@ class TaskManager:
                  task_id: str = "default",
                  spark_log_dir: str = "/root/codes/spark-log",
                  similarity_threshold: float = 0.5,
-                 ws_args: Optional[dict] = None, 
                  config_space: Optional[ConfigurationSpace] = None,
                  **kwargs):
         if hasattr(self, "_initialized") and self._initialized:
@@ -50,7 +49,14 @@ class TaskManager:
         self._initialized = True
         self.history_dir = history_dir
         self.spark_log_dir = spark_log_dir
-        self.ws_args = ws_args or {}
+
+        self.ws_args = dict(kwargs.get('ws_args') or {})
+        self.tl_args = dict(kwargs.get('tl_args') or {})
+        self.cp_args = dict(kwargs.get('cp_args') or {})
+        self.scheduler_kwargs = dict(kwargs.get('scheduler_kwargs') or {})
+        self.logger_kwargs = dict(kwargs.get('logger_kwargs') or {})
+        self.random_kwargs = dict(kwargs.get('random_kwargs') or {})
+
         self.similarity_threshold = similarity_threshold
         self.config_space = config_space
         
@@ -61,6 +67,11 @@ class TaskManager:
         self.current_meta_feature: Optional[np.ndarray] = None
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
+
+        self._scheduler = None
+        self.tl_topk: Optional[int] = self.tl_args.get('topk') if isinstance(self.tl_args, dict) else None
+        self.executor = eval_func
+        self._sql_partitioner = kwargs.get('sql_partitioner', None)
         
         self._load_historical_tasks()
         self.calculate_meta_feature(eval_func, task_id, **kwargs)
@@ -275,6 +286,8 @@ class TaskManager:
         self.current_task_history.update_observation(build_observation(default_config, result))
         logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
 
+        self._update_similarity()
+
 
     def update_history_meta_info(self, meta_info: dict):
         """
@@ -285,6 +298,47 @@ class TaskManager:
         """
         self.current_task_history.meta_info.update(meta_info)
 
+    def register_scheduler(self, scheduler):
+        # ensure scheduler is only registered once
+        if self._scheduler is not None:
+            logger.error("Scheduler already registered")
+            return
+        self._scheduler = scheduler
+        logger.info(f"Registered scheduler: {self._scheduler}")
+
+    def get_scheduler(self) -> Optional[object]:
+        return self._scheduler
+
+    def register_sql_partitioner(self, partitioner) -> None:
+        if self._sql_partitioner is not None:
+            logger.warning("SQLPartitioner already registered; skipping new registration")
+            return
+        self._sql_partitioner = partitioner
+        logger.info("Registered SQLPartitioner instance")
+
+    def get_sql_partitioner(self):
+        return self._sql_partitioner
+
+    def get_executor(self):
+        return self.executor
+
+    def get_ws_args(self) -> Dict[str, Any]:
+        return dict(self.ws_args)
+
+    def get_tl_args(self) -> Dict[str, Any]:
+        return dict(self.tl_args)
+
+    def get_cp_args(self) -> Dict[str, Any]:
+        return dict(self.cp_args)
+
+    def get_scheduler_kwargs(self) -> Dict[str, Any]:
+        return dict(self.scheduler_kwargs)
+
+    def get_logger_kwargs(self) -> Dict[str, Any]:
+        return dict(self.logger_kwargs)
+
+    def get_random_kwargs(self) -> Dict[str, Any]:
+        return dict(self.random_kwargs)
 
     def _update_similarity(self):
         self.similar_tasks_cache = map_source_hpo_data(
@@ -300,7 +354,7 @@ class TaskManager:
         logger.info(f"Updated similarity: {len(self.similar_tasks_cache)} tasks above threshold {self.similarity_threshold}")
 
 
-    def get_similar_tasks(self, topk: int = 3) -> Tuple[List[History], List[Tuple[int, float]]]:
+    def get_similar_tasks(self, topk: Optional[int] = None) -> Tuple[List[History], List[Tuple[int, float]]]:
         """
         Get filtered similar tasks.
         
@@ -312,6 +366,8 @@ class TaskManager:
         """
         if not self.similar_tasks_cache:
             return [], []
+        if topk is None:
+            topk = self.tl_topk or len(self.similar_tasks_cache)
         topk = min(topk, len(self.similar_tasks_cache))
         filtered_histories = []
         filtered_sims = []

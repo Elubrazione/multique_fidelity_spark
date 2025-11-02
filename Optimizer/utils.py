@@ -59,39 +59,19 @@ def get_advisor_config(
     return AdvisorConfig(advisor_type, surrogate_type, acq_type)
 
 def build_optimizer(args, **kwargs):
-    ws_args = kwargs.get('ws_args', None)
-    tl_args = kwargs.get('tl_args', None)
-    cp_args = kwargs.get('cp_args', None)
-    random_kwargs = kwargs.get('random_kwargs', {})
-
     per_run_time_limit = kwargs.get('per_run_time_limit', None)
 
     from Optimizer.base import BaseOptimizer
-    scheduler_kwargs = {
-        'R': args.R,
-        'eta': args.eta,
-    }
-    scheduler_type = 'mfes' if 'MFES' in args.opt else 'bohb' if 'BOHB' in args.opt else 'full'
 
     optimizer = BaseOptimizer(
         config_space=kwargs['config_space'], eval_func=kwargs['eval_func'],
         iter_num=args.iter_num, per_run_time_limit=per_run_time_limit,
         method_id=args.opt, task_id=kwargs['task'], target=kwargs['target'],
         backup_flag=args.backup_flag, save_dir=args.save_dir,
-        cp_args=cp_args,
-        ws_strategy=args.warm_start, ws_args=ws_args,
-        tl_strategy=args.transfer, tl_args=tl_args,
-        _logger_kwargs=kwargs.get('_logger_kwargs', None),
-        random_kwargs=random_kwargs,
-        scheduler_type=scheduler_type,
-        scheduler_kwargs=scheduler_kwargs,
+        ws_strategy=args.warm_start,
+        tl_strategy=args.transfer,
         resume=args.resume,
     )
-
-    logger.info("[opt: {}] [warm_start_strategy: {}] [transfer_strategy: {}] [backup_flag: {}] [seed: {}] [rand_prob: {}]".format(
-        args.opt, args.warm_start, args.transfer, args.backup_flag, args.seed, args.rand_prob)
-    )
-    logger.info("warm start args: %s: %s" % (args.warm_start, json.dumps(ws_args)))
     return optimizer
 
 
