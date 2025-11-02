@@ -195,41 +195,86 @@ class SparkSessionTPCDSExecutor:
         return f"{value}{suffix}" if suffix and not str(value).endswith(suffix) else str(value)
     
     def use_database(self, spark, database):
-        if database is not None:
-            db_name = str(database).strip()
-            if db_name:
-                logger.info(f"[SparkSession] Attempting to set database: '{db_name}'")
-                try:
-                    count = spark.sql(f"SHOW DATABASES LIKE '{db_name}'").count()
-                    logger.info(f"[SparkSession] Database existence check for '{db_name}': {count} match(es)")
-                    if count == 0:
-                        logger.warning(f"[SparkSession] Database '{db_name}' does not exist. Skipping USE.")
-                    else:
-                        spark.sql(f"USE `{db_name}`")
-                        logger.info(f"[SparkSession] Database set to: {db_name}")
-                except Exception:
-                    logger.warning(f"[SparkSession] Failed to set database to '{db_name}'. Continuing without changing database.")
-            else:
-                logger.warning("[SparkSession] Empty database name resolved; skipping USE.")
+        """Set the database for SparkSession. Returns True if successful, False otherwise.
+        
+        Raises RuntimeError if the error indicates a session state problem.
+        """
+        if not database:
+            return True
+        
+        db_name = str(database).strip()
+        if not db_name:
+            logger.warning("[SparkSession] Empty database name, skipping USE.")
+            return False
+        
+        logger.info(f"[SparkSession] Attempting to set database: '{db_name}'")
+        try:
+            spark.sql(f"USE `{db_name}`")
+            logger.info(f"[SparkSession] Database set to: {db_name}")
+            return True
+        except Exception as e:
+            error_msg = str(e).lower()
+            error_type = type(e).__name__
+            
+            if 'does not exist' in error_msg or ('database' in error_msg and 'not found' in error_msg):
+                logger.warning(f"[SparkSession] Database '{db_name}' does not exist. Skipping USE.")
+                return False
+            
+            if 'hivesessionstatebuilder' in error_msg or 'illegalargumentexception' in error_msg:
+                logger.error(f"[SparkSession] Database operation failed with session state error: {error_type}: {str(e)}")
+                raise RuntimeError(f"SparkSession state error during database operation: {str(e)}") from e
+            
+            logger.warning(f"[SparkSession] Failed to set database to '{db_name}': {error_type}: {str(e)}")
+            return False
 
     def create_spark_session(self, config_dict, app_name, database=None):
         self.stop_spark_session()
-        spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
-        for key, value in config_dict.items():
-            if str(key).startswith('spark.'):
-                spark_builder = spark_builder.config(key, self._format_config_value(key, value))
         
+        def _build_spark_builder():
+            builder = SparkSession.builder.appName(app_name).enableHiveSupport()
+            for key, value in config_dict.items():
+                if str(key).startswith('spark.'):
+                    builder = builder.config(key, self._format_config_value(key, value))
+            return builder
+        
+        spark_builder = _build_spark_builder()
         max_retries = 2
+        
         for attempt in range(max_retries):
             try:
+                if attempt > 0:
+                    logger.info(f"[SparkSession] Retry attempt {attempt + 1}: ensuring clean state")
+                    self.stop_spark_session()
+                    time.sleep(3) 
+                    spark_builder = _build_spark_builder() 
+                
                 spark = spark_builder.getOrCreate()
-                self.use_database(spark, database)
+                
+                try:
+                    db_set = self.use_database(spark, database)
+                    if not db_set and database is not None:
+                        logger.warning(f"[SparkSession] Database setting failed but continuing with session. "
+                                    f"This may cause query failures if database is required.")
+                except RuntimeError:
+                    logger.error(f"[SparkSession] Database operation revealed session state problem, will retry")
+                    spark.stop()
+                    raise
+                try:
+                    spark.sparkContext.parallelize([1]).count()
+                except Exception as validation_error:
+                    logger.error(f"[SparkSession] Session validation failed: {type(validation_error).__name__}: {str(validation_error)}")
+                    try:
+                        spark.stop()
+                    except Exception:
+                        pass
+                    raise RuntimeError(f"SparkSession created but not usable: {str(validation_error)}") from validation_error
+                
                 return spark
             except Exception as e:
                 if attempt < max_retries - 1:
                     logger.warning(f"[SparkSession] Attempt {attempt + 1} failed, trying to clean up and retry: {type(e).__name__}: {str(e)}")
                     self.stop_spark_session()
-                    time.sleep(1)
+                    time.sleep(3)
                 else:
                     logger.error(f"[SparkSession] Failed to create Spark session with app_name={app_name} after {max_retries} attempts: {type(e).__name__}: {str(e)}")
                     logger.error(f"[SparkSession] Traceback: {traceback.format_exc()}")
@@ -381,7 +426,6 @@ class SparkSessionTPCDSExecutor:
                 except RuntimeError as e:
                     if "SparkContext was shut down" in str(e) and retry_count < max_retry_attempts:
                         logger.warning(f"[SparkSession] SparkContext was shut down during {sql}, attempting to recreate (retry {retry_count + 1}/{max_retry_attempts})")
-
                         self.stop_spark_session()
                         try:
                             spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
@@ -417,6 +461,20 @@ class SparkSessionTPCDSExecutor:
         objective = total_spark_time if np.isfinite(total_spark_time) else float('inf')
         return self.build_ret_dict(objective, start_time, extra_info)
 
+    def _stop_spark_context(self):
+        try:
+            from pyspark import SparkContext
+            sc = SparkContext._active_spark_context
+            if sc is not None:
+                logger.warning(f"[SparkSession] Found active SparkContext, stopping it")
+                sc.stop()
+                logger.info("[SparkSession] SparkContext stopped")
+                time.sleep(3)
+                return True
+        except Exception as sc_exc:
+            logger.debug(f"[SparkSession] Could not stop SparkContext: {type(sc_exc).__name__}: {str(sc_exc)}")
+        return False
+
     def stop_spark_session(self):
         try:
             active_session = SparkSession.getActiveSession()
@@ -424,10 +482,14 @@ class SparkSessionTPCDSExecutor:
                 logger.warning(f"[SparkSession] Found active SparkSession, stopping it before creating new one")
                 try:
                     active_session.stop()
+                    logger.info("[SparkSession] SparkSession stopped")
                     time.sleep(1)
-                    logger.info("[SparkSession] Active SparkSession stopped")
+                    self._stop_spark_context()
                 except Exception as e:
                     logger.warning(f"[SparkSession] Failed to stop existing session: {type(e).__name__}: {str(e)}")
+            else:
+                # Even if no active session, check for SparkContext
+                self._stop_spark_context()
         except AttributeError:
             logger.warning(f"[SparkSession] getActiveSession() not available, skipping active session check")
         except Exception as e:
