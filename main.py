@@ -6,7 +6,7 @@ from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
 from task_manager import TaskManager
 from utils.spark import analyze_timeout_and_get_fidelity_details
-from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR
+from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR, RESULT_DIR
 
 
 parser = argparse.ArgumentParser()
@@ -19,7 +19,7 @@ parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--timeout', type=int, default=100)
 
-parser.add_argument('--save_dir', type=str, default=LOG_DIR)
+parser.add_argument('--save_dir', type=str, default=RESULT_DIR)
 parser.add_argument('--target', type=str, default='spark_hstest')
 
 parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
@@ -44,6 +44,7 @@ parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'
 # test_mode: code development mode when coding in local machine which has no spark cluster
 parser.add_argument('--test_mode', action='store_true', default=False)
 parser.add_argument('--debug', action='store_true', default=False)
+parser.add_argument('--skip_first', action='store_true', default=False)
 
 args = parser.parse_args()
 
@@ -93,7 +94,7 @@ task_manager = TaskManager.instance(
     similarity_threshold=0.5,
     config_space=config_space,
     test_mode=args.test_mode,
-    debug=args.debug
+    skip=args.skip_first
 )
 
 

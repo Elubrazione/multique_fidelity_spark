@@ -259,16 +259,6 @@ class SparkSessionTPCDSExecutor:
                     logger.error(f"[SparkSession] Database operation revealed session state problem, will retry")
                     spark.stop()
                     raise
-                try:
-                    spark.sparkContext.parallelize([1]).count()
-                except Exception as validation_error:
-                    logger.error(f"[SparkSession] Session validation failed: {type(validation_error).__name__}: {str(validation_error)}")
-                    try:
-                        spark.stop()
-                    except Exception:
-                        pass
-                    raise RuntimeError(f"SparkSession created but not usable: {str(validation_error)}") from validation_error
-                
                 return spark
             except Exception as e:
                 if attempt < max_retries - 1:
