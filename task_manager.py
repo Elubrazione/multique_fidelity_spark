@@ -38,8 +38,6 @@ class TaskManager:
 
     def __init__(self, 
                  history_dir: str,
-                 eval_func: Callable,
-                 task_id: str = "default",
                  spark_log_dir: str = "/root/codes/spark-log",
                  similarity_threshold: float = 0.5,
                  config_space: Optional[ConfigurationSpace] = None,
@@ -68,13 +66,12 @@ class TaskManager:
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
 
-        self._scheduler = None
+        self._scheduler: Optional[object] = None
+        self._sql_partitioner: Optional[object] = kwargs.get('sql_partitioner')
+        self._planner: Optional[object] = kwargs.get('planner')
         self.tl_topk: Optional[int] = self.tl_args.get('topk') if isinstance(self.tl_args, dict) else None
-        self.executor = eval_func
-        self._sql_partitioner = kwargs.get('sql_partitioner', None)
         
         self._load_historical_tasks()
-        self.calculate_meta_feature(eval_func, task_id, **kwargs)
 
 
     def _load_historical_tasks(self):
@@ -208,7 +205,10 @@ class TaskManager:
         
         Args:
             eval_func: Evaluator function (ExecutorManager)
-
+            task_id: Task ID
+            kwargs: Additional keyword arguments
+                - resume: Resume from a previous task
+                - test_mode: Test mode
         """
         # skip meta_feature collecting and default config evaluation
         if kwargs.get('resume', None) is not None:
@@ -232,6 +232,7 @@ class TaskManager:
             self.current_task_history = History(task_id=task_id, config_space=self.config_space,
                                                 meta_info={'meta_feature': self.current_meta_feature.tolist()})
             self.current_task_history.update_observation(build_observation(default_config, result))
+            self._update_similarity()
             return
         
         logger.info("Computing current task meta feature using default config...")
@@ -310,17 +311,22 @@ class TaskManager:
         return self._scheduler
 
     def register_sql_partitioner(self, partitioner) -> None:
-        if self._sql_partitioner is not None:
-            logger.warning("SQLPartitioner already registered; skipping new registration")
-            return
+        if self._sql_partitioner is not None and self._sql_partitioner is not partitioner:
+            logger.warning("SQLPartitioner already registered; replacing with new instance")
         self._sql_partitioner = partitioner
-        logger.info("Registered SQLPartitioner instance")
+        logger.info(f"Registered SQLPartitioner: {self._sql_partitioner}")
 
     def get_sql_partitioner(self):
         return self._sql_partitioner
 
-    def get_executor(self):
-        return self.executor
+    def register_planner(self, planner) -> None:
+        if self._planner is not None and self._planner is not planner:
+            logger.warning("Planner already registered; replacing with new instance")
+        self._planner = planner
+        logger.info(f"Registered Planner: {self._planner}")
+
+    def get_planner(self):
+        return self._planner
 
     def get_ws_args(self) -> Dict[str, Any]:
         return dict(self.ws_args)

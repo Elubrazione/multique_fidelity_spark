@@ -58,23 +58,11 @@ _logger_kwargs['force_init'] = False
 
 config_space = load_space_from_json(HUGE_SPACE_FILE)
 
-fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_details(
-    percentile=args.timeout, debug=False,
-    ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
-)
-fidelity_details[round(float(1/64), 5)] = ['q48']
-
-if args.debug:
-    fidelity_details[round(float(1.0), 5)] = ['q10', 'q12', 'q11']
-
-
 executor = ExecutorManager(
-    sqls=fidelity_details,
-    timeout=elapsed_timeout_dicts,
     config_space=config_space,
-    executor_cls=SparkSessionTPCDSExecutor,
-    executor_kwargs={'sql_dir': DATA_DIR},
-    test_mode=args.test_mode
+    sql_dir=DATA_DIR,
+    test_mode=args.test_mode,
+    debug=args.debug
 )
 
 ws_args = {
@@ -105,8 +93,6 @@ scheduler_kwargs = {
 }
 task_manager = TaskManager.instance(
     history_dir=args.src_data_path,
-    eval_func=executor,
-    task_id=args.task,
     spark_log_dir="/root/codes/spark-log",
     ws_args=ws_args,
     tl_args=tl_args,
@@ -116,8 +102,10 @@ task_manager = TaskManager.instance(
     random_kwargs=random_kwargs,
     similarity_threshold=0.5,
     config_space=config_space,
-    test_mode=args.test_mode,
-    resume=args.resume
+)
+task_manager.calculate_meta_feature(
+    eval_func=executor, task_id=args.task,
+    test_mode=args.test_mode, resume=args.resume
 )
 
 opt_kwargs = {

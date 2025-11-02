@@ -26,7 +26,6 @@ class BaseAdvisor:
         self.rand_mode = rand_mode
         
         self.task_manager = TaskManager.instance()
-        self.task_manager._update_similarity()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
 
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])

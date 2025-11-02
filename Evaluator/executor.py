@@ -11,6 +11,9 @@ from openbox import logger
 from ConfigSpace import Configuration
 from pyspark.sql import SparkSession
 
+from task_manager import TaskManager
+from .planner import SparkSQLPlanner
+from .partitioner import SQLPartitioner
 from utils.spark import clear_cache_on_remote
 from config import ENV_SPARK_SQL_PATH, DATABASE, DATA_DIR, \
     LIST_SPARK_NODES, LIST_SPARK_SERVER, LIST_SPARK_USERNAME, LIST_SPARK_PASSWORD, \
@@ -31,25 +34,24 @@ def _create_default_result(start_time):
 
 
 class ExecutorManager:
-    def __init__(self, sqls: dict, timeout: dict, config_space,
+    def __init__(self, config_space,
                  spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=LIST_SPARK_NODES,
-                 servers=LIST_SPARK_SERVER, usernames=LIST_SPARK_USERNAME, passwords=LIST_SPARK_PASSWORD,
-                 fidelity_database_mapping=None, fixed_sqls=None,
-                 executor_cls=None, executor_kwargs=None,
-                 **kwargs):
-        self.sqls = sqls
-        self.timeout = timeout
+                 servers=LIST_SPARK_SERVER,
+                 usernames=LIST_SPARK_USERNAME, passwords=LIST_SPARK_PASSWORD,
+                 sql_dir=DATA_DIR, database=DATABASE, **kwargs):
         self.config_space = config_space
         self.child_num = len(spark_nodes)
         self.executor_queue = Queue()
-        self.fidelity_database_mapping = fidelity_database_mapping or {}
-        self.fixed_sqls = fixed_sqls
-        self.executor_cls = executor_cls or SparkSessionTPCDSExecutor
-        self.executor_kwargs = executor_kwargs or {}
-        self._init_child_executor(spark_sql, spark_nodes, servers, usernames, passwords, **kwargs)
+        self.sql_dir = sql_dir
+        self._planner = None
+        self._partitioner = None
+        self._task_manager = None
+        self._init_child_executor(spark_sql, spark_nodes, servers, \
+                                usernames, passwords, database, **kwargs)
         
 
-    def _init_child_executor(self, spark_sql, spark_nodes, servers, usernames, passwords, **kwargs):
+    def _init_child_executor(self, spark_sql, spark_nodes, servers, \
+                            usernames, passwords, database, **kwargs):
         self.executors = []
         for idx in range(self.child_num):
             self.executor_queue.put(idx)
@@ -63,24 +65,41 @@ class ExecutorManager:
                 self.executors.append(TestExecutor(seed=base_seed + idx))
                 continue
             executor_kwargs = {
-                'sqls': self.sqls,
-                'timeout': self.timeout,
                 'spark_sql': spark_sql,
                 'spark_nodes': spark_nodes[idx],
                 'server': servers[idx],
                 'username': usernames[idx],
                 'password': passwords[idx],
-                'fidelity_database_mapping': self.fidelity_database_mapping,
-                'fixed_sqls': self.fixed_sqls
+                'database': database,
+                'sql_dir': self.sql_dir,
+                'debug': kwargs.get('debug', False),
             }
-            executor_kwargs.update(self.executor_kwargs)
-            self.executors.append(
-                self.executor_cls(**executor_kwargs)
-            )
+            self.executors.append(SparkSessionTPCDSExecutor(**executor_kwargs))
             
     def __call__(self, config, resource_ratio):
         idx = self.executor_queue.get()  # 阻塞直到有空闲 executor
         logger.debug(f"Got free executor: {idx}")
+
+        planner = None
+        plan = None
+        try:
+            planner = self._ensure_planner()
+            if planner is not None:
+                plan = planner.plan(resource_ratio, force_refresh=True, allow_fallback=True)
+        except Exception as exc:
+            logger.error(f"[ExecutorManager] Failed to obtain workload plan for resource {resource_ratio}: {exc}")
+            logger.debug(traceback.format_exc())
+
+        if plan is None:
+            fallback_sqls = []
+            partitioner = self._ensure_partitioner()
+            if partitioner is not None:
+                fallback_sqls = partitioner.get_all_sqls()
+            logger.info(
+                "[ExecutorManager] Using fallback plan for resource %.5f (sqls=%d)",
+                resource_ratio, len(fallback_sqls)
+            )
+            plan = {"sqls": fallback_sqls, "timeout": {}}
 
         result_queue = Queue()
 
@@ -88,7 +107,7 @@ class ExecutorManager:
             start_time = time.time()
             result = None
             try:
-                result = self.executors[idx](config, resource_ratio)
+                result = self.executors[idx](config, resource_ratio, plan)
             except Exception as e:
                 result = _create_default_result(start_time)
                 logger.error(f"[Executor {idx}] Execution raised exception, continue with INF objective. Exception: {type(e).__name__}: {str(e)}")
@@ -109,72 +128,95 @@ class ExecutorManager:
         thread.join()
         return result
 
+    def _get_task_manager(self) -> Optional[TaskManager]:
+        if self._task_manager is not None:
+            return self._task_manager
+        task_mgr = getattr(TaskManager, "_instance", None)
+        if task_mgr is not None and getattr(task_mgr, "_initialized", False):
+            self._task_manager = task_mgr
+            return self._task_manager
+        return None
+
+    def _ensure_partitioner(self) -> Optional[SQLPartitioner]:
+        """Initialise and cache the SQLPartitioner.
+
+        When TaskManager is not ready yet (bootstrap phase), return `None`
+        and executor will rely on the static SQL list; once TaskManager has
+        finished initialisation we register the real partitioner exactly once.
+        """
+        if self._partitioner is not None:
+            return self._partitioner
+        task_manager = self._get_task_manager()
+        if task_manager is None:
+            return None
+        partitioner = task_manager.get_sql_partitioner()
+        if partitioner is None:
+            # When calculating meta features, the task_manager is ready,
+            # but the sql_partitioner is not ready yet.
+            # So we create a new partitioner and register it with the task_manager.
+            logger.info("No partitioner found, creating a new one")
+            partitioner = SQLPartitioner(sql_dir=self.sql_dir)
+            task_manager.register_sql_partitioner(partitioner)
+        self._partitioner = partitioner
+        return partitioner
+    
+    def _ensure_planner(self) -> Optional[SparkSQLPlanner]:
+        if self._planner is not None:
+            return self._planner
+        task_manager = self._get_task_manager()
+        if task_manager is None:
+            return None # No probability to happen
+        partitioner = self._ensure_partitioner()
+        if partitioner is None:
+            return None # No probability to happen
+
+        fallback = {1.0: partitioner.get_all_sqls()}
+        logger.info("Fallback to full SQL list when first called to calculate meta features")
+        logger.info(f"Fallback sqls: {fallback}")
+
+        planner = task_manager.get_planner()
+        if planner is None:
+            logger.info("No planner found, creating a new one")
+            planner = SparkSQLPlanner(partitioner, fallback_sqls=fallback)
+            task_manager.register_planner(planner)
+        try:
+            if getattr(planner, "latest_plan", None) is None:
+                planner.refresh_plan()
+                logger.info("Planner refreshed")
+        except Exception:
+            logger.debug("[ExecutorManager] Planner refresh failed during initialization; continuing with fallback subset")
+        self._planner = planner
+        logger.info(
+            "[ExecutorManager] Planner ready (resource levels=%s)",
+            list(planner._cached_plan.fidelity_subsets.keys()) \
+                if getattr(planner, "_cached_plan", None) else "<none>"
+        )
+        return planner
+
 
 class SparkSessionTPCDSExecutor:
-    def __init__(self, sqls: dict, timeout: dict,
+    def __init__(self,
                  spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=SPARK_NODES,
                  server=SPARK_SERVER_NODE, username=SPARK_USERNAME, password=SPARK_PASSWORD,
-                 config_space=None, fidelity_database_mapping=None, fixed_sqls=None,
-                 sql_dir=DATA_DIR, app_name_prefix="SparkSessionTPCDSExecutor"):
-        self.sqls = sqls
-        self.timeout = timeout
+                 database=DATABASE, sql_dir=DATA_DIR, app_name_prefix="SparkSessionTPCDSExecutor",
+                 **kwargs):
         self.spark_nodes = spark_nodes or []
         if isinstance(self.spark_nodes, str):
             self.spark_nodes = [self.spark_nodes]
         self.server = server
         self.username = username
         self.password = password
+        self.database = database
         self.sql_dir = sql_dir
         self.app_name_prefix = app_name_prefix
 
-        self.fidelity_database_mapping = fidelity_database_mapping or {}
-        if fixed_sqls is not None:
-            self.fixed_sqls = fixed_sqls
-        else:
-            self.fixed_sqls = self.get_sqls_by_fidelity(resource=1.0)
+        self.debug = kwargs.get('debug', False)
+        if self.debug:
+            logger.info(f"SparkSessionTPCDSExecutor initialized in debug mode")
 
-    def __call__(self, config, resource_ratio):
-        return self.run_spark_session_job(config, resource_ratio)
+    def __call__(self, config, resource_ratio, plan=None):
+        return self.run_spark_session_job(config, resource_ratio, plan)
 
-    def _normalize_fidelity_key(self, fidelity):
-        if fidelity in self.sqls:
-            return fidelity
-        rounded = round(float(fidelity), 5)
-        if rounded in self.sqls:
-            return rounded
-
-    def _resolve_database(self, fidelity):
-        if not self.fidelity_database_mapping:
-            return DATABASE
-
-        candidates = [
-            fidelity,
-            round(float(fidelity), 5),
-            str(fidelity),
-            str(round(float(fidelity), 5))
-        ]
-        for key in candidates:
-            if key in self.fidelity_database_mapping:
-                return self.fidelity_database_mapping[key]
-        for mapping_key in self.fidelity_database_mapping.keys():
-            try:
-                if abs(float(mapping_key) - float(fidelity)) < 1e-8:
-                    return self.fidelity_database_mapping[mapping_key]
-            except (TypeError, ValueError):
-                continue
-        return DATABASE
-
-    def get_sqls_by_fidelity(self, resource):
-        if self.fidelity_database_mapping:
-            logger.info(f"[SparkSession] Using fixed SQL set for fidelity {resource}: {len(self.fixed_sqls)} queries")
-            return self.fixed_sqls
-        fidelity_key = self._normalize_fidelity_key(resource)
-        return list(self.sqls[fidelity_key])
-
-    def get_database_by_fidelity(self, fidelity):
-        database = self._resolve_database(fidelity)
-        logger.info(f"[SparkSession] Using database for fidelity {fidelity}: {database}")
-        return database
 
     def _config_to_dict(self, config):
         if hasattr(config, 'get_dictionary'):
@@ -354,7 +396,7 @@ class SparkSessionTPCDSExecutor:
             'status': status
         }
 
-    def run_spark_session_job(self, config, resource):
+    def run_spark_session_job(self, config, resource, plan=None):
         """
         Workflow:
         - if query executed successfully: continue to next query
@@ -368,18 +410,25 @@ class SparkSessionTPCDSExecutor:
         - if other exception: set status to False and break the loop
         """
         start_time = time.time()
-        queries = self.get_sqls_by_fidelity(resource=resource)
+        plan_sqls = plan.get('sqls') if isinstance(plan, dict) else None
+        if not plan_sqls:
+            plan_sqls = []
+        timeout_overrides = plan.get('timeout', {}) if isinstance(plan, dict) else {}
 
-        database = self.get_database_by_fidelity(resource)
+        # only execute 2 sqls when debug mode is enabled
+        if self.debug:
+            plan_sqls = copy.deepcopy(plan_sqls)[: 2]
+            timeout_overrides = copy.deepcopy(timeout_overrides)[: 2]
+
         config_dict = self._config_to_dict(config)
-        logger.info(f"[SparkSession] Evaluating fidelity {resource} on database {database}")
+        logger.info(f"[SparkSession] Evaluating fidelity {resource} on database {self.database}")
         logger.debug(f"[SparkSession] Configuration: {config_dict}")
 
         spark = None
         total_status = True
         app_name = f"{self.app_name_prefix}_{resource}"
         try:
-            spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
+            spark = self.create_spark_session(config_dict, app_name=app_name, database=self.database)
         except Exception as e:
             logger.error(f"[SparkSession] Failed to create Spark session, skip remaining queries. Error: {type(e).__name__}: {str(e)}")
             logger.error(f"[SparkSession] Traceback: {traceback.format_exc()}")
@@ -387,9 +436,11 @@ class SparkSessionTPCDSExecutor:
 
         total_spark_time = 0.0
         extra_info = copy.deepcopy(_DEFAULT_EXTRA_INFO)
+        extra_info['plan_sqls'] = list(plan_sqls)
+        extra_info['plan_timeout'] = timeout_overrides
         max_retry_attempts = 1
         
-        for sql in queries:
+        for sql in plan_sqls:
             sql_path = os.path.join(self.sql_dir, f"{sql}.sql")
             if not os.path.exists(sql_path):
                 logger.error(f"[SparkSession] SQL file not found: {sql_path}")
@@ -425,7 +476,7 @@ class SparkSessionTPCDSExecutor:
                         logger.warning(f"[SparkSession] SparkContext was shut down during {sql}, attempting to recreate (retry {retry_count + 1}/{max_retry_attempts})")
                         self.stop_spark_session()
                         try:
-                            spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
+                            spark = self.create_spark_session(config_dict, app_name=app_name, database=self.database)
                             logger.info(f"[SparkSession] Successfully recreated SparkSession, retrying {sql}")
                             retry_count += 1
                         except Exception as recreate_exc:
@@ -510,7 +561,7 @@ class TestExecutor:
         self.rng = np.random.default_rng(seed)
         self.sql_list = ['q10', 'q11', 'q12', 'q13', 'q14a', 'q14b', 'q15', 'q16', 'q17', 'q18', 'q19', 'q1', 'q20', 'q21', 'q22', 'q23a', 'q23b', 'q24a', 'q24b', 'q25', 'q26', 'q27', 'q28', 'q29', 'q2', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36', 'q37', 'q38', 'q39a', 'q39b', 'q3', 'q40', 'q41', 'q42', 'q43', 'q44', 'q45', 'q46', 'q47', 'q48', 'q49', 'q4', 'q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q5', 'q60', 'q61', 'q62', 'q63', 'q64', 'q65', 'q66', 'q67', 'q68', 'q69', 'q6', 'q70', 'q71', 'q72', 'q73', 'q74', 'q75', 'q76', 'q77', 'q78', 'q79', 'q7', 'q80', 'q81', 'q82', 'q83', 'q84', 'q85', 'q86', 'q87', 'q88', 'q89', 'q8', 'q90', 'q91', 'q92', 'q93', 'q94', 'q95', 'q96', 'q97', 'q98', 'q99', 'q9']
 
-    def __call__(self, config, resource_ratio):
+    def __call__(self, config, resource_ratio, plan=None):
         extra_info = copy.deepcopy(_DEFAULT_EXTRA_INFO)
 
         for sql_name in self.sql_list:
