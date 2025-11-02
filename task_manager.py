@@ -199,20 +199,20 @@ class TaskManager:
             eval_func: Evaluator function (ExecutorManager)
 
         """
+        # use default config writen in spark_default.conf
+        default_config = self.config_space.get_default_configuration()
+        default_config.origin = 'Default Configuration'
+        result = eval_func(config=default_config, resource_ratio=1.0)
+    
         if kwargs.get('test_mode', False):
             logger.info("Using test mode meta feature")
             self.current_meta_feature = META_FEATURE
             self.current_task_history = History(task_id=task_id, config_space=self.config_space,
                                                 meta_info={'meta_feature': self.current_meta_feature.tolist()})
+            self.current_task_history.update_observation(build_observation(default_config, result))
             return
         
         logger.info("Computing current task meta feature using default config...")
-
-        # use default config writen in spark_default.conf
-        default_config = self.config_space.get_default_configuration()
-        default_config.origin = 'Default Configuration'
-        if not kwargs.get('debug', False):
-            result = eval_func(config=default_config, resource_ratio=1.0)
 
         application_id = self.get_latest_application_id()
         if not application_id:

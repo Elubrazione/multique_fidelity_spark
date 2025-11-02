@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import pandas as pd
 from openbox import logger
@@ -131,7 +132,8 @@ def build_observation(config, results, **kwargs):
     else:
         trial_state = SUCCESS
 
+    extra_info_copy = copy.deepcopy(extra_info)
     obs = Observation(config=config, objectives=[perf], trial_state=trial_state, elapsed_time=elapsed_time,
-                    extra_info={'origin': config.origin, **extra_info})
+                    extra_info={'origin': config.origin, **extra_info_copy})
 
     return obs
