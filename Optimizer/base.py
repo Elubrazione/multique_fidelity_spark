@@ -6,11 +6,11 @@ import pickle as pkl
 from datetime import datetime
 from ConfigSpace import ConfigurationSpace
 from openbox import logger
-from Advisor.BO import BO
-from Advisor.MFBO import MFBO
-from typing import List
-from .utils import run_obj_func
+from typing import List, Optional
+from .utils import run_obj_func, get_advisor_config
 from .scheduler import schedulers
+from Advisor import advisors
+from task_manager import TaskManager
 from config import LIST_SPARK_NODES
 
 
@@ -18,21 +18,22 @@ class BaseOptimizer:
     def __init__(self, config_space: ConfigurationSpace, eval_func,
                  iter_num=200, per_run_time_limit=None,
                  method_id='advisor', task_id='test', target='redis',
-                 ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None,
-                 cp_args=None,
+                 ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None, cp_args=None,
                  backup_flag=False, save_dir='./results',
-                 seed=42, rand_prob=0.15, rand_mode='ran', _logger_kwargs=None,
-                 scheduler_type='bohb', scheduler_kwargs={}):
+                 random_kwargs={}, _logger_kwargs={},
+                 scheduler_type='bohb', scheduler_kwargs={},
+                 resume: Optional[str] = None):
 
         assert scheduler_type in ['bohb', 'mfes', 'full', 'fixed']
-        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFSE_SMAC', 'MFSE_GP', 'BOHB_GP', 'BOHB_SMAC']
-        assert ws_strategy in ['none', 'best_rover', 'rgpe_rover', 'best_all']
+        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
+        assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
-        assert rand_mode in ['ran', 'rs']
 
         self.eval_func = eval_func
         self.iter_num = iter_num
-        self.iter_id = 0
+
+        task_mgr = TaskManager.instance()
+        self.iter_id = len(task_mgr.current_task_history) - 1 if resume is not None else 0
 
         ws_str = ws_strategy
         if method_id != 'RS':
@@ -52,24 +53,17 @@ class BaseOptimizer:
         cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (cp_args['strategy'], cp_topk, cp_args['sigma'], cp_args['top_ratio'])
 
         self.method_id = method_id
-        if rand_mode == 'rs':
-            self.method_id += 'rs'
-        self.task_id = '%s__%s__W%sT%sC%s__s%d' % (task_id, self.method_id,
-                                                        ws_str, tl_str, cp_str, seed)
-        self.target = target
+        self.task_id = '%s__%s__W%sT%sC%s__S%s__s%d' % (task_id, self.method_id + 'rs' if random_kwargs.get('rand_mode', 'ran') == 'rs' else '',
+                                                        ws_str, tl_str, cp_str, scheduler_type, random_kwargs.get('seed', 42))
 
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
         self.tl_strategy = tl_strategy
         self.cp_args = cp_args
 
-        self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **scheduler_kwargs)
-
-        self.seed = seed
-
         self.backup_flag = backup_flag
         self.save_dir = save_dir
-
+        self.target = target
         self.result_path = None
         self.ts_backup_file = None
         self.ts_recorder = None
@@ -77,55 +71,30 @@ class BaseOptimizer:
 
         self.build_path()
         
-
-        """
-            method_id: SMAC, GP / MFSE_SMAC, MFSE_SMAC, BOHB_GP, BOHB_SMAC
-            ws_strategy: none, best_rover, rgpe_rover
-            tl_strategy: none, mce, re, mceacq, reacq
-        """
-        surrogate_type = 'prf'
-        if method_id == 'GP':
-            surrogate_type = 'gp'
-        elif method_id == 'GPF':
-            method_id = 'GP'
-            surrogate_type = 'gpf'
-    
-        acq_type = 'ei'
-        if tl_strategy != 'none':
-            surrogate_type = '%s_%s' % (tl_strategy, surrogate_type)
-            if 'acq' in tl_strategy:
-                acq_type = 'wrk_%s' % acq_type  # 'wrk_ei'
-
-        if method_id in ['SMAC', 'GP'] or 'BOHB' in method_id:
-            self.advisor = BO(config_space,
-                              surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
-                              ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
-                              cp_args=cp_args,
-                              seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                              _logger_kwargs=self._logger_kwargs)
-        elif 'MFSE' in method_id:
-            # 对于MFSE，没有tl，就默认用MF集成
-            if tl_strategy == 'none':
-                surrogate_type = 'mfse_' + surrogate_type
-
-            self.advisor = MFBO(config_space,
-                                surrogate_type=surrogate_type, acq_type=acq_type, task_id=self.task_id,
-                                ws_strategy=ws_strategy, ws_args=ws_args, tl_args=tl_args,
-                                cp_args=cp_args,
-                                seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
-                                _logger_kwargs=self._logger_kwargs)
-
+        advisor_config = get_advisor_config(method_id, tl_strategy)
+        method_id = 'GP' if method_id == 'GPF' else method_id
+        advisor_class = advisors[advisor_config.advisor_type]
+        self.advisor = advisor_class(
+            config_space=config_space,
+            task_id=self.task_id,
+            ws_strategy=ws_strategy,
+            ws_args=ws_args,
+            tl_args=tl_args,
+            cp_args=cp_args,
+            _logger_kwargs=self._logger_kwargs,
+            **advisor_config.to_dict(),
+            **random_kwargs
+        )
+        self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **scheduler_kwargs)
         self.timeout = per_run_time_limit
+        self.save_info()
 
     def build_path(self):
-        result_dir = os.path.join(self.save_dir, self.target, self.method_id)
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
+        self.res_dir = os.path.join(self.save_dir, self.target)
+        if not os.path.exists(self.res_dir):
+            os.makedirs(self.res_dir)
 
-        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')
-        self.res_dir = os.path.join(result_dir, timestamp)
-        os.makedirs(self.res_dir)
-        
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')       
         self.result_path = os.path.join(self.res_dir, "%s_%s.json" % (self.task_id, timestamp))
 
         self.ts_backup_file = "./backup/ts_backup_%s.pkl" % self.target
@@ -182,7 +151,7 @@ class BaseOptimizer:
             n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
             logger.info(f"Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
             if not i:
-                candidates = list(set(self.advisor.sample(batch_size=n_configs)))
+                candidates = self.advisor.sample(batch_size=n_configs)
                 logger.info(f"Generated {len(candidates)} initial candidates")
             resource_ratio = self.scheduler.calculate_resource_ratio(n_resource=n_resource)
             perfs = self._evaluate_configurations(candidates, resource_ratio)            
@@ -199,8 +168,6 @@ class BaseOptimizer:
         num_config_evaluated = len(self.advisor.history)
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
-            if not isinstance(candidates, list):
-                candidates = [candidates]
             logger.info(f"Initialization phase: need to evaluate {self.scheduler.num_nodes} configs, generated {len(candidates)} initial candidates")
             perfs = self._evaluate_configurations(candidates, resource_ratio=round(float(1.0), 5))
         else:

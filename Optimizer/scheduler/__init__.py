@@ -13,5 +13,6 @@ __all__ = [
     'FullFidelityScheduler',
     'FixedFidelityScheduler',
     'BOHBFidelityScheduler',
-    'MFESFidelityScheduler'
+    'MFESFidelityScheduler',
+    'schedulers'
 ]

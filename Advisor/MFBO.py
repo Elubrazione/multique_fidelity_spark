@@ -12,17 +12,17 @@ class MFBO(BO):
                 surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_args={'topk': 5}, cp_args={},
-                seed=42, rand_prob=0.15, rand_mode='ran', **kwargs):
+                random_kwargs={}, **kwargs):
         super().__init__(config_space,
                         surrogate_type=surrogate_type, acq_type=acq_type, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_args=tl_args, cp_args=cp_args,
-                        seed=seed, rand_prob=rand_prob, rand_mode=rand_mode,
+                        random_kwargs=random_kwargs,
                         **kwargs)
 
         self.history_list: List[History] = list()  # 低精度组的 history -> List[History]
         self.resource_identifiers = list()
-        if self.source_hpo_data is not None and not surrogate_type.startswith('mfse'):
+        if self.source_hpo_data is not None and not self.surrogate_type.startswith('mfes'):
             self.history_list = self.compressor.transform_source_data(self.source_hpo_data)
             self.resource_identifiers = [-1] * len(self.source_hpo_data)  # 占位符
 
@@ -162,7 +162,7 @@ class MFBO(BO):
 
         self.surrogate.update_mf_trials(self.history_list)
         # self.surrogate.build_source_surrogates()
-        return super().sample(batch_size=batch_size)
+        return super().sample(batch_size=batch_size, prefix='MF')
 
     def update(self, config, results, resource_ratio=1, update=True):
         if not update:

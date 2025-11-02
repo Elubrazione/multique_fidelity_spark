@@ -1,17 +1,17 @@
 import argparse
 from openbox import logger
 
-from executor import ExecutorManager, SparkSessionTPCDSExecutor
+from Evaluator.executor import ExecutorManager, SparkSessionTPCDSExecutor
 from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
 from task_manager import TaskManager
 from utils.spark import analyze_timeout_and_get_fidelity_details
-from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR
+from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR, RESULT_DIR
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--opt', type=str, default='MFSE_SMAC',
-                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFSE_GP', 'MFSE_SMAC', 'SMAC', 'GP', 'BOHB_SMAC'])
+parser.add_argument('--opt', type=str, default='MFES_SMAC',
+                    choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC'])
 parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
 parser.add_argument('--fidelity', type=float, default=1/9)
 parser.add_argument('--iter_num', type=int, default=40)
@@ -19,7 +19,7 @@ parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
 parser.add_argument('--timeout', type=int, default=100)
 
-parser.add_argument('--save_dir', type=str, default=LOG_DIR)
+parser.add_argument('--save_dir', type=str, default=RESULT_DIR)
 parser.add_argument('--target', type=str, default='spark_hstest')
 
 parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
@@ -40,13 +40,17 @@ parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--rand_prob', type=float, default=0.15)
 parser.add_argument('--rand_mode', type=str, default='ran', choices=['ran', 'rs'])
 
+# debug mode: debug in server which has spark cluster, for quick testing
+# test_mode: code development mode when coding in local machine which has no spark cluster
 parser.add_argument('--test_mode', action='store_true', default=False)
+parser.add_argument('--debug', action='store_true', default=False)
+parser.add_argument('--resume', type=str, default=None)
 
 args = parser.parse_args()
 
 _logger_kwargs = {
     'name': "%s" % args.task,
-    'logdir': f'./{LOG_DIR}/{args.target}/{args.opt}',
+    'logdir': f'{LOG_DIR}/{args.target}/{args.opt}',
     'level': args.log_level.upper()
 }
 logger.init(**_logger_kwargs)
@@ -59,6 +63,9 @@ fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_detai
     ratio_list=[1, 1/8, 1/32], add_on_ratio=2.5
 )
 fidelity_details[round(float(1/64), 5)] = ['q48']
+
+if args.debug:
+    fidelity_details[round(float(1.0), 5)] = ['q10', 'q12', 'q11']
 
 executor = ExecutorManager(
     sqls=fidelity_details,
@@ -86,7 +93,8 @@ task_manager = TaskManager.instance(
     ws_args=ws_args,
     similarity_threshold=0.5,
     config_space=config_space,
-    test_mode=args.test_mode
+    test_mode=args.test_mode,
+    resume=args.resume
 )
 
 
@@ -99,6 +107,11 @@ cp_args = {
                         if p in config_space.get_hyperparameter_names()],
 }
 
+random_kwargs = {
+    'seed': args.seed,
+    'rand_prob': args.rand_prob,
+    'rand_mode': args.rand_mode,
+}
 
 opt_kwargs = {
     'config_space': config_space,
@@ -106,6 +119,7 @@ opt_kwargs = {
     'target': args.target,
     'task': args.task,
     'ws_args': ws_args, 'tl_args': tl_args, 'cp_args': cp_args,
+    'random_kwargs': random_kwargs,
     '__logger_kwargs': _logger_kwargs
 }
 optimizer = build_optimizer(args, **opt_kwargs)

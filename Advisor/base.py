@@ -6,7 +6,6 @@ from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
 from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
-from task_manager import TaskManager
 
 
 class BaseAdvisor:
@@ -15,6 +14,9 @@ class BaseAdvisor:
                 tl_args=None, cp_args=None,
                 seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
+        # Delay import to avoid circular dependency
+        from task_manager import TaskManager
+        
         self.task_id = task_id
         self._logger_kwargs = kwargs.get('_logger_kwargs', None)
 

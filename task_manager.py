@@ -99,12 +99,13 @@ class TaskManager:
         result_list = results.split('\n')
         logs = []
         for line in result_list:
-            if line == '':
+            if line.strip() == '':
                 continue
             try:
                 logs.append(json.loads(line))
-            except:
-                raise ValueError('Cannot decode json data: %s' % line)
+            except json.JSONDecodeError as e:
+                logger.warning(f'Skipping invalid JSON line: {line[:100]}... (error: {e})')
+                continue
 
         start_time, end_time = None, None
         task_metrics = dict()
@@ -116,6 +117,10 @@ class TaskManager:
             elif event['Event'] == "SparkListenerApplicationEnd":
                 end_time = event['Timestamp']
             elif event['Event'] == "SparkListenerTaskEnd":
+                # Some tasks (e.g., resubmitted tasks) may not have Task Metrics
+                if 'Task Metrics' not in event:
+                    logger.debug(f"Skipping TaskEnd event without Task Metrics (Task End Reason: {event.get('Task End Reason', 'N/A')})")
+                    continue
                 cnt += 1
                 metrics_dict = event['Task Metrics']
                 for key, value in metrics_dict.items():
@@ -133,18 +138,24 @@ class TaskManager:
                     else:
                         task_metrics[key] = task_metrics.get(key, 0) + value
 
-        run_time = (end_time - start_time) / 1000
+        if start_time is None or end_time is None:
+            logger.warning('Cannot find start or end time in log')
+        else:
+            run_time = (end_time - start_time) / 1000
+            logger.info(f"Application run time: {run_time:.2f} seconds")
+
+        if cnt == 0:
+            logger.warning('No TaskEnd events found in log, using fallback metrics')
+            raise ValueError('No TaskEnd events found')
 
         keys = list(task_metrics.keys())
         keys.sort()
         for k, v in task_metrics.items():
             logger.debug(f"{k}: {v / cnt}")
         metrics = np.array([task_metrics[key] / cnt for key in keys])
+        logger.info(f"Metrics array shape: {metrics.shape}")
 
-        if start_time is None or end_time is None:
-            raise ValueError('Cannot find start or end time in log')
-
-        return run_time, metrics
+        return metrics
 
     def get_latest_application_id(self) -> Optional[str]:
         """
@@ -188,38 +199,74 @@ class TaskManager:
             eval_func: Evaluator function (ExecutorManager)
 
         """
+        # skip meta_feature collecting and default config evaluation
+        if kwargs.get('resume', None) is not None:
+            self.current_task_history = History.load_json(
+                                        filename=kwargs.get('resume'),
+                                        config_space=self.config_space)
+            self.current_meta_feature = np.array(self.current_task_history.meta_info.get('meta_feature'))
+            logger.info(f"Current task meta feature: {self.current_meta_feature}")
+            logger.info(f"Current task history: {self.current_task_history.objectives}")
+            logger.info(f"Loaded current task history from {kwargs.get('resume')}")
+            return
+
+        # use default config writen in spark_default.conf
+        default_config = self.config_space.get_default_configuration()
+        default_config.origin = 'Default Configuration'
+        result = eval_func(config=default_config, resource_ratio=1.0)
+    
         if kwargs.get('test_mode', False):
             logger.info("Using test mode meta feature")
             self.current_meta_feature = META_FEATURE
             self.current_task_history = History(task_id=task_id, config_space=self.config_space,
                                                 meta_info={'meta_feature': self.current_meta_feature.tolist()})
+            self.current_task_history.update_observation(build_observation(default_config, result))
             return
         
         logger.info("Computing current task meta feature using default config...")
-
-        # use default config writen in spark_default.conf
-        default_config = self.config_space.get_default_configuration()
-        result = eval_func(config=default_config, resource_ratio=1.0)
 
         application_id = self.get_latest_application_id()
         if not application_id:
             logger.warning("No application_id found, using fallback metrics")
             raise ValueError("No application_id found")
+
         zstd_file = os.path.join(self.spark_log_dir, f"{application_id}.zstd")
         if not os.path.exists(zstd_file):
-            logger.warning(f"Zstd file not found: {zstd_file}")
+            logger.warning(f"Zstd file not found: {zstd_file}, using fallback metrics")
             raise ValueError(f"Zstd file not found: {zstd_file}")
         logger.info(f"Found zstd file: {zstd_file}")
+
         json_file = os.path.join(self.spark_log_dir, "app.json")
-        subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
+        if os.path.exists(json_file):
+            os.remove(json_file)
+            logger.info(f"Removed existing json file: {json_file}")
+        logger.info(f"Decoding zstd file: {zstd_file} to json file: {json_file}")
+        try:
+            subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
+        except Exception as e:
+            logger.error(f"Failed to decode zstd file: {e}, using fallback metrics")
+            raise ValueError(f"Failed to decode zstd file: {e}")
+
+        json_content = ""
         with open(json_file, 'r') as f:
             json_content = f.read()
-        run_time, metrics = self.decode_results_spark(json_content)
-        os.remove(zstd_file)
-        os.remove(json_file)
-        
-        logger.info(f"Application run time: {run_time:.2f} seconds")
-        logger.info(f"Metrics array shape: {metrics.shape}")
+        logger.info(f"Read json file: {json_file}")
+        try:
+            metrics = self.decode_results_spark(json_content)
+        except Exception as e:
+            logger.error(f"Failed to decode Spark log: {e}")
+            logger.warning("Using fallback meta feature")
+            metrics = META_FEATURE
+        finally:
+            try:
+                os.remove(zstd_file)
+            except Exception:
+                pass
+            try:
+                os.remove(json_file)
+            except Exception:
+                pass
+
         logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
 
         self.current_meta_feature = metrics

@@ -15,19 +15,16 @@ class BO(BaseAdvisor):
                 surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_args={'topk': 5}, cp_args={},
-                seed=42, rand_prob=0.15, rand_mode='ran', 
+                random_kwargs={}, 
                 **kwargs):
         super().__init__(config_space, task_id=task_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_args=tl_args, cp_args=cp_args,
-                        seed=seed, rand_prob=rand_prob, rand_mode=rand_mode, **kwargs)
+                        **random_kwargs, **kwargs)
 
         self.acq_type = acq_type
         self.surrogate_type = surrogate_type
-
-        self.norm_y = True
-        if 'wrk' in acq_type:
-            self.norm_y = False
+        self.norm_y = False if 'wrk' in self.acq_type else True
 
         self.init_num = ws_args['init_num']
 
@@ -110,7 +107,7 @@ class BO(BaseAdvisor):
     采样(使用ini_configs进行热启动和普通采样)
     以及安全约束 (40轮后阈值为 0.85 * incumbent_value)
     """
-    def sample(self, batch_size=1):
+    def sample(self, batch_size=1, prefix=''):
         num_config_evaluated = len(self.history)
         if len(self.ini_configs) == 0 and (
             (self.init_num > 0 and num_config_evaluated < self.init_num)
@@ -130,10 +127,8 @@ class BO(BaseAdvisor):
                 else:
                     config = self.sample_random_configs(self.sample_space, 1,
                                                         excluded_configs=self.history.configurations)[0]
-                config.origin = 'BO Random Sample'
+                config.origin = prefix + 'BO Random Sample'
                 batch.append(config)
-            if batch_size == 1:
-                return batch[0]
             return batch
     
         X = self.history.get_config_array()
@@ -165,7 +160,7 @@ class BO(BaseAdvisor):
             if not _is_valid(config):
                 config = _sanitize(config)
             if _is_valid(config):
-                config.origin = 'BO Acquisition'
+                config.origin = prefix + 'BO Acquisition'
                 batch.append(config)
                 if len(batch) >= batch_size:
                     break
@@ -175,8 +170,6 @@ class BO(BaseAdvisor):
                 excluded_configs=self.history.configurations + batch
             )
             for config in random_configs:
-                config.origin = 'BO Random Sample'
+                config.origin = prefix + 'BO Random Sample'
                 batch.append(config)
-        if batch_size == 1:
-            return batch[0]
         return batch
