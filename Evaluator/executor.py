@@ -1,5 +1,7 @@
 
-import os, time
+import os
+import time
+import traceback
 from queue import Queue
 import threading
 import numpy as np
@@ -11,6 +13,19 @@ from utils.spark import clear_cache_on_remote
 from config import ENV_SPARK_SQL_PATH, DATABASE, DATA_DIR, \
     LIST_SPARK_NODES, LIST_SPARK_SERVER, LIST_SPARK_USERNAME, LIST_SPARK_PASSWORD, \
     SPARK_NODES, SPARK_SERVER_NODE, SPARK_USERNAME, SPARK_PASSWORD
+
+
+_DEFAULT_EXTRA_INFO = {'qt_time': {}, 'et_time': {}}
+
+
+def _create_default_result(start_time):
+    return {
+        'result': {'objective': float('inf')},
+        'timeout': True,
+        'traceback': None,
+        'elapsed_time': time.time() - start_time,
+        'extra_info': _DEFAULT_EXTRA_INFO.copy(),
+    }
 
 
 class ExecutorManager:
@@ -67,24 +82,14 @@ class ExecutorManager:
             try:
                 result = self.executors[idx](config, resource_ratio)
             except Exception as e:
-                result = {
-                    'result': {'objective': float('inf')},
-                    'timeout': True,
-                    'traceback': None,
-                    'elapsed_time': time.time() - start_time,
-                }
+                result = _create_default_result(start_time)
                 logger.error(f"[Executor {idx}] Execution raised exception, continue with INF objective. Exception: {type(e).__name__}: {str(e)}")
             finally:
                 if result is not None:
                     result_queue.put(result)
                 else:
-                    default_result = {
-                        'result': {'objective': float('inf')},
-                        'timeout': True,
-                        'traceback': None,
-                        'elapsed_time': time.time() - start_time,
-                    }
-                    result_queue.put(default_result)
+                    result = _create_default_result(start_time)
+                    result_queue.put(result)
                     logger.error(f"[Executor {idx}] Result was None, using default INF result.")
                 self.executor_queue.put(idx)  # 标记为"空闲"
                 logger.debug(f"[Executor {idx}] Marked as free again.")
@@ -153,7 +158,6 @@ class SparkSessionTPCDSExecutor:
 
     def get_sqls_by_fidelity(self, resource):
         if self.fidelity_database_mapping:
-            fidelity_key = self._normalize_fidelity_key(resource)
             logger.info(f"[SparkSession] Using fixed SQL set for fidelity {resource}: {len(self.fixed_sqls)} queries")
             return self.fixed_sqls
         fidelity_key = self._normalize_fidelity_key(resource)
@@ -208,13 +212,27 @@ class SparkSessionTPCDSExecutor:
                 logger.warning("[SparkSession] Empty database name resolved; skipping USE.")
 
     def create_spark_session(self, config_dict, app_name, database=None):
+        self.stop_spark_session()
         spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
         for key, value in config_dict.items():
             if str(key).startswith('spark.'):
                 spark_builder = spark_builder.config(key, self._format_config_value(key, value))
-        spark = spark_builder.getOrCreate()
-        self.use_database(spark, database)
-        return spark
+        
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                spark = spark_builder.getOrCreate()
+                self.use_database(spark, database)
+                return spark
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"[SparkSession] Attempt {attempt + 1} failed, trying to clean up and retry: {type(e).__name__}: {str(e)}")
+                    self.stop_spark_session()
+                    time.sleep(1)
+                else:
+                    logger.error(f"[SparkSession] Failed to create Spark session with app_name={app_name} after {max_retries} attempts: {type(e).__name__}: {str(e)}")
+                    logger.error(f"[SparkSession] Traceback: {traceback.format_exc()}")
+                    raise
 
     def _clear_cluster_cache(self):
         if not self.spark_nodes:
@@ -319,12 +337,13 @@ class SparkSessionTPCDSExecutor:
         app_name = f"{self.app_name_prefix}_{resource}"
         try:
             spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
-        except Exception:
-            logger.error("[SparkSession] Failed to create Spark session, skip remaining queries.")
+        except Exception as e:
+            logger.error(f"[SparkSession] Failed to create Spark session, skip remaining queries. Error: {type(e).__name__}: {str(e)}")
+            logger.error(f"[SparkSession] Traceback: {traceback.format_exc()}")
             return self.build_ret_dict(float('inf'), start_time)
 
         total_spark_time = 0.0
-        extra_info = {'qt_time': {}, 'et_time': {}}
+        extra_info = _DEFAULT_EXTRA_INFO.copy()
         max_retry_attempts = 1
         
         for sql in queries:
@@ -362,7 +381,7 @@ class SparkSessionTPCDSExecutor:
                     if "SparkContext was shut down" in str(e) and retry_count < max_retry_attempts:
                         logger.warning(f"[SparkSession] SparkContext was shut down during {sql}, attempting to recreate (retry {retry_count + 1}/{max_retry_attempts})")
 
-                        self.stop_spark_session(spark)
+                        self.stop_spark_session()
                         try:
                             spark = self.create_spark_session(config_dict, app_name=app_name, database=database)
                             logger.info(f"[SparkSession] Successfully recreated SparkSession, retrying {sql}")
@@ -390,28 +409,33 @@ class SparkSessionTPCDSExecutor:
             if not query_executed or (result is not None and result['status'] != 'success'):
                 break
 
-        self.stop_spark_session(spark)
+        self.stop_spark_session()
 
         if not total_status:
             total_spark_time = float('inf')
         objective = total_spark_time if np.isfinite(total_spark_time) else float('inf')
         return self.build_ret_dict(objective, start_time, extra_info)
 
-    def stop_spark_session(self, spark):
-        if spark is not None:
-            try:
-                spark.stop()
-                logger.info("SparkSession closed")
-            except Exception as e:
-                logger.warning(f"[SparkSession] Exception while stopping SparkSession: {type(e).__name__}: {str(e)}")
+    def stop_spark_session(self):
+        try:
+            active_session = SparkSession.getActiveSession()
+            if active_session is not None:
+                logger.warning(f"[SparkSession] Found active SparkSession, stopping it before creating new one")
                 try:
-                    if hasattr(spark, 'sparkContext') and spark.sparkContext is not None:
-                        spark.sparkContext.stop()
-                except Exception:
-                    pass
+                    active_session.stop()
+                    time.sleep(1)
+                    logger.info("[SparkSession] Active SparkSession stopped")
+                except Exception as e:
+                    logger.warning(f"[SparkSession] Failed to stop existing session: {type(e).__name__}: {str(e)}")
+        except AttributeError:
+            logger.warning(f"[SparkSession] getActiveSession() not available, skipping active session check")
+        except Exception as e:
+            logger.warning(f"[SparkSession] Could not check for active session: {type(e).__name__}: {str(e)}")
 
     @staticmethod
-    def build_ret_dict(perf, start_time, extra_info={'qt_time': {}, 'et_time': {}}):
+    def build_ret_dict(perf, start_time, extra_info=None):
+        if extra_info is None:
+            extra_info = _DEFAULT_EXTRA_INFO.copy()
         result = {
             'result': {'objective': perf},
             'timeout': not np.isfinite(perf),
@@ -426,7 +450,7 @@ class TestExecutor:
         pass
 
     def __call__(self, config, resource_ratio):
-        extra_info = {'qt_time': {}, 'et_time': {}}
+        extra_info = _DEFAULT_EXTRA_INFO.copy()
         sql_list = ['q10', 'q11', 'q12', 'q13', 'q14a', 'q14b', 'q15', 'q16', 'q17', 'q18', 'q19', 'q1', 'q20', 'q21', 'q22', 'q23a', 'q23b', 'q24a', 'q24b', 'q25', 'q26', 'q27', 'q28', 'q29', 'q2', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36', 'q37', 'q38', 'q39a', 'q39b', 'q3', 'q40', 'q41', 'q42', 'q43', 'q44', 'q45', 'q46', 'q47', 'q48', 'q49', 'q4', 'q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q5', 'q60', 'q61', 'q62', 'q63', 'q64', 'q65', 'q66', 'q67', 'q68', 'q69', 'q6', 'q70', 'q71', 'q72', 'q73', 'q74', 'q75', 'q76', 'q77', 'q78', 'q79', 'q7', 'q80', 'q81', 'q82', 'q83', 'q84', 'q85', 'q86', 'q87', 'q88', 'q89', 'q8', 'q90', 'q91', 'q92', 'q93', 'q94', 'q95', 'q96', 'q97', 'q98', 'q99', 'q9']
         for it in sql_list:
             extra_info['qt_time'][it] = np.random.rand()
