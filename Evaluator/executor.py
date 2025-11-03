@@ -106,19 +106,7 @@ class ExecutorManager:
                 "selected_fidelity": 1.0,
                 "plan_source": "executor-fallback",
             }
-
-        selected_fidelity = plan.get("selected_fidelity")
-        plan_source = plan.get("plan_source", "partition")
-        sql_count = len(plan.get("sqls", [])) if isinstance(plan, dict) else 0
-        fidelity_display = f"{float(selected_fidelity):.5f}" if selected_fidelity is not None else "<unknown>"
-        logger.info(
-            "[ExecutorManager] Dispatching resource %.5f using fidelity %s (%d SQLs) via %s",
-            resource_ratio,
-            fidelity_display,
-            sql_count,
-            plan_source,
-        )
-
+    
         result_queue = Queue()
 
         def run():
@@ -190,19 +178,15 @@ class ExecutorManager:
 
         fallback = {1.0: partitioner.get_all_sqls()}
         logger.info("Fallback to full SQL list when first called to calculate meta features")
-        logger.info(f"Fallback sqls: {fallback}")
 
         planner = task_manager.get_planner()
         if planner is None:
             logger.info("No planner found, creating a new one")
             planner = SparkSQLPlanner(partitioner, fallback_sqls=fallback)
             task_manager.register_planner(planner)
-        try:
-            if getattr(planner, "latest_plan", None) is None:
-                planner.refresh_plan()
-                logger.info("Planner refreshed")
-        except Exception:
-            logger.debug("[ExecutorManager] Planner refresh failed during initialization; continuing with fallback subset")
+        if getattr(planner, "latest_plan", None) is None:
+            planner.refresh_plan(force=True)
+            logger.info("Planner refreshed because there is no cached plan")
         self._planner = planner
         logger.info(
             "[ExecutorManager] Planner ready (resource levels=%s)",

@@ -1,7 +1,8 @@
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Tuple
 import os
 import re
 import subprocess
+import json
 import time
 import numpy as np
 import pandas as pd
@@ -9,7 +10,7 @@ from datetime import datetime
 from openbox import logger
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
-from config import FILE_TIMEOUT_CSV, DATABASE, DATA_DIR
+from config import DATABASE, DATA_DIR
 import paramiko
 
 
@@ -328,3 +329,141 @@ def clear_cache_on_remote(server, username = "root", password = "root"):
     except Exception as e:
         logger.error(f"[{server}] Error: {e}")
 
+
+def decode_results_spark(results: str) -> np.ndarray:
+    """
+    Decode Spark application logs to extract runtime metrics.
+    
+    Args:
+        results: JSON content from Spark log file
+        
+    Returns:
+        Tuple of (run_time, metrics_array)
+    """
+    result_list = results.split('\n')
+    logs = []
+    for line in result_list:
+        if line.strip() == '':
+            continue
+        try:
+            logs.append(json.loads(line))
+        except json.JSONDecodeError as e:
+            logger.warning(f'Skipping invalid JSON line: {line[:100]}... (error: {e})')
+            continue
+
+    start_time, end_time = None, None
+    task_metrics = dict()
+
+    cnt = 0
+    for event in logs:
+        if event['Event'] == "SparkListenerApplicationStart":
+            start_time = event['Timestamp']
+        elif event['Event'] == "SparkListenerApplicationEnd":
+            end_time = event['Timestamp']
+        elif event['Event'] == "SparkListenerTaskEnd":
+            # Some tasks (e.g., resubmitted tasks) may not have Task Metrics
+            if 'Task Metrics' not in event:
+                logger.debug(f"Skipping TaskEnd event without Task Metrics (Task End Reason: {event.get('Task End Reason', 'N/A')})")
+                continue
+            cnt += 1
+            metrics_dict = event['Task Metrics']
+            for key, value in metrics_dict.items():
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        if isinstance(sub_value, dict):
+                            for sub_sub_key, sub_sub_value in sub_value.items():
+                                final_key = "%s_%s_%s" % (key, sub_key, sub_sub_key)
+                                task_metrics[final_key] = task_metrics.get(final_key, 0) + sub_sub_value
+                        else:
+                            final_key = "%s_%s" % (key, sub_key)
+                            task_metrics[final_key] = task_metrics.get(final_key, 0) + sub_value
+                elif isinstance(value, list):
+                    continue
+                else:
+                    task_metrics[key] = task_metrics.get(key, 0) + value
+
+    if start_time is None or end_time is None:
+        logger.warning('Cannot find start or end time in log')
+    else:
+        run_time = (end_time - start_time) / 1000
+        logger.info(f"Application run time: {run_time:.2f} seconds")
+
+    if cnt == 0:
+        logger.warning('No TaskEnd events found in log, using fallback metrics')
+        raise ValueError('No TaskEnd events found')
+
+    keys = list(task_metrics.keys())
+    keys.sort()
+    for k, v in task_metrics.items():
+        logger.debug(f"{k}: {v / cnt}")
+    metrics = np.array([task_metrics[key] / cnt for key in keys])
+    logger.info(f"Metrics array shape: {metrics.shape}")
+
+    return metrics
+
+def get_latest_application_id(spark_log_dir: str = "/root/codes/spark-log") -> Optional[str]:
+    """
+    Get the latest application_id from spark-log directory by finding the newest zstd file.
+    
+    Returns:
+        Application ID extracted from the newest zstd filename, or None if not found
+    """
+    if not os.path.exists(spark_log_dir):
+        logger.warning(f"Spark log directory {spark_log_dir} does not exist.")
+        return None
+        
+    zstd_files = []
+    for filename in os.listdir(spark_log_dir):
+        if filename.endswith('.zstd'):
+            filepath = os.path.join(spark_log_dir, filename)
+            mtime = os.path.getmtime(filepath)
+            zstd_files.append((filename, mtime))
+    
+    if not zstd_files:
+        logger.warning(f"No zstd files found in {spark_log_dir}")
+        return None
+        
+    zstd_files.sort(key=lambda x: x[1], reverse=True)
+    latest_filename = zstd_files[0][0]
+
+    if latest_filename.startswith('application_') and latest_filename.endswith('.zstd'):
+        application_id = latest_filename[:-5]
+        logger.info(f"Found latest application_id: {application_id}")
+        return application_id
+    else:
+        logger.warning(f"Unexpected filename format: {latest_filename}")
+        return None
+
+def resolve_runtime_metrics(
+    spark_log_dir: str = "/root/codes/spark-log",
+) -> np.ndarray:
+    application_id = get_latest_application_id(spark_log_dir)
+    if not application_id:
+        logger.warning("No application_id found, using fallback metrics")
+        raise ValueError("No application_id found")
+
+    zstd_file = os.path.join(spark_log_dir, f"{application_id}.zstd")
+    if not os.path.exists(zstd_file):
+        logger.warning(f"Zstd file not found: {zstd_file}, using fallback metrics")
+        raise ValueError(f"Zstd file not found: {zstd_file}")
+    logger.info(f"Found zstd file: {zstd_file}")
+
+    json_file = os.path.join(spark_log_dir, "app.json")
+    if os.path.exists(json_file):
+        os.remove(json_file)
+        logger.info(f"Removed existing json file: {json_file}")
+    logger.info(f"Decoding zstd file: {zstd_file} to json file: {json_file}")
+    try:
+        subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
+    except Exception as e:
+        logger.error(f"Failed to decode zstd file: {e}, using fallback metrics")
+        raise ValueError(f"Failed to decode zstd file: {e}")
+
+    json_content = ""
+    with open(json_file, 'r') as f:
+        json_content = f.read()
+    logger.info(f"Read json file: {json_file}")
+    metrics = decode_results_spark(json_content)
+    os.remove(zstd_file)
+    os.remove(json_file)
+    logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
