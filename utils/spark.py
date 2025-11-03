@@ -1,34 +1,274 @@
+from typing import Any, Dict, Iterable, Optional
+import os
 import re
+import subprocess
+import time
 import numpy as np
 import pandas as pd
 from datetime import datetime
 from openbox import logger
+from pyspark import SparkContext
+from pyspark.sql import SparkSession
 from config import FILE_TIMEOUT_CSV, DATABASE, DATA_DIR
-import os, subprocess, paramiko
+import paramiko
+
+
+SPARK_SIZE_SUFFIXES: Dict[str, str] = {
+    'spark.executor.memory': 'g',
+    'spark.driver.memory': 'g',
+    'spark.executor.memoryOverhead': 'm',
+    'spark.driver.memoryOverhead': 'm',
+    'spark.driver.maxResultSize': 'm',
+    'spark.broadcast.blockSize': 'm',
+    'spark.io.compression.snappy.blockSize': 'k',
+    'spark.shuffle.service.index.cache.size': 'm',
+    'spark.sql.autoBroadcastJoinThreshold': 'm',
+    'spark.memory.offHeap.size': 'g',
+    'spark.storage.memoryMapThreshold': 'g',
+    'spark.kryoserializer.buffer.max': 'm',
+    'spark.shuffle.file.buffer': 'k',
+    'spark.shuffle.unsafe.file.output.buffer': 'k',
+}
+
+
+def format_spark_config_value(key: str, value: Any) -> str:
+    suffix = SPARK_SIZE_SUFFIXES.get(key)
+    value_str = str(value)
+    if not suffix:
+        return value_str
+
+    if value_str.lower().endswith(suffix.lower()):
+        return value_str
+    return f"{value_str}{suffix}"
+
+
+def is_spark_context_valid(spark) -> bool:
+    try:
+        sc = getattr(spark, "sparkContext", None)
+        if sc is None or getattr(sc, "_jsc", None) is None:
+            return False
+        _ = sc.version
+        return True
+    except Exception:
+        return False
+
+
+def stop_active_spark_context(sleep_seconds: float = 3.0) -> bool:
+    try:
+        sc = SparkContext._active_spark_context
+    except Exception:
+        logger.debug("[SparkSession] Unable to access active SparkContext reference")
+        return False
+
+    if sc is None:
+        return False
+
+    logger.warning("[SparkSession] Found active SparkContext, stopping it")
+    try:
+        sc.stop()
+        logger.info("[SparkSession] SparkContext stopped")
+        if sleep_seconds > 0:
+            time.sleep(sleep_seconds)
+        return True
+    except Exception as exc:
+        logger.debug(f"[SparkSession] Could not stop SparkContext: {type(exc).__name__}: {str(exc)}")
+        return False
+
+
+def stop_active_spark_session() -> None:
+    try:
+        active_session = SparkSession.getActiveSession()
+    except AttributeError:
+        logger.warning("[SparkSession] getActiveSession() not available, skipping active session check")
+        stop_active_spark_context()
+        return
+    except Exception as exc:
+        logger.warning(f"[SparkSession] Could not check for active session: {type(exc).__name__}: {str(exc)}")
+        stop_active_spark_context()
+        return
+
+    if active_session is None:
+        stop_active_spark_context()
+        return
+
+    logger.warning("[SparkSession] Found active SparkSession, stopping it before creating new one")
+    try:
+        active_session.stop()
+        logger.info("[SparkSession] SparkSession stopped")
+    except Exception as exc:
+        logger.warning(f"[SparkSession] Failed to stop existing session: {type(exc).__name__}: {str(exc)}")
+    finally:
+        stop_active_spark_context(sleep_seconds=1.0)
+
+
+def use_database(spark: SparkSession, database: Optional[str]) -> bool:
+    if not database:
+        return True
+
+    db_name = str(database).strip()
+    if not db_name:
+        logger.warning("[SparkSession] Empty database name, skipping USE.")
+        return False
+
+    logger.info(f"[SparkSession] Attempting to set database: '{db_name}'")
+    try:
+        spark.sql(f"USE `{db_name}`")
+        logger.info(f"[SparkSession] Database set to: {db_name}")
+        return True
+    except Exception as exc:
+        error_msg = str(exc).lower()
+        error_type = type(exc).__name__
+
+        if 'does not exist' in error_msg or ('database' in error_msg and 'not found' in error_msg):
+            logger.warning(f"[SparkSession] Database '{db_name}' does not exist. Skipping USE.")
+            return False
+
+        if 'hivesessionstatebuilder' in error_msg or 'illegalargumentexception' in error_msg:
+            logger.error(f"[SparkSession] Database operation failed with session state error: {error_type}: {str(exc)}")
+            raise RuntimeError(f"SparkSession state error during database operation: {str(exc)}") from exc
+
+        logger.warning(f"[SparkSession] Failed to set database to '{db_name}': {error_type}: {str(exc)}")
+        return False
+
+
+def create_spark_session(
+    config_dict: Dict[str, Any],
+    app_name: str,
+    database: Optional[str] = None,
+    max_retries: int = 2,
+) -> SparkSession:
+    stop_active_spark_session()
+
+    def _build_spark_builder() -> SparkSession.Builder:
+        builder = SparkSession.builder.appName(app_name).enableHiveSupport()
+        for key, value in config_dict.items():
+            if str(key).startswith('spark.'):
+                builder = builder.config(key, format_spark_config_value(key, value))
+        return builder
+
+    spark_builder = _build_spark_builder()
+
+    last_exception: Optional[Exception] = None
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                logger.info(f"[SparkSession] Retry attempt {attempt + 1}: ensuring clean state")
+                stop_active_spark_session()
+                time.sleep(3)
+                spark_builder = _build_spark_builder()
+
+            spark = spark_builder.getOrCreate()
+
+            try:
+                db_set = use_database(spark, database)
+                if not db_set and database is not None:
+                    logger.warning(
+                        "[SparkSession] Database setting failed but continuing with session. "
+                        "This may cause query failures if database is required."
+                    )
+            except RuntimeError:
+                logger.error("[SparkSession] Database operation revealed session state problem, will retry")
+                spark.stop()
+                raise
+
+            return spark
+        except Exception as exc:
+            last_exception = exc
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"[SparkSession] Attempt {attempt + 1} failed, trying to clean up and retry: "
+                    f"{type(exc).__name__}: {str(exc)}"
+                )
+                stop_active_spark_session()
+                time.sleep(3)
+            else:
+                logger.error(
+                    f"[SparkSession] Failed to create Spark session with app_name={app_name} "
+                    f"after {max_retries} attempts: {type(exc).__name__}: {str(exc)}"
+                )
+                raise
+
+    if last_exception:
+        raise last_exception
+
+    raise RuntimeError("Failed to create Spark session for unknown reasons")
+
+
+def clear_cluster_cache(spark_nodes: Iterable[str], username: str, password: str) -> None:
+    if not spark_nodes:
+        return
+
+    for node in spark_nodes:
+        try:
+            clear_cache_on_remote(node, username=username, password=password)
+        except Exception as exc:
+            logger.error(f"[SparkSession] Failed to clear cache on {node}: {exc}")
+
+
+def execute_sql_with_timing(spark, sql_content: str, sql_file: str, *, check_context=is_spark_context_valid):
+    queries = [q.strip() for q in sql_content.split(';') if q.strip()]
+
+    total_start_time = time.time()
+    per_qt_time = 0.0
+    status = 'success'
+
+    for idx, query in enumerate(queries):
+        if not query:
+            continue
+        logger.debug(f"  execute query {idx + 1}/{len(queries)}: {query[:50]}...")
+
+        if not check_context(spark):
+            logger.error(f"     {sql_file} query {idx + 1} failed: SparkContext was shut down")
+            status = 'error'
+            per_qt_time = float('inf')
+            raise RuntimeError("SparkContext was shut down")
+
+        query_start_time = time.time()
+        try:
+            result = spark.sql(query)
+            collected = result.collect()
+            logger.debug(f"     {sql_file} query {idx + 1} returned {len(collected)} rows")
+            per_qt_time += (time.time() - query_start_time)
+            logger.info(f"     {sql_file} query {idx + 1} completed")
+        except Exception as exc:
+            _ = time.time() - query_start_time
+            status = 'error'
+            py_err = type(exc).__name__
+            jvm_info = ""
+            try:
+                java_exc = getattr(exc, 'java_exception', None)
+                if java_exc is not None:
+                    jvm_err = java_exc.getClass().getName()
+                    try:
+                        jvm_msg = str(java_exc.getMessage()) or ""
+                        jvm_info = f", jvm={jvm_err}, msg={jvm_msg[:150]}"
+                    except Exception:
+                        jvm_info = f", jvm={jvm_err}"
+            except Exception:
+                pass
+            logger.error(f"     {sql_file} query {idx + 1} failed (py_err={py_err}{jvm_info})")
+
+            error_msg = str(exc).lower()
+            if 'sparkcontext' in error_msg and ('shut down' in error_msg or 'cancelled' in error_msg):
+                logger.warning(f"     SparkContext was shut down, will attempt to recreate SparkSession")
+                raise RuntimeError("SparkContext was shut down")
+
+            break
+
+    total_elapsed = time.time() - total_start_time
+    return {
+        'sql_file': sql_file,
+        'per_et_time': total_elapsed,
+        'per_qt_time': per_qt_time if status == 'success' else float('inf'),
+        'status': status
+    }
+
 
 def convert_to_spark_params(config: dict):
-    memory_params = {
-        'spark.executor.memory': 'g',
-        'spark.driver.memory': 'g',
-        'spark.executor.memoryOverhead': 'm',
-        'spark.driver.memoryOverhead': 'm',
-        'spark.driver.maxResultSize': 'm',
-        'spark.broadcast.blockSize': 'm',
-        'spark.io.compression.snappy.blockSize': 'k',
-        'spark.shuffle.service.index.cache.size': 'm',
-        'spark.sql.autoBroadcastJoinThreshold': 'm',
-        'spark.memory.offHeap.size': 'g',
-        'spark.storage.memoryMapThreshold': 'g',
-        'spark.kryoserializer.buffer.max': 'm',
-        'spark.shuffle.file.buffer': 'k',
-        'spark.shuffle.unsafe.file.output.buffer': 'k',
-    }
     spark_params = []
     for k, v in config.items():
-        if k in memory_params:
-            spark_params.extend(["--conf", f"{k}={v}{memory_params[k]}"])
-        else:
-            spark_params.extend(["--conf", f"{k}={v}"])
+        formatted_value = format_spark_config_value(k, v)
+        spark_params.extend(["--conf", f"{k}={formatted_value}"])
     return spark_params
 
 def custom_sort(key):
@@ -41,58 +281,6 @@ def custom_sort(key):
         else:
             sort_key.append(part)
     return tuple(sort_key)
-
-def analyze_timeout_and_get_fidelity_details(file_path=FILE_TIMEOUT_CSV, percentile=100,
-                                             ratio_list=[], round_num=5, debug=False, add_on_ratio=1.5):
-    elapsed_timeout_dicts = analyze_sqls_timeout_from_csv(file_path=file_path, percentile=percentile, add_on_ratio=add_on_ratio)
-
-    fidelity_details = {}
-    excluded_sqls = set()
-    for r in ratio_list:
-        if int(r) == 1: continue
-        selected_queries, total_time = off_line_greedy_selection(
-            time_dicts=elapsed_timeout_dicts,
-            ratio=r, excluded_sqls=excluded_sqls
-        )
-        if debug:
-            print(total_time)
-            for k, v in selected_queries.items():
-                print(k, "  ", v)
-        fidelity_details[round(r, round_num)] = sorted(list(selected_queries.keys()), key=lambda x: custom_sort(x))
-        excluded_sqls.update(selected_queries.keys())
-    fidelity_details[round(1, round_num)] = list(elapsed_timeout_dicts.keys())
-    
-    logger.debug(fidelity_details)
-    return fidelity_details, elapsed_timeout_dicts
-
-def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33, add_on_ratio=1.5):
-    df = pd.read_csv(file_path)
-    df = df[df['status'] == 'complete']
-    et_columns = [col for col in df.columns if col.startswith("et_q")]
-
-    et_quantiles = {}
-    for col in et_columns:
-        values = df[col].dropna().values
-        if len(values) > 0:
-            clean_key = col.replace('et_', '', 1)
-            et_quantiles[clean_key] = np.percentile(values, percentile)
-    et_quantiles = {k: v * add_on_ratio + v for k, v in et_quantiles.items()}
-    return et_quantiles
-
-def off_line_greedy_selection(time_dicts: dict, ratio=1, excluded_sqls=None):
-    sorted_queries = sorted(time_dicts.items(), key=lambda x: -x[1])
-    time_target = sum(time_dicts.values()) * ratio
-    
-    selected_queries = {}
-    total_time = 0
-    for q, t in sorted_queries:
-        if total_time + t <= time_target:
-            if q not in excluded_sqls:
-                selected_queries[q] = t
-                total_time += t
-        if total_time >= time_target * 0.98:
-            break
-    return selected_queries, total_time
 
 def run_spark(config, sql, result_dir):
     spark_cmd = [
@@ -140,98 +328,3 @@ def clear_cache_on_remote(server, username = "root", password = "root"):
     except Exception as e:
         logger.error(f"[{server}] Error: {e}")
 
-def parse_spark_log(log_dir, queries, suffix_type='log'):
-    results = {}
-    time_pattern = re.compile(r'Time taken: ([\d.]+) seconds')
-    cost = 0
-    for i in queries:
-        results[i] = np.Inf
-        if os.path.exists(os.path.join(log_dir, f"{i}.{suffix_type}")):
-            with open(os.path.join(log_dir, f"{i}.{suffix_type}"), 'r') as f:
-                for line in f:
-                    time_match = time_pattern.search(line)
-                    if time_match:
-                        execution_time = float(time_match.group(1))
-                        results[i] = execution_time
-                        cost += execution_time
-
-    sorted_results = dict(sorted(results.items(), key=lambda x: custom_sort(x[0])))
-    return cost, sorted_results
-
-def extract_performance_from_logs(log_dir, output_path):
-    results = {}
-    timestamps = []
-
-    time_pattern = re.compile(r'Time taken: ([\d.]+) seconds')
-    query_pattern = re.compile(r'(q\d+[a-z]?)')  # 匹配 q1, q1a, q1b 格式
-    datetime_pattern = re.compile(r'(\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})')
-
-    for filename in os.listdir(log_dir):
-        if filename.endswith('.log'):
-            query_match = query_pattern.search(filename)
-            if query_match:
-                query_name = query_match.group(1)
-                results[query_name] = np.Inf
-                with open(os.path.join(log_dir, filename), 'r') as f:
-                    for line in f:
-                        time_match = time_pattern.search(line)
-                        if time_match:
-                            execution_time = float(time_match.group(1))
-                            results[query_name] = execution_time
-
-                        datetime_match = datetime_pattern.search(line)
-                        if datetime_match:
-                            timestamp = datetime.strptime(datetime_match.group(1), '%d/%m/%y %H:%M:%S')
-                            timestamps.append(timestamp)
-
-    with open(output_path, 'w') as out_file:
-        if timestamps:
-            earliest: datetime = min(timestamps)
-            latest: datetime = max(timestamps)
-            time_diff = latest - earliest
-            hours, remainder = divmod(time_diff.total_seconds(), 3600)
-            minutes, seconds = divmod(remainder, 60)
-
-            out_file.write(f"start: {earliest.strftime('%d/%m/%y %H:%M:%S')}\n")
-            out_file.write(f"end: {latest.strftime('%d/%m/%y %H:%M:%S')}\n")
-            out_file.write(f"cost: {int(hours)}h {int(minutes)}m {int(seconds)}s\n\n")
-
-        sorted_results = dict(sorted(results.items(), key=lambda x: custom_sort(x[0])))
-        cost = 0
-        for _, (k, v) in enumerate(sorted_results.items()):
-            cost += v
-            out_file.write(f"{k}\t{v}\n")
-
-        out_file.write(f'\ntotal: {cost}\n')
-
-    print(f"Results saved to {output_path}")
-
-    times = list(sorted_results.values())
-    mean = np.mean(times)
-    median = np.median(times)
-    p90 = np.percentile(times, 90)
-    p99 = np.percentile(times, 99)
-
-    with open(output_path, 'a') as out_file:
-        out_file.write("\n=== Statistics ===\n")
-        out_file.write(f"Mean: {mean:.2f} s\n")
-        out_file.write(f"Median: {median:.2f} s\n")
-        out_file.write(f"P90: {p90:.2f} s\n")
-        out_file.write(f"P99: {p99:.2f} s\n")
-
-
-    outliers_p90 = {k: v for k, v in sorted_results.items() if v > p90}
-    outliers_p99 = {k: v for k, v in sorted_results.items() if v > p99}
-
-    with open(output_path, 'a') as out_file:
-        out_file.write("\n=== Long Tail Queries (P90) ===\n")
-        for k, v in outliers_p90.items():
-            out_file.write(f"{k}\t{v}\n")
-
-        out_file.write("\n=== Severe Long Tail Queries (P99) ===\n")
-        for k, v in outliers_p99.items():
-            out_file.write(f"{k}\t{v}\n")
-
-if __name__ == '__main__':
-    extract_performance_from_logs(log_dir=f"/root/codes/multique_fidelity_spark/exps/data_volume_correlation/20251019_163750/config_1/0.03", 
-    output_path=f"/root/codes/multique_fidelity_spark/exps/data_volume_correlation/20251019_163750/config_1/performance_0.03.txt")

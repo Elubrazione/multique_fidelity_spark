@@ -1,11 +1,10 @@
 import argparse
 from openbox import logger
 
-from Evaluator.executor import ExecutorManager, SparkSessionTPCDSExecutor
+from Evaluator.executor import ExecutorManager
 from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
 from task_manager import TaskManager
-from utils.spark import analyze_timeout_and_get_fidelity_details
 from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR, RESULT_DIR
 
 

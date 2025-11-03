@@ -1,7 +1,21 @@
-from typing import Dict, Any, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import pandas as pd
 from openbox.utils.history import History, Observation
+
+
+def config_to_dict(config: Any) -> Dict[str, Any]:
+    if config is None:
+        return {}
+    if hasattr(config, "get_dictionary"):
+        try:
+            return dict(config.get_dictionary())
+        except Exception:
+            pass
+    try:
+        return dict(config)
+    except Exception:
+        return {}
 
 
 def _observation_to_record(observation: Observation, sql_type: str) -> Dict[str, float]:

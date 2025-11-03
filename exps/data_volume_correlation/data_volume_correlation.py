@@ -17,7 +17,12 @@ from openbox import logger
 from pyspark.sql import SparkSession
 
 from Optimizer.utils import load_space_from_json
-from utils.spark import get_full_queries_tasks, clear_cache_on_remote, custom_sort
+from utils.spark import (
+    clear_cache_on_remote,
+    custom_sort,
+    format_spark_config_value,
+    get_full_queries_tasks,
+)
 from config import HUGE_SPACE_FILE, SPARK_NODES, DATA_DIR
 
 
@@ -315,14 +320,6 @@ def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_seed=None):
     }
 
 def create_spark_session(config, app_name, database=None) -> SparkSession:
-    memory_params = {
-        'spark.executor.memory': 'g',
-        'spark.driver.memory': 'g',
-        'spark.executor.memoryOverhead': 'm',
-        'spark.driver.maxResultSize': 'm',
-        'spark.sql.autoBroadcastJoinThreshold': 'm'     
-    }
-    
     spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
     if hasattr(config, 'get_dictionary'):
         config_dict = config.get_dictionary()
@@ -330,8 +327,9 @@ def create_spark_session(config, app_name, database=None) -> SparkSession:
         config_dict = config
     for key, value in config_dict.items():
         if key.startswith('spark.'):
-            spark_builder = spark_builder.config(key, str(value) + memory_params.get(key, ''))
-            logger.debug(f"set spark config: {key} = {value}")
+            formatted_value = format_spark_config_value(key, value)
+            spark_builder = spark_builder.config(key, formatted_value)
+            logger.debug(f"set spark config: {key} = {formatted_value}")
     spark = spark_builder.getOrCreate()
     if database:
         spark.sql(f"USE {database}")
