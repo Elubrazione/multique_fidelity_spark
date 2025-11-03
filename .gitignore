@@ -13,3 +13,8 @@ log/*
 
 catboost_info/*
 *.cbm
+
+results/*
+docs/
+mock_data/
+mock_history/*

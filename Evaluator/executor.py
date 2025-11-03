@@ -13,6 +13,7 @@ from ConfigSpace import Configuration
 from task_manager import TaskManager
 from .planner import SparkSQLPlanner
 from .partitioner import SQLPartitioner
+from .mock_executor import MockExecutor
 from .utils import config_to_dict
 from utils.spark import create_spark_session, execute_sql_with_timing, stop_active_spark_session
 from config import ENV_SPARK_SQL_PATH, DATABASE, DATA_DIR, \
@@ -62,7 +63,7 @@ class ExecutorManager:
                 else:
                     base_seed = int(base_seed) + time.time_ns()
 
-                self.executors.append(TestExecutor(seed=base_seed + idx))
+                self.executors.append(MockExecutor(seed=base_seed + idx))
                 continue
             executor_kwargs = {
                 'spark_sql': spark_sql,
@@ -85,7 +86,7 @@ class ExecutorManager:
         try:
             planner = self._ensure_planner()
             if planner is not None:
-                plan = planner.plan(resource_ratio, force_refresh=True, allow_fallback=True)
+                plan = planner.plan(resource_ratio, force_refresh=False, allow_fallback=True)
         except Exception as exc:
             logger.error(f"[ExecutorManager] Failed to obtain workload plan for resource {resource_ratio}: {exc}")
             logger.debug(traceback.format_exc())
@@ -99,7 +100,24 @@ class ExecutorManager:
                 "[ExecutorManager] Using fallback plan for resource %.5f (sqls=%d)",
                 resource_ratio, len(fallback_sqls)
             )
-            plan = {"sqls": fallback_sqls, "timeout": {}}
+            plan = {
+                "sqls": fallback_sqls,
+                "timeout": {},
+                "selected_fidelity": 1.0,
+                "plan_source": "executor-fallback",
+            }
+
+        selected_fidelity = plan.get("selected_fidelity")
+        plan_source = plan.get("plan_source", "partition")
+        sql_count = len(plan.get("sqls", [])) if isinstance(plan, dict) else 0
+        fidelity_display = f"{float(selected_fidelity):.5f}" if selected_fidelity is not None else "<unknown>"
+        logger.info(
+            "[ExecutorManager] Dispatching resource %.5f using fidelity %s (%d SQLs) via %s",
+            resource_ratio,
+            fidelity_display,
+            sql_count,
+            plan_source,
+        )
 
         result_queue = Queue()
 
@@ -343,25 +361,3 @@ class SparkSessionTPCDSExecutor:
             'elapsed_time': time.time() - start_time
         }
         return result
-
-class TestExecutor:
-    def __init__(self, seed: Optional[int] = None):
-        self.rng = np.random.default_rng(seed)
-        self.sql_list = ['q10', 'q11', 'q12', 'q13', 'q14a', 'q14b', 'q15', 'q16', 'q17', 'q18', 'q19', 'q1', 'q20', 'q21', 'q22', 'q23a', 'q23b', 'q24a', 'q24b', 'q25', 'q26', 'q27', 'q28', 'q29', 'q2', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36', 'q37', 'q38', 'q39a', 'q39b', 'q3', 'q40', 'q41', 'q42', 'q43', 'q44', 'q45', 'q46', 'q47', 'q48', 'q49', 'q4', 'q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q5', 'q60', 'q61', 'q62', 'q63', 'q64', 'q65', 'q66', 'q67', 'q68', 'q69', 'q6', 'q70', 'q71', 'q72', 'q73', 'q74', 'q75', 'q76', 'q77', 'q78', 'q79', 'q7', 'q80', 'q81', 'q82', 'q83', 'q84', 'q85', 'q86', 'q87', 'q88', 'q89', 'q8', 'q90', 'q91', 'q92', 'q93', 'q94', 'q95', 'q96', 'q97', 'q98', 'q99', 'q9']
-
-    def __call__(self, config, resource_ratio, plan=None):
-        extra_info = copy.deepcopy(_DEFAULT_EXTRA_INFO)
-
-        for sql_name in self.sql_list:
-            extra_info['qt_time'][sql_name] = float(self.rng.random())
-            extra_info['et_time'][sql_name] = float(self.rng.random())
-
-        result_objective = float(sum(extra_info['qt_time'].values()))
-
-        return {
-            'result': {'objective': result_objective},
-            'timeout': not np.isfinite(self.rng.random()),
-            'traceback': None,
-            'extra_info': extra_info,
-            'elapsed_time': float(self.rng.random()),
-        }

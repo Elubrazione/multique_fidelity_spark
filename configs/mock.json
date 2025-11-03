@@ -1,0 +1,27 @@
+{
+    "log_dir": "log",
+    "result_dir": "results",
+    "database": "tpcds_100g",
+    "spark": {
+      "nodes": ["agent1", "agent2", "server1"],
+      "server_node": "server1",
+      "username": "root",
+      "password": "rootroot"
+    },
+    "multi_cluster": {
+      "usernames": ["root"],
+      "passwords": ["root"],
+      "servers": ["192.168.90.76"],
+      "nodes": [
+        ["192.168.90.76", "192.168.90.77", "192.168.90.78"]
+      ]
+    },
+    "env": {
+      "spark_sql_path": "/usr/local/spark/bin/spark-sql",
+      "yarn_path": "/usr/local/hadoop/bin/yarn"
+    },
+    "data_dir": "mock_data",
+    "config_space": "configs/space/huge_space.json",
+    "os_config_space": "configs/space/os_params.json",
+    "expert_space": "configs/space/expert_space.json"
+  }
