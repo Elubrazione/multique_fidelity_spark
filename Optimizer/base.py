@@ -83,6 +83,7 @@ class BaseOptimizer:
             task_id=self.task_id,
             ws_strategy=ws_strategy,
             ws_args=self.ws_args,
+            tl_strategy=tl_strategy,
             tl_args=self.tl_args,
             cp_args=self.cp_args,
             _logger_kwargs=self._logger_kwargs,

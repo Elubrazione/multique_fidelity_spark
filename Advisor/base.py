@@ -11,7 +11,7 @@ from .utils import build_observation, is_valid_spark_config, sanitize_spark_conf
 class BaseAdvisor:
     def __init__(self, config_space: ConfigurationSpace,
                 task_id='test', ws_strategy='none', ws_args=None,
-                tl_args=None, cp_args=None,
+                tl_strategy='none', tl_args=None, cp_args=None,
                 seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
         # Delay import to avoid circular dependency
@@ -28,8 +28,8 @@ class BaseAdvisor:
         self.task_manager = TaskManager.instance()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
 
-        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
-        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk']) if tl_strategy != 'none' else ([], [])
+        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data) if tl_strategy != 'none' else (config_space, config_space)
         
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)
@@ -45,6 +45,7 @@ class BaseAdvisor:
 
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
+        self.tl_strategy = tl_strategy
         self.tl_args = tl_args
         self.cp_args = cp_args
         self.history = self.task_manager.current_task_history
