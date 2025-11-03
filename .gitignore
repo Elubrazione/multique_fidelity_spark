@@ -16,5 +16,4 @@ catboost_info/*
 
 results/*
 docs/
-mock_data/
-mock_history/*
+mock/*

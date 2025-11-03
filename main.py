@@ -5,7 +5,7 @@ from Evaluator.executor import ExecutorManager
 from Compressor.utils import load_expert_params
 from Optimizer.utils import build_optimizer, load_space_from_json
 from task_manager import TaskManager
-from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR, RESULT_DIR
+from config import LOG_DIR, HUGE_SPACE_FILE, EXPERT_PARAMS_FILE, DATA_DIR, RESULT_DIR, HISTORY_DIR
 
 
 parser = argparse.ArgumentParser()
@@ -31,7 +31,7 @@ parser.add_argument('--ws_inner_surrogate_model', type=str, default='prf')
 parser.add_argument('--transfer', type=str, default='none')
 parser.add_argument('--tl_topk', type=int, default=3)
 
-parser.add_argument('--src_data_path', type=str, default='')
+parser.add_argument('--src_data_path', type=str, default=HISTORY_DIR)
 parser.add_argument('--backup_flag', action='store_true', default=False)
 
 parser.add_argument('--task', type=str, default='test_ws')

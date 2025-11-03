@@ -20,7 +20,8 @@
       "spark_sql_path": "/usr/local/spark/bin/spark-sql",
       "yarn_path": "/usr/local/hadoop/bin/yarn"
     },
-    "data_dir": "mock_data",
+    "data_dir": "mock/data",
+    "history_dir": "mock/history",
     "config_space": "configs/space/huge_space.json",
     "os_config_space": "configs/space/os_params.json",
     "expert_space": "configs/space/expert_space.json"

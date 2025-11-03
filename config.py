@@ -21,6 +21,7 @@ class ConfigManager:
         self.RESULT_DIR = os.path.join(self.ROOT_DIR, self.config['result_dir'])
         
         self.DATA_DIR = self.config['data_dir']
+        self.HISTORY_DIR = self.config['history_dir']
         self.DATABASE = self.config['database']
         self.SPARK_NODES = self.config['spark']['nodes']
         self.SPARK_SERVER_NODE = self.config['spark']['server_node']
@@ -46,6 +47,7 @@ ROOT_DIR = config_manager.ROOT_DIR
 LOG_DIR = config_manager.LOG_DIR
 RESULT_DIR = config_manager.RESULT_DIR
 DATA_DIR = config_manager.DATA_DIR
+HISTORY_DIR = config_manager.HISTORY_DIR
 ENV_SPARK_SQL_PATH = config_manager.ENV_SPARK_SQL_PATH
 ENV_YARN_PATH = config_manager.ENV_YARN_PATH
 DATABASE = config_manager.DATABASE
