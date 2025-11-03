@@ -171,6 +171,7 @@ class BaseOptimizer:
 
     def run_one_iter(self):
         self.iter_id += 1
+        logger.info("iter =========================================================================== {:3d}".format(self.iter_id))
         num_config_evaluated = len(self.advisor.history)
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
@@ -182,20 +183,18 @@ class BaseOptimizer:
         self.log_iteration_results(candidates, perfs)
         self.save_info(interval=1)
 
-    def log_iteration_results(self, configs, performances, iteration_id=None):
-        iter_id = iteration_id if iteration_id is not None else self.iter_id
-        
-        logger.info("iter {:5d} ---------------------------------------------------------".format(iter_id))
-        
+    def log_iteration_results(self, configs, performances):
+        logger.info("------------------------------------------------------------------------------")
         for idx, config in enumerate(configs):
             if hasattr(config, 'origin') and config.origin:
                 logger.warn("!!!!!!!!!! {} !!!!!!!!!!".format(config.origin))
             
             logger.info('Config: ' + str(config.get_dictionary()))
             logger.info('Obj: {}'.format(performances[idx]))
-        
+            logger.info("-------------------------------------------------------------------------------")
+
         logger.info('best obj: {}'.format(self.advisor.history.get_incumbent_value()))
-        logger.info("===========================================================================")
+        logger.info("===============================================================================")
 
     def save_info(self, interval=1):
         if self.tl_strategy != 'none' or 'MFSE' in self.method_id:

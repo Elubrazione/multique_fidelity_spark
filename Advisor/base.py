@@ -1,7 +1,7 @@
 import numpy as np
 import json as js
 from openbox import logger
-from ConfigSpace import ConfigurationSpace
+from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
@@ -49,6 +49,9 @@ class BaseAdvisor:
         self.tl_args = tl_args
         self.cp_args = cp_args
         self.history = self.task_manager.current_task_history
+        
+        if tl_strategy != 'none':
+            self._compress_history_observations()
 
 
     def warm_start(self):
@@ -109,3 +112,22 @@ class BaseAdvisor:
             return
         obs = build_observation(config, results)
         self.history.update_observation(obs)
+
+    def _compress_history_observations(self):
+        if self.history is None or len(self.history) == 0:
+            return
+
+        surrogate_names = self.surrogate_space.get_hyperparameter_names()
+        for obs in self.history.observations:
+            config = obs.config
+            if config.configuration_space == self.surrogate_space:
+                continue
+
+            config_dict = config.get_dictionary()
+            filtered_values = {name: config_dict[name] for name in surrogate_names if name in config_dict}
+            new_config = Configuration(self.surrogate_space, values=filtered_values)
+            if hasattr(config, 'origin') and config.origin is not None:
+                new_config.origin = config.origin
+            obs.config = new_config
+
+        self.history.config_space = self.surrogate_space

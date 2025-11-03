@@ -68,8 +68,8 @@ class BO(BaseAdvisor):
                 for j in range(task_num):
                     config_warm_old = sim_obs[j].config
                     # 在 sample_space 里创建新 config，并逐个拷贝参数
-                    # 注意这里的搜索空间是 config_space 而不是 sample_space
-                    config_warm = Configuration(self.config_space, values={
+                    # 注意这里的搜索空间是 surrogate_space 而不是 sample_space
+                    config_warm = Configuration(self.surrogate_space, values={
                         name: config_warm_old[name] for name in self.sample_space.get_hyperparameter_names()
                     })
                     config_warm.origin = self.ws_strategy + self.source_hpo_data[sim[0]].task_id
@@ -135,7 +135,7 @@ class BO(BaseAdvisor):
         Y = self.history.get_objectives()
 
         if self.surrogate_type == 'gpf':
-            self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space,
+            self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space,
                                                 rng=self.rng,
                                                 transfer_learning_history=self.source_hpo_data,
                                                 extra_dim=self.extra_dim, norm_y=self.norm_y)

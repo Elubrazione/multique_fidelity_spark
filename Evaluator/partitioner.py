@@ -114,9 +114,10 @@ class SQLPartitioner:
         return plan
 
     def refresh_from_task_manager(self, *, force: bool = False) -> PartitionPlan:
+        # TODO: only use current task history when include_current_task is True
         if force or self._plan_dirty or self._latest_plan is None:
             logger.warning("SQLPartitioner: plan is dirty or latest plan is None, building new plan")
-            return self.build_plan(include_current_task=True)
+            return self.build_plan(include_current_task=False)
         return self._latest_plan
 
     def mark_plan_dirty(self) -> None:
