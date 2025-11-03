@@ -5,7 +5,11 @@ from openbox import logger
 from openbox.utils.history import History
 
 from task_manager import TaskManager
-from .utils import build_weighted_dataframe, multi_fidelity_sql_selection
+from .utils import (
+    build_weighted_dataframe,
+    compute_subset_correlation,
+    multi_fidelity_sql_selection,
+)
 from utils.spark import get_full_queries_tasks
 
 
@@ -22,15 +26,11 @@ class SQLPartitioner:
         *,
         sql_dir: Optional[str] = None,
         correlation_method: str = "spearman",
-        time_type: str = "spark_time",
-        sql_type: str = "qt",
+        sql_type: str = "qt",   # qt: query time, et: elapsed time
         tolerance: float = 0.1,
         lambda_penalty: float = 0.1,
         current_task_weight: float = 1.0,
-        min_weight: float = 1e-6,
         top_ratio: float = 1.0,
-        normalize_similarities: bool = True,
-        enable_calibration: bool = True,
     ):
         self.task_manager = TaskManager.instance()
         self.scheduler = self.task_manager.get_scheduler()
@@ -38,16 +38,12 @@ class SQLPartitioner:
         self._default_fidelity_levels = [round(float(1.0), 5)]
 
         self.correlation_method = correlation_method
-        self.time_type = time_type
         self.sql_type = sql_type
         self.tolerance = tolerance
         self.lambda_penalty = lambda_penalty
         self.current_task_weight = current_task_weight
 
-        self.min_weight = min_weight
         self.top_ratio = top_ratio
-        self.normalize_similarities = normalize_similarities
-        self.enable_calibration = enable_calibration
 
         self.sql_dir = sql_dir
         self._all_sqls = self._load_all_sqls()
@@ -70,9 +66,7 @@ class SQLPartitioner:
         df = build_weighted_dataframe(
             histories_with_weights,
             sql_type=self.sql_type,
-            top_ratio=self.top_ratio,
-            normalize_similarities=self.normalize_similarities,
-            enable_calibration=self.enable_calibration,
+            top_ratio=self.top_ratio
         )
         if df.empty:
             logger.warning("SQLPartitioner: aggregated dataframe is empty.")
@@ -91,10 +85,20 @@ class SQLPartitioner:
             weights=weights,
             lambda_penalty=self.lambda_penalty,
             correlation_method=self.correlation_method,
-            time_type=self.time_type,
             sql_type=self.sql_type,
             tolerance=self.tolerance,
         )
+
+        subset_correlations: Dict[float, float] = {}
+        for fidelity, subset in fidelity_subsets.items():
+            correlation = compute_subset_correlation(
+                df,
+                subset,
+                weights=weights,
+                correlation_method=self.correlation_method,
+                sql_type=self.sql_type,
+            ) if subset else 0.0
+            subset_correlations[fidelity] = correlation
 
         plan = PartitionPlan(
             fidelity_subsets={k: sorted(values) for k, values in fidelity_subsets.items()},
@@ -102,6 +106,9 @@ class SQLPartitioner:
             metadata={
                 "histories": [history.task_id for history, _ in histories_with_weights],
                 "weights": [weight for _, weight in histories_with_weights],
+                "subset_correlation": {
+                    float(fidelity): corr for fidelity, corr in subset_correlations.items()
+                },
             },
         )
 
@@ -111,6 +118,12 @@ class SQLPartitioner:
             f"{float(fid):.3f} -> {len(sqls)} SQLs" for fid, sqls in plan.fidelity_subsets.items()
         )
         logger.info("SQLPartitioner: built plan with fidelities: %s", summary or "<empty>")
+        for fidelity, corr in subset_correlations.items():
+            logger.info(
+                "SQLPartitioner: fidelity %.3f subset correlation = %.4f",
+                float(fidelity),
+                corr,
+            )
         return plan
 
     def refresh_from_task_manager(self, *, force: bool = False) -> PartitionPlan:
@@ -146,7 +159,7 @@ class SQLPartitioner:
         if similar_histories:
             for history, (_, score) in zip(similar_histories, similar_scores):
                 weight = float(score)
-                if weight >= self.min_weight and len(history) > 0:
+                if len(history) > 0:
                     histories.append((history, weight))
 
         return histories
