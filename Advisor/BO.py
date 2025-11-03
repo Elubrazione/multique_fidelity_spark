@@ -5,19 +5,16 @@ from ConfigSpace import Configuration, ConfigurationSpace
 
 from .base import BaseAdvisor
 from .utils import build_my_surrogate, build_my_acq_func, is_valid_spark_config, sanitize_spark_config
-from .workload_mapping.rover.transfer import get_transfer_suggestion
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
-from config import LIST_SPARK_NODES
 
 
 class BO(BaseAdvisor):
-    def __init__(self, config_space: ConfigurationSpace,
+    def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 surrogate_type='prf', acq_type='ei', task_id='test',
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_strategy='none', tl_args={'topk': 5}, cp_args={},
-                random_kwargs={}, 
-                **kwargs):
-        super().__init__(config_space, task_id=task_id,
+                random_kwargs={}, **kwargs):
+        super().__init__(config_space, task_id=task_id, method_id=method_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
                         tl_strategy=tl_strategy, tl_args=tl_args, cp_args=cp_args,
                         **random_kwargs, **kwargs)
@@ -25,9 +22,6 @@ class BO(BaseAdvisor):
         self.acq_type = acq_type
         self.surrogate_type = surrogate_type
         self.norm_y = False if 'wrk' in self.acq_type else True
-
-        self.init_num = ws_args['init_num']
-
         
         self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
                                             transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
@@ -38,14 +32,11 @@ class BO(BaseAdvisor):
                                                             config_space=self.sample_space)
 
     def warm_start(self):
-        if self.ws_strategy == 'none':
+        # no warm start if ws_strategy or tl_strategy is none
+        if self.ws_strategy == 'none' or self.tl_strategy == 'none':
             return
-
+        
         sims = self.source_hpo_data_sims
-
-        for i, sim in enumerate(sims):
-            logger.info("The %d-th similar task(%s): %s" % (sim[0], self.source_hpo_data[i].task_id, sim[1]))
-
         warm_str_list = []
         for i in range(len(sims)):
             idx, sim = sims[i]
@@ -58,79 +49,121 @@ class BO(BaseAdvisor):
         else:
             self.history.meta_info['warm_start'].append(warm_str_list)
 
-        num_evaluated = len(self.history)
-        if self.ws_strategy.startswith('best'):
-            for i, sim in enumerate(sims):
-                sim_obs = copy.deepcopy(self.source_hpo_data[sim[0]].observations)
-                sim_obs = sorted(sim_obs, key=lambda x: x.objectives[0])
+        # warm_start strategy: select the best ws_args['topk'] configurations from each similar task
+        # organize configurations by ranking, here K is the number of similar tasks (tl_args['topk'])
+        #   task1_config1, task2_config1, task3_config1, ..., task_{K}_config1,
+        #   task1_config2, task2_config2, task3_config2, ..., task_{K}_config2,
+        #   ...
+        #   task1_config{ws_topk}, task2_config{ws_topk}, task3_config{ws_topk}, ..., task_{K}_config{ws_topk},
+        
+        # For BOHB/MFES: ws_topk = ws_args['topk'], length of ini_configs = self.init_num * ws_topk
+        # For others: ws_topk = 1, length of ini_configs = self.init_num
+        ws_topk = int(self.ws_args['topk']) if 'BOHB' in self.method_id or 'MFES' in self.method_id else 1
 
-                task_num = 3 if i == 0 else 1
-                for j in range(task_num):
-                    config_warm_old = sim_obs[j].config
-                    # 在 sample_space 里创建新 config，并逐个拷贝参数
-                    # 注意这里的搜索空间是 surrogate_space 而不是 sample_space
+        # prepare sorted configurations for each similar task
+        source_observations = []
+        for idx, sim in sims:
+            sim_obs = copy.deepcopy(self.source_hpo_data[idx].observations)
+            sim_obs = sorted(sim_obs, key=lambda x: x.objectives[0])
+            # select the best ws_args['topk'] configurations
+            top_obs = sim_obs[: min(ws_topk, len(sim_obs))]
+            source_observations.append((idx, top_obs))
+            logger.info("Source task %s: selected top %d configurations" \
+                % (self.source_hpo_data[idx].task_id, len(top_obs)))
+
+        ini_list = []
+        target_length = self.init_num * ws_topk if ws_topk > 1 else self.init_num
+        num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
+        
+        for rank in range(ws_topk):
+            if len(ini_list) + num_evaluated_exclude_default >= target_length:
+                break
+            for idx, top_obs in source_observations:
+                if len(ini_list) + num_evaluated_exclude_default >= target_length:
+                    break
+                if rank < len(top_obs):
+                    config_warm_old = top_obs[rank].config
+                    # create new config in surrogate_space from original config in history
                     config_warm = Configuration(self.surrogate_space, values={
                         name: config_warm_old[name] for name in self.sample_space.get_hyperparameter_names()
                     })
-                    config_warm.origin = self.ws_strategy + self.source_hpo_data[sim[0]].task_id
-                    # 后加的更差，因为是从后往前取的，所以往前加
-                    self.ini_configs = [config_warm] + self.ini_configs
-                if len(self.ini_configs) + num_evaluated >= self.init_num:
-                    break
+                    config_warm.origin = self.ws_strategy + "_" + self.source_hpo_data[idx].task_id + "_" + str(sims[idx][1]) + "_rank" + str(rank)
+                    ini_list.append(config_warm)
+                    logger.info("Warm start configuration from task %s, rank %d, objective: %s, %s" % 
+                                (self.source_hpo_data[idx].task_id, rank, top_obs[rank].objectives[0], config_warm.origin))
 
-            while len(self.ini_configs) + num_evaluated < self.init_num:
-                config = self.sample_random_configs(self.sample_space, 1,
-                                                    excluded_configs=self.history.configurations)[0]
-                self.ini_configs = [config] + self.ini_configs
+        # the best configurations should be at the end of the list, so we need to reverse the list
+        # the reversed order: task3_config2, ..., task3_config1, task2_config1, task1_config1
+        # (the last one is the first one to be used)
+        # the usage order: task1_config1, task2_config1, task3_config1, task1_config2, task2_config2
+        self.ini_configs = ini_list[::-1] + self.ini_configs
 
-            logger.info("Successfully warm start %d configurations with %s!" % (len(self.ini_configs), self.ws_strategy))
+        while len(self.ini_configs) + num_evaluated_exclude_default < target_length:
+            config = self.sample_random_configs(self.sample_space, 1,
+                                                excluded_configs=self.history.configurations)[0]
+            config.origin = self.ws_strategy + " Warm Start Random Sample"
+            logger.debug("Warm start configuration from random sample: %s" % config.origin)
+            self.ini_configs = [config] + self.ini_configs
 
-        elif self.ws_strategy.startswith('rgpe'):
-            topk = self.ws_args.get('topk', 3)
+        logger.info("Successfully warm start %d configurations with %s!" \
+                    % (len(self.ini_configs), self.ws_strategy))
 
-            src_history = [self.source_hpo_data[sims[i][0]] for i in range(topk)]
-            target_history = self.history
 
-            while len(self.ini_configs) + num_evaluated < self.init_num:
-                final_config = get_transfer_suggestion(src_history, target_history, _logger_kwargs=self._logger_kwargs)
-                final_config.origin = self.ws_strategy
-                if final_config not in self.history.configurations + self.ini_configs:
-                    self.ini_configs.append(final_config)
-
-            logger.info("Successfully warm start %d configurations with %s!" % (len(self.ini_configs), self.ws_strategy))
-
-        else:
-
-            raise ValueError('Invalid ws_strategy: %s' % self.ws_strategy)
-
-    """
-    采样(使用ini_configs进行热启动和普通采样)
-    以及安全约束 (40轮后阈值为 0.85 * incumbent_value)
-    """
     def sample(self, batch_size=1, prefix=''):
-        num_config_evaluated = len(self.history)
-        if len(self.ini_configs) == 0 and (
-            (self.init_num > 0 and num_config_evaluated < self.init_num)
-            or (self.init_num == 0 and num_config_evaluated == 0)
-        ):
+        # exclude default configuration from count
+        num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
+
+        if len(self.ini_configs) == 0 and num_evaluated_exclude_default < self.init_num:
             logger.info("Begin to warm start!")
             self.warm_start()
 
-        logger.info("num_config_evaluated: [%d], init_num: [%d], init_configs: [%d]" % (num_config_evaluated, self.init_num, len(self.ini_configs)))
-        if num_config_evaluated < self.init_num or (not self.init_num and not num_config_evaluated):
-        # if num_config_evaluated <= self.init_num:
+        logger.info("num_evaluated_exclude_default: [%d], init_num: [%d], init_configs: [%d]" \
+                    % (num_evaluated_exclude_default, self.init_num, len(self.ini_configs)))
+
+        # Check if called from MFBO (MFES uses MFBO, which handles initialization itself)
+        # If prefix is 'MF', it means we're called from MFBO after initialization phase
+        is_called_from_mfbo = prefix == 'MF'
+        is_bohb = 'BOHB' in self.method_id
+        
+        # Initialization phase: only handle if not called from MFBO (BOHB uses BO directly)
+        if num_evaluated_exclude_default < self.init_num and not is_called_from_mfbo:
             batch = []
-            for _ in range(batch_size):
-                if len(self.ini_configs) > 0:
-                    config = self.ini_configs[-1]
-                    self.ini_configs.pop()
-                else:
+            if is_bohb:
+                # BOHB: full-fidelity warm start, take 1 config at a time for tl_args['topk'] rounds
+                logger.info("BOHB: full-fidelity warm start, take 1 config at a time for tl_args['topk'] rounds")
+                take_from_ws = min(1, batch_size, len(self.ini_configs))
+                for _ in range(take_from_ws):
+                    if len(self.ini_configs) > 0:
+                        config = self.ini_configs[-1]
+                        self.ini_configs.pop()
+                        config.origin = prefix + 'BO Warm Start ' + str(config.origin)
+                        logger.debug("BOHB: take config from warm start: %s" % config.origin)
+                        batch.append(config)
+                remaining = batch_size - len(batch)
+                for _ in range(remaining):
                     config = self.sample_random_configs(self.sample_space, 1,
                                                         excluded_configs=self.history.configurations)[0]
-                config.origin = prefix + 'BO Random Sample'
-                batch.append(config)
+                    config.origin = prefix + 'BO Warm Start Random Sample'
+                    logger.debug("BOHB: take random config: %s" % config.origin)
+                    batch.append(config)
+            else:
+                # Regular BO: take configs one by one during initialization
+                logger.info("Regular BO: take configs one by one during initialization")
+                for _ in range(batch_size):
+                    if len(self.ini_configs) > 0:
+                        config = self.ini_configs[-1]
+                        self.ini_configs.pop()
+                        config.origin = prefix + 'BO Warm Start ' + str(config.origin)
+                        logger.debug("Regular BO: take config from warm start: %s" % config.origin)
+                    else:
+                        config = self.sample_random_configs(self.sample_space, 1,
+                                                            excluded_configs=self.history.configurations)[0]
+                        config.origin = prefix + 'BO Warm Start Random Sample'
+                        logger.debug("Regular BO: take random config: %s" % config.origin)
+                    batch.append(config)
             return batch
-    
+        
+        # After initialization, use acquisition function for sampling
         X = self.history.get_config_array()
         Y = self.history.get_objectives()
 
@@ -144,17 +177,33 @@ class BO(BaseAdvisor):
         self.surrogate.train(X, Y)
 
         incumbent_value = self.history.get_incumbent_value()
-        self.acq_func.update(model=self.surrogate, eta=incumbent_value, num_data=num_config_evaluated)
+        self.acq_func.update(model=self.surrogate, eta=incumbent_value, num_data=len(self.history))
 
         observations = self.history.observations
         challengers = self.acq_optimizer.maximize(observations=observations, num_points=2000)
     
-        # select first valid, non-duplicate config; sanitize if necessary
         _is_valid = is_valid_spark_config
         _sanitize = sanitize_spark_config
 
         batch = []
+        # For BOHB/MFES in low-fidelity stage: take q configs from warm start, then fill rest with acquisition function
+        # Note: MFES calls this through MFBO.sample() -> super().sample() after initialization, prefix='MF'
+        if (is_bohb or is_called_from_mfbo) and len(self.ini_configs) > 0:
+            # q: number of warm start configs to take in low-fidelity stage (default: 2, same as MFBO)
+            logger.info("BOHB/MFES: take configs from warm start in low-fidelity stage")
+            q = min(2, batch_size, len(self.ini_configs))
+            for _ in range(q):
+                config = self.ini_configs[-1]
+                self.ini_configs.pop()
+                config.origin = prefix + 'BO Warm Start ' + str(config.origin)
+                logger.debug("BOHB/MFES: take config from warm start: %s" % config.origin)
+                batch.append(config)
+            logger.info(f"[BOHB/MFES] Take {q} configurations from warm start in low-fidelity stage, remaining: {len(self.ini_configs)}")
+        
+        # Fill remaining with acquisition function samples
         for config in challengers.challengers:
+            if len(batch) >= batch_size:
+                break
             if config in self.history.configurations:
                 continue
             if not _is_valid(config):
@@ -162,14 +211,15 @@ class BO(BaseAdvisor):
             if _is_valid(config):
                 config.origin = prefix + 'BO Acquisition'
                 batch.append(config)
-                if len(batch) >= batch_size:
-                    break
+                logger.debug("BOHB/MFES: take config from acquisition function: %s" % config.origin)
+        # Fill any remaining with random samples
         if len(batch) < batch_size:
             random_configs = self.sample_random_configs(
                 self.sample_space, batch_size - len(batch),
                 excluded_configs=self.history.configurations + batch
             )
             for config in random_configs:
-                config.origin = prefix + 'BO Random Sample'
+                config.origin = prefix + 'BO Acquisition Random Sample'
+                logger.debug("BOHB/MFES: take random config: %s" % config.origin)
                 batch.append(config)
         return batch

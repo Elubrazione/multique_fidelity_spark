@@ -16,22 +16,19 @@ parser.add_argument('--fidelity', type=float, default=1/9)
 parser.add_argument('--iter_num', type=int, default=40)
 parser.add_argument('--R', type=int, default=27)
 parser.add_argument('--eta', type=int, default=3)
-parser.add_argument('--timeout', type=int, default=100)
 
 parser.add_argument('--save_dir', type=str, default=RESULT_DIR)
 parser.add_argument('--target', type=str, default='spark_hstest')
 
 parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
 parser.add_argument('--cp_topk', type=int, default=40)
-parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_cos', 'best_euc', 'best_rover', 'best_all', 'rgpe_rover'])
+parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_rover', 'best_all'])
 parser.add_argument('--ws_init_num', type=int, default=4)
 parser.add_argument('--ws_topk', type=int, default=4)
 parser.add_argument('--ws_inner_surrogate_model', type=str, default='prf')
-
 parser.add_argument('--transfer', type=str, default='none')
 parser.add_argument('--tl_topk', type=int, default=3)
-
-parser.add_argument('--src_data_path', type=str, default=HISTORY_DIR)
+parser.add_argument('--history_dir', type=str, default=HISTORY_DIR)
 parser.add_argument('--backup_flag', action='store_true', default=False)
 
 parser.add_argument('--task', type=str, default='test_ws')
@@ -91,7 +88,7 @@ scheduler_kwargs = {
     'eta': args.eta,
 }
 task_manager = TaskManager.instance(
-    history_dir=args.src_data_path,
+    history_dir=args.history_dir,
     spark_log_dir="/root/codes/spark-log",
     ws_args=ws_args,
     tl_args=tl_args,

@@ -87,6 +87,7 @@ class BaseOptimizer:
             tl_args=self.tl_args,
             cp_args=self.cp_args,
             _logger_kwargs=self._logger_kwargs,
+            method_id=method_id,
             **advisor_config.to_dict(),
             **self.random_kwargs
         )
@@ -151,7 +152,9 @@ class BaseOptimizer:
         iter_full_eval_configs, iter_full_eval_perfs = [], []
         candidates = []
 
-        s = self.scheduler.get_bracket_index(self.iter_id - self.advisor.init_num)
+        s = self.scheduler.get_bracket_index(
+            self.iter_id - self.advisor.init_num - self.advisor.has_default_config
+        )
 
         for i in range(s + 1):
             n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
@@ -172,7 +175,7 @@ class BaseOptimizer:
     def run_one_iter(self):
         self.iter_id += 1
         logger.info("iter =========================================================================== {:3d}".format(self.iter_id))
-        num_config_evaluated = len(self.advisor.history)
+        num_config_evaluated = self.advisor.get_num_evaluated_exclude_default()
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
             logger.info(f"Initialization phase: need to evaluate {self.scheduler.num_nodes} configs, generated {len(candidates)} initial candidates")

@@ -9,7 +9,7 @@ from .utils import build_observation, is_valid_spark_config, sanitize_spark_conf
 
 
 class BaseAdvisor:
-    def __init__(self, config_space: ConfigurationSpace,
+    def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 task_id='test', ws_strategy='none', ws_args=None,
                 tl_strategy='none', tl_args=None, cp_args=None,
                 seed=42, rand_prob=0.15, rand_mode='ran', 
@@ -48,11 +48,34 @@ class BaseAdvisor:
         self.tl_strategy = tl_strategy
         self.tl_args = tl_args
         self.cp_args = cp_args
-        self.history = self.task_manager.current_task_history
         
+        self.method_id = method_id
+        self.history = self.task_manager.current_task_history
+
+        # init_num is equal to the number of topk similar tasks if use transfer learning,
+        # otherwise it is the number of initial configurations for warm start
+        self.init_num = ws_args['init_num'] if tl_strategy == 'none' else tl_args['topk']
+
         if tl_strategy != 'none':
             self._compress_history_observations()
 
+    def get_num_evaluated_exclude_default(self):
+        """
+        Get the number of evaluated configurations excluding the default configuration.
+        The default configuration is added in calculate_meta_feature and should not be counted.
+        
+        Returns
+        -------
+        int: Number of evaluated configurations excluding default config
+        """
+        if self.history is None or len(self.history) == 0:
+            return 0
+        self.has_default_config = any(
+            hasattr(obs.config, 'origin') and obs.config.origin == 'Default Configuration'
+            for obs in self.history.observations
+        )
+        num_evaluated = len(self.history)
+        return max(0, num_evaluated - 1) if self.has_default_config else num_evaluated
 
     def warm_start(self):
 
