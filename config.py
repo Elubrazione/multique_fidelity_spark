@@ -258,7 +258,6 @@ class ConfigManager:
         logger_kwargs['name'] = task
         logger_kwargs['logdir'] = f'{self.log_dir}/{self.target}/{opt}'
         logger_kwargs['level'] = log_level.upper()
-        logger_kwargs['force_init'] = False
         return logger_kwargs
     
     def get_cp_args(self, config_space) -> Dict[str, Any]:

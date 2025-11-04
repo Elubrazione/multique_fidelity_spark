@@ -38,9 +38,6 @@ method_args:
     R: 27
     eta: 3
 
-  logger_kwargs:
-    force_init: false
-
 # Config spaces
 config_spaces:
   config_space: configs/space/huge_space.json

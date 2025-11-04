@@ -11,6 +11,7 @@ config_space = load_space_from_json(config_manager.config_space)
 
 logger_kwargs = config_manager.get_logger_kwargs(args.task, args.opt, args.log_level)
 logger.init(**logger_kwargs)
+logger_kwargs.update({'force_init': False})
 
 executor = ExecutorManager(
     config_space=config_space,
