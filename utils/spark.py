@@ -10,7 +10,7 @@ from datetime import datetime
 from openbox import logger
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
-from config import DATABASE, DATA_DIR
+from config import ConfigManager
 import paramiko
 
 
@@ -283,13 +283,13 @@ def custom_sort(key):
             sort_key.append(part)
     return tuple(sort_key)
 
-def run_spark(config, sql, result_dir):
+def run_spark(config, sql, result_dir, database, sql_dir):
     spark_cmd = [
         "spark-sql",
         "--master", "yarn",
-        "--database", f"{DATABASE}",
+        "--database", f"{database}",
         *convert_to_spark_params(config),
-        "-f", f"{DATA_DIR}/{sql}.sql"
+        "-f", f"{sql_dir}/{sql}.sql"
     ]
 
     log_file = f"{result_dir}/{sql}.log"
@@ -302,7 +302,7 @@ def run_spark(config, sql, result_dir):
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-def get_full_queries_tasks(query_dir=f"{DATA_DIR}/"):
+def get_full_queries_tasks(query_dir):
     queries = os.listdir(query_dir)
     queries = sorted(
         [q[: -4] for q in queries if q.endswith('.sql')],

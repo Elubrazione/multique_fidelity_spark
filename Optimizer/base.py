@@ -11,16 +11,15 @@ from .utils import run_obj_func, get_advisor_config
 from .scheduler import schedulers
 from Advisor import advisors
 from task_manager import TaskManager
-from config import LIST_SPARK_NODES
 
 
 class BaseOptimizer:
     def __init__(self, config_space: ConfigurationSpace, eval_func,
                  iter_num=200, per_run_time_limit=None,
-                 method_id='advisor', task_id='test', target='redis',
+                 method_id='advisor', task_id='test',
+                 target='redis', save_dir='./results',
                  ws_strategy='none', tl_strategy='none',
-                 backup_flag=False, save_dir='./results',
-                 resume: Optional[str] = None):
+                 backup_flag=False, resume: Optional[str] = None):
 
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
         assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
@@ -33,7 +32,10 @@ class BaseOptimizer:
 
         task_mgr = TaskManager.instance()
         self.scheduler_kwargs = task_mgr.get_scheduler_kwargs()
-        self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **self.scheduler_kwargs)
+        self.scheduler = schedulers[scheduler_type](
+            num_nodes=len(task_mgr._config_manager.multi_nodes),
+            **self.scheduler_kwargs
+        )
         task_mgr.register_scheduler(self.scheduler)
 
         self.ws_args = task_mgr.get_ws_args()

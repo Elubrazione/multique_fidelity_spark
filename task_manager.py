@@ -1,33 +1,15 @@
 import os
-import json
-import subprocess
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any, Callable
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 from Advisor.utils import map_source_hpo_data, build_observation
+from config import ConfigManager
 from utils.spark import resolve_runtime_metrics
 
 
 class TaskManager:
-    """
-    Manages historical tasks and current task similarity computation.
-    Handles:
-    - Loading historical tasks from directory
-    - Computing current task runtime metrics
-    - Dynamic similarity updates
-    - Providing filtered similar tasks to optimizer/compressor
-    - Updating current task history from evaluator results
-
-    Args:
-        - history_dir: Directory containing historical tasks
-        - spark_log_dir: Directory containing Spark log files
-        - similarity_threshold: Similarity threshold for filtering similar tasks
-        - ws_args: Warm start arguments
-        - config_space: Original configuration space without compression
-    """
-
     _instance = None
 
     @classmethod
@@ -37,39 +19,40 @@ class TaskManager:
         return cls._instance
 
     def __init__(self, 
-                 history_dir: str,
-                 spark_log_dir: str = "/root/codes/spark-log",
-                 similarity_threshold: float = 0.5,
-                 config_space: Optional[ConfigurationSpace] = None,
-                 **kwargs):
+                config_space: ConfigurationSpace,
+                config_manager: ConfigManager,
+                logger_kwargs,
+                cp_args,
+                **kwargs):
         if hasattr(self, "_initialized") and self._initialized:
             return
         self._initialized = True
-        self.history_dir = history_dir
-        self.spark_log_dir = spark_log_dir
+        
+        self._config_manager = config_manager
+        self.history_dir = config_manager.history_dir
+        self.spark_log_dir = config_manager.spark_log_dir
+        self.similarity_threshold = config_manager.similarity_threshold
 
-        self.ws_args = dict(kwargs.get('ws_args') or {})
-        self.tl_args = dict(kwargs.get('tl_args') or {})
-        self.cp_args = dict(kwargs.get('cp_args') or {})
-        self.scheduler_kwargs = dict(kwargs.get('scheduler_kwargs') or {})
-        self.logger_kwargs = dict(kwargs.get('logger_kwargs') or {})
-        self.random_kwargs = dict(kwargs.get('random_kwargs') or {})
+        method_args = config_manager.method_args
+        self.ws_args = method_args.get('ws_args')
+        self.tl_args = method_args.get('tl_args')
+        self.cp_args = cp_args
+        self.scheduler_kwargs = method_args.get('scheduler_kwargs')
+        self.logger_kwargs = logger_kwargs
+        self.random_kwargs = method_args.get('random_kwargs')
 
-        self.similarity_threshold = similarity_threshold
         self.config_space = config_space
         
         self.historical_tasks: List[History] = []
         self.historical_meta_features: List[np.ndarray] = []
-        
         self.current_task_history: Optional[History] = None
         self.current_meta_feature: Optional[np.ndarray] = None
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
 
         self._scheduler: Optional[object] = None
-        self._sql_partitioner: Optional[object] = kwargs.get('sql_partitioner')
-        self._planner: Optional[object] = kwargs.get('planner')
-        self.tl_topk: Optional[int] = self.tl_args.get('topk') if isinstance(self.tl_args, dict) else None
+        self._sql_partitioner: Optional[object] = None
+        self._planner: Optional[object] = None
         
         self._load_historical_tasks()
 
@@ -234,7 +217,7 @@ class TaskManager:
         if not self.similar_tasks_cache:
             return [], []
         if topk is None:
-            topk = self.tl_topk or len(self.similar_tasks_cache)
+            topk = self.tl_args.get('topk') or len(self.similar_tasks_cache)
         topk = min(topk, len(self.similar_tasks_cache))
         filtered_histories = []
         filtered_sims = []

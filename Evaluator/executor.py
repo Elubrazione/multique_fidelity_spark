@@ -16,9 +16,7 @@ from .partitioner import SQLPartitioner
 from .mock_executor import MockExecutor
 from .utils import config_to_dict
 from utils.spark import create_spark_session, execute_sql_with_timing, stop_active_spark_session
-from config import ENV_SPARK_SQL_PATH, DATABASE, DATA_DIR, \
-    LIST_SPARK_NODES, LIST_SPARK_SERVER, LIST_SPARK_USERNAME, LIST_SPARK_PASSWORD, \
-    SPARK_NODES, SPARK_SERVER_NODE, SPARK_USERNAME, SPARK_PASSWORD
+from config import ConfigManager
 
 
 _DEFAULT_EXTRA_INFO = {'qt_time': {}, 'et_time': {}}
@@ -35,24 +33,23 @@ def _create_default_result(start_time):
 
 
 class ExecutorManager:
-    def __init__(self, config_space,
-                 spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=LIST_SPARK_NODES,
-                 servers=LIST_SPARK_SERVER,
-                 usernames=LIST_SPARK_USERNAME, passwords=LIST_SPARK_PASSWORD,
-                 sql_dir=DATA_DIR, database=DATABASE, **kwargs):
+    def __init__(self,
+                config_space,
+                config_manager: ConfigManager,
+                **kwargs):
+        self.config_manager = config_manager
+        
         self.config_space = config_space
-        self.child_num = len(spark_nodes)
+        self.child_num = len(config_manager.multi_nodes)
         self.executor_queue = Queue()
-        self.sql_dir = sql_dir
+        self.sql_dir = config_manager.data_dir
         self._planner = None
         self._partitioner = None
         self._task_manager = None
-        self._init_child_executor(spark_sql, spark_nodes, servers, \
-                                usernames, passwords, database, **kwargs)
+        self._init_child_executor(**kwargs)
         
 
-    def _init_child_executor(self, spark_sql, spark_nodes, servers, \
-                            usernames, passwords, database, **kwargs):
+    def _init_child_executor(self, **kwargs):
         self.executors = []
         for idx in range(self.child_num):
             self.executor_queue.put(idx)
@@ -66,12 +63,11 @@ class ExecutorManager:
                 self.executors.append(MockExecutor(seed=base_seed + idx))
                 continue
             executor_kwargs = {
-                'spark_sql': spark_sql,
-                'spark_nodes': spark_nodes[idx],
-                'server': servers[idx],
-                'username': usernames[idx],
-                'password': passwords[idx],
-                'database': database,
+                'nodes': self.config_manager.multi_nodes[idx],
+                'server': self.config_manager.multi_servers[idx],
+                'username': self.config_manager.multi_usernames[idx],
+                'password': self.config_manager.multi_passwords[idx],
+                'database': self.config_manager.database,
                 'sql_dir': self.sql_dir,
                 'debug': kwargs.get('debug', False),
             }
@@ -198,13 +194,11 @@ class ExecutorManager:
 
 class SparkSessionTPCDSExecutor:
     def __init__(self,
-                 spark_sql=ENV_SPARK_SQL_PATH, spark_nodes=SPARK_NODES,
-                 server=SPARK_SERVER_NODE, username=SPARK_USERNAME, password=SPARK_PASSWORD,
-                 database=DATABASE, sql_dir=DATA_DIR, app_name_prefix="SparkSessionTPCDSExecutor",
-                 **kwargs):
-        self.spark_nodes = spark_nodes or []
-        if isinstance(self.spark_nodes, str):
-            self.spark_nodes = [self.spark_nodes]
+                nodes, server, username, password,
+                database, sql_dir, app_name_prefix="SessionExecutor",
+                **kwargs):
+
+        self.nodes = nodes
         self.server = server
         self.username = username
         self.password = password
@@ -214,7 +208,7 @@ class SparkSessionTPCDSExecutor:
 
         self.debug = kwargs.get('debug', False)
         if self.debug:
-            logger.info(f"SparkSessionTPCDSExecutor initialized in debug mode")
+            logger.info(f"SessionExecutor initialized in debug mode")
 
     def __call__(self, config, resource_ratio, plan=None):
         return self.run_spark_session_job(config, resource_ratio, plan)
