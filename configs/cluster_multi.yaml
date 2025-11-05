@@ -1,0 +1,15 @@
+# Multi-cluster connection configuration
+multi_clusters:
+  usernames:
+    - root
+  passwords:
+    - root
+  servers:
+    - 192.168.90.76
+  nodes:
+    - - 192.168.90.76
+      - 192.168.90.77
+      - 192.168.90.78
+  yarn_path: /usr/local/hadoop/bin/yarn
+  spark_sql_path: /usr/local/spark/bin/spark-sql
+  spark_log_dir: /root/codes/spark-log

@@ -1,0 +1,44 @@
+includes:
+  - configs/cluster_local.yaml
+  - configs/cluster_multi.yaml
+
+database: tpcds_100g
+similarity_threshold: 0.5
+
+# Path directories
+paths:
+  log_dir: log
+  data_dir: mock/data
+  history_dir: mock/history
+  target: tpcds_100g
+  save_dir: results
+
+# Method-related arguments
+method_args:
+  random_kwargs:
+    seed: 42
+    rand_prob: 0.15
+    rand_mode: ran
+
+  tl_args:
+    topk: 3
+
+  ws_args:
+    init_num: 4
+    topk: 4
+    inner_surrogate_model: prf
+
+  cp_args:
+    strategy: none
+    topk: 40
+    sigma: 2.0
+    top_ratio: 0.8
+
+  scheduler_kwargs:
+    R: 27
+    eta: 3
+
+# Config spaces
+config_spaces:
+  config_space: configs/space/huge_space.json
+  expert_space: configs/space/expert_space.json

@@ -1,0 +1,20 @@
+{
+    "spark": [
+        "spark.default.parallelism",
+        "spark.driver.cores",
+        "spark.driver.memory",
+        "spark.executor.cores",
+        "spark.executor.instances",
+        "spark.executor.memory",
+        "spark.executor.memoryOverhead",
+        "spark.locality.wait",
+        "spark.network.timeout",
+        "spark.sql.autoBroadcastJoinThreshold",
+        "spark.sql.broadcastTimeout",
+        "spark.sql.shuffle.partitions",
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism",
+        "spark.task.cpus",
+        "spark.driver.maxResultSize",
+        "spark.scheduler.minRegisteredResourcesRatio"
+    ]
+}

@@ -1,0 +1,12 @@
+# Local Spark connection configuration
+local_cluster:
+  nodes:
+    - agent1
+    - agent2
+    - server1
+  server: server1
+  username: root
+  password: rootroot
+  spark_log_dir: /root/codes/spark-log
+  yarn_path: /usr/local/hadoop/bin/yarn
+  spark_sql_path: /usr/local/spark/bin/spark-sql

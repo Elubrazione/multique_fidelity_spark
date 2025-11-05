@@ -1,0 +1,48 @@
+from openbox import logger
+
+from config import ConfigManager
+from Evaluator.executor import ExecutorManager
+from Evaluator.mock_executor import MockExecutor
+from Optimizer.utils import build_optimizer, load_space_from_json
+from task_manager import TaskManager
+
+args = ConfigManager.parse_args()
+config_manager = ConfigManager(config_file=args.config, args=args)
+config_space = load_space_from_json(config_manager.config_space)
+
+logger_kwargs = config_manager.get_logger_kwargs(args.task, args.opt, args.log_level)
+logger.init(**logger_kwargs)
+logger_kwargs.update({'force_init': False})
+
+# executor = ExecutorManager(
+#     config_space=config_space,
+#     test_mode=args.test_mode,
+#     debug=args.debug,
+#     config_manager=config_manager
+# )
+
+executor = MockExecutor()
+
+
+# Create task_manager with config_manager
+task_manager = TaskManager.instance(
+    config_space=config_space,
+    config_manager=config_manager,
+    logger_kwargs=logger_kwargs,
+    cp_args=config_manager.get_cp_args(config_space)
+)
+task_manager.calculate_meta_feature(
+    eval_func=executor, task_id=args.task,
+    test_mode=args.test_mode, resume=args.resume
+)
+
+opt_kwargs = {
+    'config_space': config_space,
+    'eval_func': executor,
+    'config_manager': config_manager
+}
+optimizer = build_optimizer(args, **opt_kwargs)
+
+if __name__ == '__main__':
+    for i in range(optimizer.iter_num):
+        optimizer.run_one_iter()
