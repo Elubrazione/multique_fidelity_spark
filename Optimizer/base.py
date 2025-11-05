@@ -23,7 +23,7 @@ class BaseOptimizer:
                  ws_strategy='none', tl_strategy='none',
                  backup_flag=False, resume: Optional[str] = None):
 
-        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
+        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC', 'LOCAT']
         assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
 
@@ -179,6 +179,21 @@ class BaseOptimizer:
     def run_one_iter(self):
         self.iter_id += 1
         logger.info("iter =========================================================================== {:3d}".format(self.iter_id))
+        
+        # LOCAT-specific initialization
+        if self.method_id == 'LOCAT' and hasattr(self.advisor, 'qcsa_done'):
+            # Run QCSA and IICP if not done (using History data, no need for eval_func)
+            if not self.advisor.qcsa_done:
+                logger.info("LOCAT: Running QCSA using History data...")
+                from task_manager import TaskManager
+                task_mgr = TaskManager.instance()
+                sql_partitioner = task_mgr.get_sql_partitioner()
+                self.advisor.run_qcsa(sql_partitioner)
+            
+            if not self.advisor.iicp_done:
+                logger.info("LOCAT: Running IICP using History data...")
+                self.advisor.run_iicp(data_size=1.0)
+        
         num_config_evaluated = self.advisor.get_num_evaluated_exclude_default()
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
@@ -205,8 +220,9 @@ class BaseOptimizer:
 
     def save_info(self, interval=1):
         if self.tl_strategy != 'none' or 'MFES' in self.method_id:
-            hist_ws = self.advisor.surrogate.hist_ws.copy()
-            self.advisor.history.meta_info['tl_ws'] = hist_ws
+            if self.advisor.surrogate is not None and hasattr(self.advisor.surrogate, 'hist_ws'):
+                hist_ws = self.advisor.surrogate.hist_ws.copy()
+                self.advisor.history.meta_info['tl_ws'] = hist_ws
         
         if self.iter_id == self.iter_num or self.iter_id % interval == 0:    
             self._save_json_atomic(self.result_path)

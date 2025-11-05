@@ -50,13 +50,19 @@ def get_advisor_config(
     method_id: str,
     tl_strategy: str = 'none'
 ) -> AdvisorConfig:
-    if 'MFES' in method_id:
+    if 'LOCAT' in method_id:
+        advisor_type = 'locat'
+        surrogate_type = 'gp'
+        acq_type = 'ei'
+    elif 'MFES' in method_id:
         advisor_type = 'mfbo'
+        surrogate_type = get_surrogate_type(method_id, tl_strategy)
+        acq_type = get_acq_type(tl_strategy)
     else:
         advisor_type = 'bo'
+        surrogate_type = get_surrogate_type(method_id, tl_strategy)
+        acq_type = get_acq_type(tl_strategy)
     
-    surrogate_type = get_surrogate_type(method_id, tl_strategy)
-    acq_type = get_acq_type(tl_strategy)
     return AdvisorConfig(advisor_type, surrogate_type, acq_type)
 
 def build_optimizer(args, **kwargs):
