@@ -147,11 +147,10 @@ class TopTune:
 
     def build_advisor(self):
         pd_config_space = self.projector.pd_config_space
-
         advisor = Advisor(
             config_space=pd_config_space,
             initial_trials=5,
-            _logger_kwargs=self._logger_kwargs,
+            logger_kwargs=self._logger_kwargs,
             **self.openbox_kwargs
         )
         advisor.logger = logger
