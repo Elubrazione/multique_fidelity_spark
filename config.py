@@ -102,6 +102,7 @@ class ConfigManager:
             'ws_inner_surrogate_model': ['method_args', 'ws_args', 'inner_surrogate_model'],
             'tl_topk': ['method_args', 'tl_args', 'topk'],
             'cp_topk': ['method_args', 'cp_args', 'topk'],
+            'compress': ['method_args', 'cp_args', 'strategy'],
         }
         
         if key in PARAM_MAPPINGS:
