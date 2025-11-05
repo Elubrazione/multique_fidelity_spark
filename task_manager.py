@@ -46,7 +46,6 @@ class TaskManager:
         self.historical_tasks: List[History] = []
         self.historical_meta_features: List[np.ndarray] = []
         self.current_task_history: Optional[History] = None
-        self.current_meta_feature: Optional[np.ndarray] = None
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
 
@@ -54,28 +53,6 @@ class TaskManager:
         self._sql_partitioner: Optional[object] = None
         self._planner: Optional[object] = None
         
-        self._load_historical_tasks()
-
-
-    def _load_historical_tasks(self):
-        if not os.path.exists(self.history_dir):
-            logger.warning(f"History directory {self.history_dir} does not exist.")
-            return
-        
-        # 默认History里面observations的配置是全空间的配置而非压缩过的
-        for filename in os.listdir(self.history_dir):
-            if filename.endswith('.json'):
-                filepath = os.path.join(self.history_dir, filename)
-                history = History.load_json(filename=filepath, config_space=self.config_space)
-                self.historical_tasks.append(history)
-                meta_feature = history.meta_info.get('meta_feature')
-                if meta_feature is not None:
-                    logger.debug(f"Got meta_feature: {meta_feature} from {filename}")
-                    self.historical_meta_features.append(np.array(meta_feature))
-                else:
-                    logger.warning(f"No meta_feature found in {filename}")     
-        logger.info(f"Loaded {len(self.historical_tasks)} historical tasks from {self.history_dir}")
-
 
     def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default", **kwargs):
         """
@@ -93,37 +70,14 @@ class TaskManager:
             self.current_task_history = History.load_json(
                                         filename=kwargs.get('resume'),
                                         config_space=self.config_space)
-            self.current_meta_feature = np.array(self.current_task_history.meta_info.get('meta_feature'))
-            logger.info(f"Current task meta feature: {self.current_meta_feature}")
             logger.info(f"Current task history: {self.current_task_history.objectives}")
             logger.info(f"Loaded current task history from {kwargs.get('resume')}")
             return
 
-        # use default config writen in spark_default.conf
-        default_config = self.config_space.get_default_configuration()
-        default_config.origin = 'Default Configuration'
-        result = eval_func(config=default_config, resource_ratio=1.0)
-    
-        if kwargs.get('test_mode', False):
-            logger.info("Using test mode meta feature")
-            self.current_meta_feature = np.random.rand(34)
-            self.current_task_history = History(task_id=task_id, config_space=self.config_space,
-                                                meta_info={'meta_feature': self.current_meta_feature.tolist()})
-            self.current_task_history.update_observation(build_observation(default_config, result))
-            self._update_similarity()
-            return
-        
         logger.info("Computing current task meta feature using default config...")
-
-        metrics = resolve_runtime_metrics(spark_log_dir=self.spark_log_dir)
-
-        self.current_meta_feature = metrics
-        self.current_task_history = History(task_id=task_id, config_space=self.config_space,
-                                            meta_info={'meta_feature': self.current_meta_feature.tolist()})
-        self.current_task_history.update_observation(build_observation(default_config, result))
+        self.current_task_history = History(task_id=task_id, config_space=self.config_space)
         logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
 
-        self._update_similarity()
 
 
     def update_history_meta_info(self, meta_info: dict):
@@ -189,56 +143,6 @@ class TaskManager:
     def get_random_kwargs(self) -> Dict[str, Any]:
         return dict(self.random_kwargs)
 
-    def _update_similarity(self):
-
-        def cosine_similarity(A, B):
-            # 点积
-            dot_product = np.dot(A, B)
-            # 范数（长度）
-            norm_A = np.linalg.norm(A)
-            norm_B = np.linalg.norm(B)
-            # 余弦相似性
-            similarity = dot_product / (norm_A * norm_B)
-            return similarity        
-
-        self.similar_tasks_cache = []
-        ts_meta_features = []
-        for idx, history in enumerate(self.historical_tasks):
-            meta_feature = history.meta_info.get('meta_feature')
-            self.similar_tasks_cache.append((idx, cosine_similarity(self.current_meta_feature, meta_feature)))
-
-        self.similar_tasks_cache.sort(key=lambda x: x[1])
-
-
-        filtered_sims = [(idx, sim) for idx, sim in self.similar_tasks_cache]
-        self.similar_tasks_cache = filtered_sims
-        
-        logger.info(f"Updated similarity: {len(self.similar_tasks_cache)} tasks above threshold {self.similarity_threshold}")
-
-
-    def get_similar_tasks(self, topk: Optional[int] = None) -> Tuple[List[History], List[Tuple[int, float]]]:
-        """
-        Get filtered similar tasks.
-        
-        Args:
-            topk: Top k similar tasks to return
-
-        Returns:
-            Tuple of (filtered_histories, similarity_scores)
-        """
-        if not self.similar_tasks_cache:
-            return [], []
-        if topk is None:
-            topk = self.tl_args.get('topk') or len(self.similar_tasks_cache)
-        topk = min(topk, len(self.similar_tasks_cache))
-        filtered_histories = []
-        filtered_sims = []
-        for i in range(topk):
-            idx, sim = self.similar_tasks_cache[i]
-            filtered_histories.append(self.historical_tasks[idx])
-            filtered_sims.append((i, sim))
-            logger.info(f"Similar task {i}: {self.historical_tasks[idx].task_id} (similarity: {sim:.3f})")
-        return filtered_histories, filtered_sims
 
 
     def update_current_task_history(self, config, results):

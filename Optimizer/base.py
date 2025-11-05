@@ -23,7 +23,7 @@ class TunefulOptimizer:
                  ws_strategy='none', tl_strategy='none',
                  backup_flag=False, resume: Optional[str] = None):
 
-        assert method_id in ['tuneful']
+        assert method_id in ['toptune']
 
         scheduler_type = 'full'
         
@@ -52,7 +52,7 @@ class TunefulOptimizer:
 
         self.build_path()
         
-        advisor_class = advisors['tuneful']
+        advisor_class = advisors['toptune']
         self.advisor = advisor_class(
             config_space=config_space,
             _logger_kwargs = self._logger_kwargs

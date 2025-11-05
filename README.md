@@ -11,5 +11,5 @@ nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_n
 
 # Tuneful example
 ```bash
-python main.py --opt tuneful --iter_num 30 --test_mode --history_dir mock/history --save_dir tuneful_test
+python main.py --opt toptune --iter_num 30 --test_mode --history_dir mock/history --save_dir toptune_test
 ```

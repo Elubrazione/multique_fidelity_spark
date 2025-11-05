@@ -1,9 +1,9 @@
-from .Tuneful import Tuneful
+from .TopTune import TopTune
 
 advisors = {
-    'tuneful': Tuneful
+    'toptune': TopTune
 }
 
 __all__ = [
-    'Tuneful'
+    'TopTune'
 ]
