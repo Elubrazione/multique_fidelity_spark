@@ -54,7 +54,8 @@ class TunefulOptimizer:
         
         advisor_class = advisors['tuneful']
         self.advisor = advisor_class(
-            config_space=config_space
+            config_space=config_space,
+            _logger_kwargs = self._logger_kwargs
         )
 
         self.timeout = per_run_time_limit
@@ -79,7 +80,6 @@ class TunefulOptimizer:
         self, candidates,
         resource_ratio=round(float(1.0), 5)
     ) -> List[float]:
-
         futures, performances = [], []
         with ThreadPoolExecutor(max_workers=len(candidates)) as executor:
             for config in candidates:

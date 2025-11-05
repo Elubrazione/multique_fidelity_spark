@@ -32,16 +32,18 @@ class Tuneful:
 
     def __init__(self, config_space: ConfigurationSpace,
                  sa_fraction=0.6,
-                 sa_rounds=10,
-                 sa_iterations=2,
+                 sa_rounds=2,
+                 sa_iterations=10,
                  num_objs=1,
                  num_constraints=0,
                  rfr_kwargs: dict = None,
-                 openbox_kwargs: dict = None):
+                 openbox_kwargs: dict = None,
+                 **kwargs):
                  
+        self._logger_kwargs = kwargs.get('_logger_kwargs', None)
+        
         from task_manager import TaskManager
         self.task_manager = TaskManager.instance()
-
 
         self.config_space = config_space
         self.sample_condition = None
@@ -71,6 +73,9 @@ class Tuneful:
 
         self.saved_configurations = []
         self.advisor = self.build_advisor(self.config_space)
+        
+        # task_manager里面的history有一个默认配置表现，初始化过来
+        self.advisor.history = self.task_manager.current_task_history
 
     def build_config_space(self, parameter_names: list):
         cs = ConfigurationSpace()
@@ -85,7 +90,8 @@ class Tuneful:
             config_space=config_space,
             num_objectives=self.num_objs,
             num_constraints=self.num_constraints,
-            initial_trials=5,
+            initial_trials=2,
+            logger_kwargs=self._logger_kwargs,
             **self.openbox_kwargs,
         )
         advisor.logger = logger
@@ -170,11 +176,7 @@ class Tuneful:
 
         return self.advisor.update_observation(new_obs)
 
-    def get_history(self):
-        return self.advisor.get_history()
 
-    
     @property
     def history(self):
-        return self.advisor.get_history()
-    
+        return self.advisor.history

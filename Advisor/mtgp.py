@@ -38,7 +38,6 @@ class MultiTaskGP:
         self.history_Y = torch.from_numpy(np.array([x[0] for x in history.objectives]))
 
     def train(self, X: np.ndarray, Y: np.ndarray):
-        
         train_x1 = torch.from_numpy(X)
         train_x2 = self.history_X
 
