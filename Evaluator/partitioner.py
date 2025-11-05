@@ -31,6 +31,7 @@ class SQLPartitioner:
         lambda_penalty: float = 0.1,
         current_task_weight: float = 1.0,
         top_ratio: float = 1.0,
+        custom_sqls: Optional[List[str]] = None,
     ):
         self.task_manager = TaskManager.instance()
         self.scheduler = self.task_manager.get_scheduler()
@@ -47,6 +48,9 @@ class SQLPartitioner:
 
         self.sql_dir = sql_dir
         self._all_sqls = self._load_all_sqls()
+        
+        # Custom SQL list (if specified, use this instead of building plan)
+        self.custom_sqls: Optional[List[str]] = custom_sqls
 
         self._latest_plan: Optional[PartitionPlan] = None
         self._plan_dirty: bool = True
@@ -127,11 +131,40 @@ class SQLPartitioner:
         return plan
 
     def refresh_from_task_manager(self, *, force: bool = False) -> PartitionPlan:
-        # TODO: only use current task history when include_current_task is True
+        # If custom_sqls is specified, create a plan with custom SQLs
+        if self.custom_sqls is not None:
+            if self._latest_plan is None or force:
+                custom_plan = PartitionPlan(
+                    fidelity_subsets={1.0: sorted(self.custom_sqls)},
+                    sql_stats={},
+                    metadata={
+                        "custom_sqls": True,
+                        "total_queries": len(self.custom_sqls)
+                    }
+                )
+                self._latest_plan = custom_plan
+                self._plan_dirty = False
+                logger.info(f"SQLPartitioner: Using custom SQL list with {len(self.custom_sqls)} queries")
+            return self._latest_plan
+        
+        # Otherwise, use normal plan building logic
         if force or self._plan_dirty or self._latest_plan is None:
             logger.warning("SQLPartitioner: plan is dirty or latest plan is None, building new plan")
             return self.build_plan(include_current_task=False)
         return self._latest_plan
+    
+    def set_custom_sqls(self, sqls: Optional[List[str]]):
+        """
+        Set custom SQL list. If specified, partitioner will use this list
+        instead of building plan from history.
+        
+        Args:
+            sqls: List of SQL query names, or None to use normal plan building
+        """
+        self.custom_sqls = sqls
+        self._plan_dirty = True  # Mark as dirty to force refresh
+        logger.info(f"SQLPartitioner: Custom SQL list {'set' if sqls else 'cleared'} "
+                   f"({len(sqls) if sqls else 0} queries)")
 
     def mark_plan_dirty(self) -> None:
         self._plan_dirty = True
