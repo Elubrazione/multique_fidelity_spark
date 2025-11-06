@@ -187,7 +187,7 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
     logger = logging.getLogger("recommender")
     logger.info(big_gap)
     logger.info(f"Start tuning for new task {task_id}.")
-    data = gen_task_embedding(task_id)
+    data = gen_task_embedding(task_id) # 应该是将SQL转换为128维向量
     if data is None:
         return
     data['task_id'] = task_id

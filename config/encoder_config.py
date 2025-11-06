@@ -3,7 +3,7 @@ from config.common import cwd
 from config.config import encoding_model
 
 base_dir = f'{cwd}/sql_encoder'
-tree_sitter_sql_lib_path = f"{cwd}/sql_encoder/tree-sitter/sql.so"
+tree_sitter_sql_lib_path = f"{cwd}/sql_encoder/tree-sitter/sql.dll"
 
 dataset = 'text2sql_300k'
 device = torch.device('cpu')

@@ -29,7 +29,7 @@ def run_task(task_id, config):
         sqls = ['AGGR']
 
     os.chdir(os.getenv("SPARK_HOME"))
-    cmd = "run-spark-command"
+    cmd = "run-spark-command" # shit! 它没有给出run-spark-command的具体内容!
 
     app_idx = []
     for index, sql in enumerate(sqls):

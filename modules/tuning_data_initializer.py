@@ -48,6 +48,7 @@ def gen_matched_history_tasks(connection):
 
 
 def init_tuning_data(file_path=all_history_data_file_path, clear_content=False):
+    # 对于非BERT情况, history_data.csv中的内容主要是性能指标 (duration & status), spark配置参数(23个), SQL查询嵌入向量(128维)
     with create_session() as db_session:
         db_session.execute(text("DROP TABLE IF EXISTS task_embeddings"))
         db_session.execute(text("DROP TABLE IF EXISTS task_history"))
@@ -62,6 +63,7 @@ def init_tuning_data(file_path=all_history_data_file_path, clear_content=False):
         all_history_data.reset_index(inplace=True)
         history_data = all_history_data
 
+        # 四张核心表的生成, 可能会涉及到历史数据的转换, 需讨论
         gen_embedding_data(history_data, db_session)
         history_data = gen_history_data(history_data, db_session)
         gen_best_config_data(history_data, db_session)

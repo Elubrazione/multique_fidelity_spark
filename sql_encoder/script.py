@@ -9,7 +9,7 @@ import json
 
 
 def encode(sql):
-    sql = rewrite_query(sql, json.load(open(f"./schema/{workload}.json", "r")))
+    sql = rewrite_query(sql, json.load(open(f"./sql_encoder/schema/{workload}.json", "r")))
     sql_encoder = SQLEncoder()
     if not sql_encoder.load_encoder():
         print("Encoder checkpoint file not found, can't encode the sql...")

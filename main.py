@@ -10,20 +10,20 @@ def conf_check():
     from config.common import sql_base_path, loftune_db_url, cwd, db_name, config_path
     from config.encoder_config import tree_sitter_sql_lib_path
 
-    if not os.path.exists(sql_base_path):
+    if not os.path.exists(sql_base_path): # ?待调优的SQL查询文件所在文件夹? 例如q28.sql之类的
         print("The path of SQL statements does not exist, please specify `sql_base_path` in common.py.")
         sys.exit()
 
-    if not os.path.exists(config_path):
+    if not os.path.exists(config_path): # Spark配置文件路径
         print(f"The path for Spark Configuration files does not exist, creating directory {config_path}.")
         os.makedirs(config_path)
 
-    if not os.path.exists(tree_sitter_sql_lib_path):
+    if not os.path.exists(tree_sitter_sql_lib_path): # Tree-sitter SQL语法解析器编译后的动态库路径
         print("sql.so is not found, please specify `tree_sitter_sql_lib_path` in encoder_config.py.")
         sys.exit()
 
     pymysql.install_as_MySQLdb()
-    if not database_exists(loftune_db_url):
+    if not database_exists(loftune_db_url): # 这里是一个MySQL数据库 (猜测是它们存储history的地方)
         print(f"Database {db_name} does not exist, creating database according to the connection in config.py.")
         create_database(loftune_db_url)
 
@@ -42,14 +42,14 @@ if __name__ == "__main__":
                                  'recommend-config-alternately'],
                         help='Decide what to do.')
     parser.add_argument('--mode', type=str, default='single', choices=['single', 'multi'])
-    parser.add_argument('--model', type=str, default='tbcnn', choices=['tbcnn', 'bert', 'tuneful', 'rover', 'random'])
+    parser.add_argument('--model', type=str, default='tbcnn', choices=['tbcnn', 'bert', 'tuneful', 'rover', 'random']) # model上, 为什么rover会和tbcnn同级?
     parser.add_argument('--task_suffix', type=str, default='')
     parser.add_argument('--tradeoff', type=float, default=0.4)
     parser.add_argument('--task_id', type=str, default='', help='The task for operation.')
-    parser.add_argument('--epochs', type=int, default=2, help='The number of sampled configs for each history task.')
+    parser.add_argument('--epochs', type=int, default=2, help='The number of sampled configs for each history task.') # 优化轮次, 与论文中max_iter相同
     parser.add_argument('--random_epochs', type=int, default=10,
-                        help='The number of sampled configs for each history task.')
-    parser.add_argument('--per_round', type=int, default=1, help='The number of sampled configs for each history task.')
+                        help='The number of sampled configs for each history task.') # 仅在没有history的情况下使用, 表示前多少轮使用随机采样
+    parser.add_argument('--per_round', type=int, default=1, help='The number of sampled configs for each history task.') # 完全没被使用
     opt = parser.parse_args()
 
     config.config.workload = opt.workload
@@ -66,6 +66,7 @@ if __name__ == "__main__":
         init_tuning_data()
 
     # python main.py --type recommend-config --task_id {the task id for config recommendation}
+    # 复现的时候使用这个就好
     elif opt.type == 'recommend-config':
         if opt.task_id == '':
             print("Please specify the task id.")

@@ -10,7 +10,7 @@ event_log_hdfs_path = "event-log-hdfs-path"
 alpha = 0.1
 rate_tradeoff = 0.4
 
-db_user = 'user'
-db_password = 'password'
+db_user = 'root'
+db_password = 'wyc685425'
 db_host = 'localhost'
 db_port = '3306'
