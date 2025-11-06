@@ -4,7 +4,7 @@ from openbox import logger
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
-from Compressor import SHAPCompressor
+from Compressor import get_compressor
 from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
 
 
@@ -26,10 +26,20 @@ class BaseAdvisor:
         self.rand_mode = rand_mode
         
         self.task_manager = TaskManager.instance()
-        self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
+        
+        self.compressor = get_compressor(
+            compressor_type=cp_args.get('strategy', 'none'),
+            config_space=config_space,
+            **(cp_args or {})
+        )
 
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk']) if tl_strategy != 'none' else ([], [])
-        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data) if tl_strategy != 'none' else (config_space, config_space)
+        if tl_strategy != 'none':
+            # Compress space: pass source_hpo_data only if using transfer learning and compressor supports it
+            self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+        else:
+            # For compressors that need compression even without transfer learning (e.g., LlamaTuneCompressor)
+            self.surrogate_space, self.sample_space = self.compressor.compress_space()
         
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)

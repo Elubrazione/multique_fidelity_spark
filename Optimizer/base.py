@@ -9,9 +9,8 @@ from datetime import datetime
 from ConfigSpace import ConfigurationSpace
 from openbox import logger
 from typing import List, Optional
-from .utils import run_obj_func, get_advisor_config
 from .scheduler import schedulers
-from Advisor import advisors
+from Advisor import get_advisor_config, get_advisor
 from task_manager import TaskManager
 
 
@@ -23,7 +22,8 @@ class BaseOptimizer:
                  ws_strategy='none', tl_strategy='none',
                  backup_flag=False, resume: Optional[str] = None):
 
-        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
+        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC',
+                             'LLAMATUNE_SMAC', 'LLAMATUNE_GP', 'REMBO_SMAC', 'REMBO_GP', 'HESBO_SMAC', 'HESBO_GP']
         assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
 
@@ -42,8 +42,15 @@ class BaseOptimizer:
 
         self.ws_args = task_mgr.get_ws_args()
         self.tl_args = task_mgr.get_tl_args()
-        self.cp_args = task_mgr.get_cp_args()
+        self.cp_args = task_mgr.get_cp_args().copy()
         self.random_kwargs = task_mgr.get_random_kwargs()
+        
+        if 'REMBO' in method_id or 'HESBO' in method_id or 'LLAMATUNE' in method_id:
+            self.cp_args['strategy'] = 'llamatune'
+            if 'REMBO' in method_id:
+                self.cp_args['adapter_alias'] = 'rembo'
+            elif 'HESBO' in method_id:
+                self.cp_args['adapter_alias'] = 'hesbo'
         self._logger_kwargs = task_mgr.get_logger_kwargs()
         self.iter_id = len(task_mgr.current_task_history) - 1 if resume is not None else 0
         
@@ -58,10 +65,20 @@ class BaseOptimizer:
                 ws_str = '%s%dk%d' % (ws_strategy, init_num, ws_topk)
         tl_topk = self.tl_args['topk'] if tl_strategy != 'none' else -1
         tl_str = '%sk%d' % (tl_strategy, tl_topk)
-        cp_topk = len(self.cp_args['expert_params']) if self.cp_args['strategy'] == 'expert' \
-                    else len(config_space) if self.cp_args['strategy'] == 'none' or self.cp_args['topk'] <= 0 \
-                        else self.cp_args['topk']
-        cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (self.cp_args['strategy'], cp_topk, self.cp_args['sigma'], self.cp_args['top_ratio'])
+        
+        compressor_type = self.cp_args.get('strategy', 'none')
+        if compressor_type == 'llamatune':
+            adapter_alias = self.cp_args.get('adapter_alias', 'none')
+            le_low_dim = self.cp_args.get('le_low_dim', 'auto')
+            quant = self.cp_args.get('quantization_factor', 'none')
+            cp_str = f'llamatune_{adapter_alias}_dim{le_low_dim}_quant{quant}'
+        else:
+            cp_topk = len(self.cp_args.get('expert_params', [])) if self.cp_args.get('strategy') == 'expert' \
+                        else len(config_space) if self.cp_args.get('strategy') == 'none' or self.cp_args.get('topk', 0) <= 0 \
+                            else self.cp_args.get('topk', len(config_space))
+            cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (self.cp_args.get('strategy', 'none'), cp_topk, 
+                                                      self.cp_args.get('sigma', 2.0), 
+                                                      self.cp_args.get('top_ratio', 0.8))
 
         self.method_id = method_id
         self.task_id = '%s__%s__W%sT%sC%s__S%s__s%d' % (task_id, self.method_id + 'rs' if self.random_kwargs.get('rand_mode', 'ran') == 'rs' else '',
@@ -81,7 +98,7 @@ class BaseOptimizer:
         
         advisor_config = get_advisor_config(method_id, tl_strategy)
         method_id = 'GP' if method_id == 'GPF' else method_id
-        advisor_class = advisors[advisor_config.advisor_type]
+        advisor_class = get_advisor(advisor_config.advisor_type)
         self.advisor = advisor_class(
             config_space=config_space,
             task_id=self.task_id,

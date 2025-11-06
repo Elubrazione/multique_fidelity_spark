@@ -2,7 +2,8 @@ from openbox import logger
 
 from config import ConfigManager
 from Evaluator.executor import ExecutorManager
-from Optimizer.utils import build_optimizer, load_space_from_json
+from Optimizer import get_optimizer
+from Optimizer.utils import load_space_from_json
 from task_manager import TaskManager
 
 args = ConfigManager.parse_args()
@@ -37,7 +38,7 @@ opt_kwargs = {
     'eval_func': executor,
     'config_manager': config_manager
 }
-optimizer = build_optimizer(args, **opt_kwargs)
+optimizer = get_optimizer(args, **opt_kwargs)
 
 if __name__ == '__main__':
     for i in range(optimizer.iter_num):
