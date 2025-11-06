@@ -1,5 +1,7 @@
 import os
 import copy
+import shutil
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pickle as pkl
@@ -22,7 +24,8 @@ class BaseOptimizer:
                  backup_flag=False, save_dir='./results',
                  random_kwargs={}, _logger_kwargs={},
                  scheduler_type='bohb', scheduler_kwargs={},
-                 resume: Optional[str] = None):
+                 resume: Optional[str] = None,
+                 external_knowledge_file: Optional[str] = '/root/codes/multique_fidelity_spark/log/tpcds_100g/SMAC/64u240n2_2025-11-02-10-36-40-000639_configs.json'):
 
         assert scheduler_type in ['bohb', 'mfes', 'full', 'fixed']
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
@@ -192,15 +195,65 @@ class BaseOptimizer:
         logger.info("===========================================================================")
 
     def save_info(self, interval=1):
-        if self.tl_strategy != 'none' or 'MFSE' in self.method_id:
+        if self.tl_strategy != 'none' or 'MFES' in self.method_id:
             hist_ws = self.advisor.surrogate.hist_ws.copy()
             self.advisor.history.meta_info['tl_ws'] = hist_ws
         
         if self.iter_id == self.iter_num or self.iter_id % interval == 0:    
-            self.advisor.history.save_json(self.result_path)
+            self._save_json_atomic(self.result_path)
             
             if self.iter_id == self.iter_num and self.backup_flag:
                 self.record_task()
-                with open(self.ts_backup_file, 'wb') as ts:
-                    pkl.dump(self.ts_recorder, ts)
+                self._save_pkl_atomic(self.ts_backup_file, self.ts_recorder)
+    
+    def _save_json_atomic(self, filepath: str):
+        try:
+            temp_dir = os.path.dirname(filepath) or '.'
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix='.json',
+                dir=temp_dir,
+                prefix=os.path.basename(filepath) + '.tmp.'
+            )
+            
+            try:
+                os.close(temp_fd)
+                self.advisor.history.save_json(temp_path)
+                shutil.move(temp_path, filepath)
+                logger.debug(f"Successfully saved history to {filepath}")
+            except Exception as e:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to save history to {filepath}: {e}")
+            raise
+    
+    def _save_pkl_atomic(self, filepath: str, data):
+        try:
+            temp_dir = os.path.dirname(filepath) or '.'
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix='.pkl',
+                dir=temp_dir,
+                prefix=os.path.basename(filepath) + '.tmp.'
+            )
+            
+            try:
+                with open(temp_path, 'wb') as f:
+                    pkl.dump(data, f)
+                
+                shutil.move(temp_path, filepath)
+                logger.debug(f"Successfully saved backup to {filepath}")
+            except Exception as e:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to save backup to {filepath}: {e}")
+            raise
 
