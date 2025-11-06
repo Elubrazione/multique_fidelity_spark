@@ -56,14 +56,14 @@ class BOHBFidelityScheduler(BaseScheduler):
         self.B = (self.s_max + 1) * self.R
         self.s_values = list(reversed(range(self.s_max + 1)))
 
-        self.fidelity_levels = [int(x) for x in np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)]
+        self.fidelity_levels = [round(x / self.R, 5) for x in np.logspace(0, self.s_max, self.s_max + 1, base=self.eta)]
         assert len(self.fidelity_levels) == self.s_max + 1, "Fidelity levels length mismatch"
     
         logger.info("FidelityScheduler: run %d brackets with fidelity levels %s. s_max = [%d]. R = [%d], eta = [%d]" 
                     % (len(self.s_values), self.get_fidelity_levels(), self.s_max, self.R, self.eta))
     
     def get_bracket_index(self, iter_id: int) -> int:
-        return self.s_values[iter_id % len(self.s_values) - 1]
+        return self.s_values[iter_id % len(self.s_values)]
 
     def get_bracket_params(self, s: int) -> Tuple[int, int]:
         """

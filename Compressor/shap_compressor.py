@@ -111,7 +111,7 @@ class SHAPCompressor(Compressor, DimensionCompressor, RangeCompressor):
                 # minimization problem
                 "effect": np.where(mean_shap < 0, "increase_objective", "decrease_objective")
             }).sort_values("importance", ascending=True)
-            logger.info(f"SHAP dimension compression feature importance: {df.to_string()}")
+            logger.debug(f"SHAP dimension compression feature importance: {df.to_string()}")
 
             models.append(model)
             importances.append(mean_shap)

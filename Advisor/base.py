@@ -1,7 +1,7 @@
 import numpy as np
 import json as js
 from openbox import logger
-from ConfigSpace import ConfigurationSpace
+from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
 from Compressor import SHAPCompressor
@@ -9,9 +9,9 @@ from .utils import build_observation, is_valid_spark_config, sanitize_spark_conf
 
 
 class BaseAdvisor:
-    def __init__(self, config_space: ConfigurationSpace,
+    def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 task_id='test', ws_strategy='none', ws_args=None,
-                tl_args=None, cp_args=None,
+                tl_strategy='none', tl_args=None, cp_args=None,
                 seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
         # Delay import to avoid circular dependency
@@ -26,11 +26,10 @@ class BaseAdvisor:
         self.rand_mode = rand_mode
         
         self.task_manager = TaskManager.instance()
-        self.task_manager._update_similarity()
         self.compressor = SHAPCompressor(config_space=config_space, **cp_args)
 
-        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk'])
-        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk']) if tl_strategy != 'none' else ([], [])
+        self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data) if tl_strategy != 'none' else (config_space, config_space)
         
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)
@@ -46,10 +45,37 @@ class BaseAdvisor:
 
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
+        self.tl_strategy = tl_strategy
         self.tl_args = tl_args
         self.cp_args = cp_args
+        
+        self.method_id = method_id
         self.history = self.task_manager.current_task_history
 
+        # init_num is equal to the number of topk similar tasks if use transfer learning,
+        # otherwise it is the number of initial configurations for warm start
+        self.init_num = ws_args['init_num'] if tl_strategy == 'none' else tl_args['topk']
+
+        if tl_strategy != 'none':
+            self._compress_history_observations()
+
+    def get_num_evaluated_exclude_default(self):
+        """
+        Get the number of evaluated configurations excluding the default configuration.
+        The default configuration is added in calculate_meta_feature and should not be counted.
+        
+        Returns
+        -------
+        int: Number of evaluated configurations excluding default config
+        """
+        if self.history is None or len(self.history) == 0:
+            return 0
+        self.has_default_config = any(
+            hasattr(obs.config, 'origin') and obs.config.origin == 'Default Configuration'
+            for obs in self.history.observations
+        )
+        num_evaluated = len(self.history)
+        return max(0, num_evaluated - 1) if self.has_default_config else num_evaluated
 
     def warm_start(self):
 
@@ -109,3 +135,22 @@ class BaseAdvisor:
             return
         obs = build_observation(config, results)
         self.history.update_observation(obs)
+
+    def _compress_history_observations(self):
+        if self.history is None or len(self.history) == 0:
+            return
+
+        surrogate_names = self.surrogate_space.get_hyperparameter_names()
+        for obs in self.history.observations:
+            config = obs.config
+            if config.configuration_space == self.surrogate_space:
+                continue
+
+            config_dict = config.get_dictionary()
+            filtered_values = {name: config_dict[name] for name in surrogate_names if name in config_dict}
+            new_config = Configuration(self.surrogate_space, values=filtered_values)
+            if hasattr(config, 'origin') and config.origin is not None:
+                new_config.origin = config.origin
+            obs.config = new_config
+
+        self.history.config_space = self.surrogate_space

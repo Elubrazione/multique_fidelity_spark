@@ -1,33 +1,15 @@
 import os
-import json
-import subprocess
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any, Callable
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 from Advisor.utils import map_source_hpo_data, build_observation
+from config import ConfigManager
+from utils.spark import resolve_runtime_metrics
 
-META_FEATURE = np.random.rand(34)
 
 class TaskManager:
-    """
-    Manages historical tasks and current task similarity computation.
-    Handles:
-    - Loading historical tasks from directory
-    - Computing current task runtime metrics
-    - Dynamic similarity updates
-    - Providing filtered similar tasks to optimizer/compressor
-    - Updating current task history from evaluator results
-
-    Args:
-        - history_dir: Directory containing historical tasks
-        - spark_log_dir: Directory containing Spark log files
-        - similarity_threshold: Similarity threshold for filtering similar tasks
-        - ws_args: Warm start arguments
-        - config_space: Original configuration space without compression
-    """
-
     _instance = None
 
     @classmethod
@@ -37,33 +19,42 @@ class TaskManager:
         return cls._instance
 
     def __init__(self, 
-                 history_dir: str,
-                 eval_func: Callable,
-                 task_id: str = "default",
-                 spark_log_dir: str = "/root/codes/spark-log",
-                 similarity_threshold: float = 0.5,
-                 ws_args: Optional[dict] = None, 
-                 config_space: Optional[ConfigurationSpace] = None,
-                 **kwargs):
+                config_space: ConfigurationSpace,
+                config_manager: ConfigManager,
+                logger_kwargs,
+                cp_args,
+                **kwargs):
         if hasattr(self, "_initialized") and self._initialized:
             return
         self._initialized = True
-        self.history_dir = history_dir
-        self.spark_log_dir = spark_log_dir
-        self.ws_args = ws_args or {}
-        self.similarity_threshold = similarity_threshold
+        
+        self._config_manager = config_manager
+        self.history_dir = config_manager.history_dir
+        self.spark_log_dir = config_manager.spark_log_dir
+        self.similarity_threshold = config_manager.similarity_threshold
+
+        method_args = config_manager.method_args
+        self.ws_args = method_args.get('ws_args')
+        self.tl_args = method_args.get('tl_args')
+        self.cp_args = cp_args
+        self.scheduler_kwargs = method_args.get('scheduler_kwargs')
+        self.logger_kwargs = logger_kwargs
+        self.random_kwargs = method_args.get('random_kwargs')
+
         self.config_space = config_space
         
         self.historical_tasks: List[History] = []
         self.historical_meta_features: List[np.ndarray] = []
-        
         self.current_task_history: Optional[History] = None
         self.current_meta_feature: Optional[np.ndarray] = None
         
         self.similar_tasks_cache: List[Tuple[int, float]] = []
+
+        self._scheduler: Optional[object] = None
+        self._sql_partitioner: Optional[object] = None
+        self._planner: Optional[object] = None
         
         self._load_historical_tasks()
-        self.calculate_meta_feature(eval_func, task_id, **kwargs)
 
 
     def _load_historical_tasks(self):
@@ -86,118 +77,16 @@ class TaskManager:
         logger.info(f"Loaded {len(self.historical_tasks)} historical tasks from {self.history_dir}")
 
 
-    def decode_results_spark(self, results: str) -> Tuple[float, np.ndarray]:
-        """
-        Decode Spark application logs to extract runtime metrics.
-        
-        Args:
-            results: JSON content from Spark log file
-            
-        Returns:
-            Tuple of (run_time, metrics_array)
-        """
-        result_list = results.split('\n')
-        logs = []
-        for line in result_list:
-            if line.strip() == '':
-                continue
-            try:
-                logs.append(json.loads(line))
-            except json.JSONDecodeError as e:
-                logger.warning(f'Skipping invalid JSON line: {line[:100]}... (error: {e})')
-                continue
-
-        start_time, end_time = None, None
-        task_metrics = dict()
-
-        cnt = 0
-        for event in logs:
-            if event['Event'] == "SparkListenerApplicationStart":
-                start_time = event['Timestamp']
-            elif event['Event'] == "SparkListenerApplicationEnd":
-                end_time = event['Timestamp']
-            elif event['Event'] == "SparkListenerTaskEnd":
-                # Some tasks (e.g., resubmitted tasks) may not have Task Metrics
-                if 'Task Metrics' not in event:
-                    logger.debug(f"Skipping TaskEnd event without Task Metrics (Task End Reason: {event.get('Task End Reason', 'N/A')})")
-                    continue
-                cnt += 1
-                metrics_dict = event['Task Metrics']
-                for key, value in metrics_dict.items():
-                    if isinstance(value, dict):
-                        for sub_key, sub_value in value.items():
-                            if isinstance(sub_value, dict):
-                                for sub_sub_key, sub_sub_value in sub_value.items():
-                                    final_key = "%s_%s_%s" % (key, sub_key, sub_sub_key)
-                                    task_metrics[final_key] = task_metrics.get(final_key, 0) + sub_sub_value
-                            else:
-                                final_key = "%s_%s" % (key, sub_key)
-                                task_metrics[final_key] = task_metrics.get(final_key, 0) + sub_value
-                    elif isinstance(value, list):
-                        continue
-                    else:
-                        task_metrics[key] = task_metrics.get(key, 0) + value
-
-        if start_time is None or end_time is None:
-            logger.warning('Cannot find start or end time in log')
-        else:
-            run_time = (end_time - start_time) / 1000
-            logger.info(f"Application run time: {run_time:.2f} seconds")
-
-        if cnt == 0:
-            logger.warning('No TaskEnd events found in log, using fallback metrics')
-            raise ValueError('No TaskEnd events found')
-
-        keys = list(task_metrics.keys())
-        keys.sort()
-        for k, v in task_metrics.items():
-            logger.debug(f"{k}: {v / cnt}")
-        metrics = np.array([task_metrics[key] / cnt for key in keys])
-        logger.info(f"Metrics array shape: {metrics.shape}")
-
-        return metrics
-
-    def get_latest_application_id(self) -> Optional[str]:
-        """
-        Get the latest application_id from spark-log directory by finding the newest zstd file.
-        
-        Returns:
-            Application ID extracted from the newest zstd filename, or None if not found
-        """
-        if not os.path.exists(self.spark_log_dir):
-            logger.warning(f"Spark log directory {self.spark_log_dir} does not exist.")
-            return None
-            
-        zstd_files = []
-        for filename in os.listdir(self.spark_log_dir):
-            if filename.endswith('.zstd'):
-                filepath = os.path.join(self.spark_log_dir, filename)
-                mtime = os.path.getmtime(filepath)
-                zstd_files.append((filename, mtime))
-        
-        if not zstd_files:
-            logger.warning(f"No zstd files found in {self.spark_log_dir}")
-            return None
-            
-        zstd_files.sort(key=lambda x: x[1], reverse=True)
-        latest_filename = zstd_files[0][0]
-
-        if latest_filename.startswith('application_') and latest_filename.endswith('.zstd'):
-            application_id = latest_filename[:-5]
-            logger.info(f"Found latest application_id: {application_id}")
-            return application_id
-        else:
-            logger.warning(f"Unexpected filename format: {latest_filename}")
-            return None
-
-
     def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default", **kwargs):
         """
         Get runtime metric for current task by running default config and parsing latest Spark log.
         
         Args:
             eval_func: Evaluator function (ExecutorManager)
-
+            task_id: Task ID
+            kwargs: Additional keyword arguments
+                - resume: Resume from a previous task
+                - test_mode: Test mode
         """
         # skip meta_feature collecting and default config evaluation
         if kwargs.get('resume', None) is not None:
@@ -217,63 +106,24 @@ class TaskManager:
     
         if kwargs.get('test_mode', False):
             logger.info("Using test mode meta feature")
-            self.current_meta_feature = META_FEATURE
+            self.current_meta_feature = np.random.rand(34)
             self.current_task_history = History(task_id=task_id, config_space=self.config_space,
                                                 meta_info={'meta_feature': self.current_meta_feature.tolist()})
             self.current_task_history.update_observation(build_observation(default_config, result))
+            self._update_similarity()
             return
         
         logger.info("Computing current task meta feature using default config...")
 
-        application_id = self.get_latest_application_id()
-        if not application_id:
-            logger.warning("No application_id found, using fallback metrics")
-            raise ValueError("No application_id found")
-
-        zstd_file = os.path.join(self.spark_log_dir, f"{application_id}.zstd")
-        if not os.path.exists(zstd_file):
-            logger.warning(f"Zstd file not found: {zstd_file}, using fallback metrics")
-            raise ValueError(f"Zstd file not found: {zstd_file}")
-        logger.info(f"Found zstd file: {zstd_file}")
-
-        json_file = os.path.join(self.spark_log_dir, "app.json")
-        if os.path.exists(json_file):
-            os.remove(json_file)
-            logger.info(f"Removed existing json file: {json_file}")
-        logger.info(f"Decoding zstd file: {zstd_file} to json file: {json_file}")
-        try:
-            subprocess.run(['zstd', '-d', zstd_file, '-o', json_file], check=True)
-        except Exception as e:
-            logger.error(f"Failed to decode zstd file: {e}, using fallback metrics")
-            raise ValueError(f"Failed to decode zstd file: {e}")
-
-        json_content = ""
-        with open(json_file, 'r') as f:
-            json_content = f.read()
-        logger.info(f"Read json file: {json_file}")
-        try:
-            metrics = self.decode_results_spark(json_content)
-        except Exception as e:
-            logger.error(f"Failed to decode Spark log: {e}")
-            logger.warning("Using fallback meta feature")
-            metrics = META_FEATURE
-        finally:
-            try:
-                os.remove(zstd_file)
-            except Exception:
-                pass
-            try:
-                os.remove(json_file)
-            except Exception:
-                pass
-
-        logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
+        metrics = resolve_runtime_metrics(spark_log_dir=self.spark_log_dir)
 
         self.current_meta_feature = metrics
         self.current_task_history = History(task_id=task_id, config_space=self.config_space,
                                             meta_info={'meta_feature': self.current_meta_feature.tolist()})
         self.current_task_history.update_observation(build_observation(default_config, result))
         logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
+
+        self._update_similarity()
 
 
     def update_history_meta_info(self, meta_info: dict):
@@ -285,6 +135,59 @@ class TaskManager:
         """
         self.current_task_history.meta_info.update(meta_info)
 
+    def register_scheduler(self, scheduler):
+        # ensure scheduler is only registered once
+        if self._scheduler is not None:
+            logger.error("Scheduler already registered")
+            return
+        self._scheduler = scheduler
+        logger.info(f"Registered scheduler: {self._scheduler}")
+        self._mark_sql_plan_dirty()
+
+    def get_scheduler(self) -> Optional[object]:
+        return self._scheduler
+
+    def register_sql_partitioner(self, partitioner) -> None:
+        if self._sql_partitioner is not None and self._sql_partitioner is not partitioner:
+            logger.warning("SQLPartitioner already registered; replacing with new instance")
+        self._sql_partitioner = partitioner
+        logger.info(f"Registered SQLPartitioner: {self._sql_partitioner}")
+        self._mark_sql_plan_dirty()
+
+    def get_sql_partitioner(self):
+        return self._sql_partitioner
+
+    def register_planner(self, planner) -> None:
+        if self._planner is not None and self._planner is not planner:
+            logger.warning("Planner already registered; replacing with new instance")
+        self._planner = planner
+        logger.info(f"Registered Planner: {self._planner}")
+
+    def get_planner(self):
+        return self._planner
+
+    def _mark_sql_plan_dirty(self) -> None:
+        if self._sql_partitioner is not None:
+            logger.warning("Marking SQL plan dirty")
+            self._sql_partitioner.mark_plan_dirty()
+
+    def get_ws_args(self) -> Dict[str, Any]:
+        return dict(self.ws_args)
+
+    def get_tl_args(self) -> Dict[str, Any]:
+        return dict(self.tl_args)
+
+    def get_cp_args(self) -> Dict[str, Any]:
+        return dict(self.cp_args)
+
+    def get_scheduler_kwargs(self) -> Dict[str, Any]:
+        return dict(self.scheduler_kwargs)
+
+    def get_logger_kwargs(self) -> Dict[str, Any]:
+        return dict(self.logger_kwargs)
+
+    def get_random_kwargs(self) -> Dict[str, Any]:
+        return dict(self.random_kwargs)
 
     def _update_similarity(self):
         self.similar_tasks_cache = map_source_hpo_data(
@@ -298,9 +201,10 @@ class TaskManager:
         self.similar_tasks_cache = filtered_sims
         
         logger.info(f"Updated similarity: {len(self.similar_tasks_cache)} tasks above threshold {self.similarity_threshold}")
+        self._mark_sql_plan_dirty()
 
 
-    def get_similar_tasks(self, topk: int = 3) -> Tuple[List[History], List[Tuple[int, float]]]:
+    def get_similar_tasks(self, topk: Optional[int] = None) -> Tuple[List[History], List[Tuple[int, float]]]:
         """
         Get filtered similar tasks.
         
@@ -312,6 +216,8 @@ class TaskManager:
         """
         if not self.similar_tasks_cache:
             return [], []
+        if topk is None:
+            topk = self.tl_args.get('topk') or len(self.similar_tasks_cache)
         topk = min(topk, len(self.similar_tasks_cache))
         filtered_histories = []
         filtered_sims = []
@@ -324,19 +230,10 @@ class TaskManager:
 
 
     def update_current_task_history(self, config, results):
-        """
-        Update current task history with new evaluation result.
-        This is called by optimizer after evaluator execution.
-        
-        Args:
-            config: Configuration that was evaluated
-            results: Evaluation results from executor
-        """
         if not self.current_task_history:
             logger.warning("Current task not initialized, cannot update history")
             return
             
-        from .utils import build_observation
         obs = build_observation(config, results)
         self.current_task_history.update_observation(obs)
         self._update_similarity()

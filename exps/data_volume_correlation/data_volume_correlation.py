@@ -17,9 +17,14 @@ from openbox import logger
 from pyspark.sql import SparkSession
 
 from Optimizer.utils import load_space_from_json
-from utils.spark import get_full_queries_tasks, clear_cache_on_remote, custom_sort
-from config import HUGE_SPACE_FILE, SPARK_NODES, DATA_DIR
+from utils.spark import (
+    clear_cache_on_remote,
+    format_spark_config_value,
+    get_full_queries_tasks,
+)
 
+from config import ConfigManager
+config_manager = ConfigManager()
 
 def extract_sql_performance_data(sql_results):
     performance_data = {}
@@ -263,7 +268,7 @@ def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_seed=None):
             continue 
         logger.info(f"  execute query {i+1}/{len(queries)}: {query[:50]}...")
         
-        for node in SPARK_NODES:
+        for node in config_manager.local_nodes:
             clear_cache_on_remote(node)
 
         query_start_time = time.time()
@@ -315,14 +320,6 @@ def execute_sql_with_timing(spark, sql_content, sql_file, shuffle_seed=None):
     }
 
 def create_spark_session(config, app_name, database=None) -> SparkSession:
-    memory_params = {
-        'spark.executor.memory': 'g',
-        'spark.driver.memory': 'g',
-        'spark.executor.memoryOverhead': 'm',
-        'spark.driver.maxResultSize': 'm',
-        'spark.sql.autoBroadcastJoinThreshold': 'm'     
-    }
-    
     spark_builder = SparkSession.builder.appName(app_name).enableHiveSupport()
     if hasattr(config, 'get_dictionary'):
         config_dict = config.get_dictionary()
@@ -330,8 +327,9 @@ def create_spark_session(config, app_name, database=None) -> SparkSession:
         config_dict = config
     for key, value in config_dict.items():
         if key.startswith('spark.'):
-            spark_builder = spark_builder.config(key, str(value) + memory_params.get(key, ''))
-            logger.debug(f"set spark config: {key} = {value}")
+            formatted_value = format_spark_config_value(key, value)
+            spark_builder = spark_builder.config(key, formatted_value)
+            logger.debug(f"set spark config: {key} = {formatted_value}")
     spark = spark_builder.getOrCreate()
     if database:
         spark.sql(f"USE {database}")
@@ -339,7 +337,7 @@ def create_spark_session(config, app_name, database=None) -> SparkSession:
     return spark
 
 def evaluate_config_on_fidelity(config, fidelity, database, sql_files, 
-                                config_idx, experiment_dir, sql_dir=DATA_DIR):
+                                config_idx, experiment_dir, sql_dir):
     try:
         logger.info(f"evaluate config {config_idx} on fidelity {fidelity} (database: {database})")
         
@@ -499,7 +497,7 @@ def main():
     parser.add_argument('--num_samples', type=int, default=100, help='sample configs number')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--test_mode', action='store_true', default=False, help='test mode, only evaluate a few configs')
-    parser.add_argument('--sql_dir', default=DATA_DIR, help='SQL file directory path')
+    parser.add_argument('--sql_dir', default=config_manager.data_dir, help='SQL file directory path')
     parser.add_argument('--resume', action='store_true', help='resume from latest experiment directory')
     parser.add_argument('--history', type=str, default=None, help='path to existing configs history file to load')
     parser.add_argument('--history_start_idx', type=int, default=1, help='starting index for history configs (default: 1)')
@@ -544,7 +542,7 @@ def main():
     # detect the completed configurations and fidelity combinations
     completed_evaluations = detect_completed_evaluations(experiment_dir, fidelity_mapping)
     
-    original_config_space = load_space_from_json(HUGE_SPACE_FILE)
+    original_config_space = load_space_from_json(config_manager.config_space)
     logger.info(f"original config space loaded, total {len(original_config_space.get_hyperparameters())} params")
     
     config_space = filter_expert_config_space(original_config_space)

@@ -1,5 +1,7 @@
 import os
 import copy
+import tempfile
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pickle as pkl
@@ -11,55 +13,62 @@ from .utils import run_obj_func, get_advisor_config
 from .scheduler import schedulers
 from Advisor import advisors
 from task_manager import TaskManager
-from config import LIST_SPARK_NODES
 
 
 class BaseOptimizer:
     def __init__(self, config_space: ConfigurationSpace, eval_func,
                  iter_num=200, per_run_time_limit=None,
-                 method_id='advisor', task_id='test', target='redis',
-                 ws_strategy='none', ws_args=None, tl_strategy='none', tl_args=None, cp_args=None,
-                 backup_flag=False, save_dir='./results',
-                 random_kwargs={}, _logger_kwargs={},
-                 scheduler_type='bohb', scheduler_kwargs={},
-                 resume: Optional[str] = None):
+                 method_id='advisor', task_id='test',
+                 target='redis', save_dir='./results',
+                 ws_strategy='none', tl_strategy='none',
+                 backup_flag=False, resume: Optional[str] = None):
 
-        assert scheduler_type in ['bohb', 'mfes', 'full', 'fixed']
         assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC']
         assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
 
+        scheduler_type = 'mfes' if 'MFES' in method_id else 'bohb' if 'BOHB' in method_id else 'full'
+        
         self.eval_func = eval_func
         self.iter_num = iter_num
 
         task_mgr = TaskManager.instance()
+        self.scheduler_kwargs = task_mgr.get_scheduler_kwargs()
+        self.scheduler = schedulers[scheduler_type](
+            num_nodes=len(task_mgr._config_manager.multi_nodes),
+            **self.scheduler_kwargs
+        )
+        task_mgr.register_scheduler(self.scheduler)
+
+        self.ws_args = task_mgr.get_ws_args()
+        self.tl_args = task_mgr.get_tl_args()
+        self.cp_args = task_mgr.get_cp_args()
+        self.random_kwargs = task_mgr.get_random_kwargs()
+        self._logger_kwargs = task_mgr.get_logger_kwargs()
         self.iter_id = len(task_mgr.current_task_history) - 1 if resume is not None else 0
+        
 
         ws_str = ws_strategy
         if method_id != 'RS':
-            init_num = ws_args['init_num']
+            init_num = self.ws_args['init_num']
             if 'rgpe' not in ws_strategy:
                 ws_str = '%s%d' % (ws_strategy, init_num)
             else:
-                ws_topk = ws_args['topk']
+                ws_topk = self.ws_args['topk']
                 ws_str = '%s%dk%d' % (ws_strategy, init_num, ws_topk)
-
-        tl_topk = tl_args['topk'] if tl_strategy != 'none' else -1
+        tl_topk = self.tl_args['topk'] if tl_strategy != 'none' else -1
         tl_str = '%sk%d' % (tl_strategy, tl_topk)
-
-        cp_topk = len(cp_args['expert_params']) if cp_args['strategy'] == 'expert' \
-                    else len(config_space) if cp_args['strategy'] == 'none' or cp_args['topk'] <= 0 \
-                        else cp_args['topk']
-        cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (cp_args['strategy'], cp_topk, cp_args['sigma'], cp_args['top_ratio'])
+        cp_topk = len(self.cp_args['expert_params']) if self.cp_args['strategy'] == 'expert' \
+                    else len(config_space) if self.cp_args['strategy'] == 'none' or self.cp_args['topk'] <= 0 \
+                        else self.cp_args['topk']
+        cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (self.cp_args['strategy'], cp_topk, self.cp_args['sigma'], self.cp_args['top_ratio'])
 
         self.method_id = method_id
-        self.task_id = '%s__%s__W%sT%sC%s__S%s__s%d' % (task_id, self.method_id + 'rs' if random_kwargs.get('rand_mode', 'ran') == 'rs' else '',
-                                                        ws_str, tl_str, cp_str, scheduler_type, random_kwargs.get('seed', 42))
+        self.task_id = '%s__%s__W%sT%sC%s__S%s__s%d' % (task_id, self.method_id + 'rs' if self.random_kwargs.get('rand_mode', 'ran') == 'rs' else '',
+                                                        ws_str, tl_str, cp_str, scheduler_type, self.random_kwargs.get('seed', 42))
 
         self.ws_strategy = ws_strategy
-        self.ws_args = ws_args
         self.tl_strategy = tl_strategy
-        self.cp_args = cp_args
 
         self.backup_flag = backup_flag
         self.save_dir = save_dir
@@ -67,7 +76,6 @@ class BaseOptimizer:
         self.result_path = None
         self.ts_backup_file = None
         self.ts_recorder = None
-        self._logger_kwargs = _logger_kwargs
 
         self.build_path()
         
@@ -78,16 +86,19 @@ class BaseOptimizer:
             config_space=config_space,
             task_id=self.task_id,
             ws_strategy=ws_strategy,
-            ws_args=ws_args,
-            tl_args=tl_args,
-            cp_args=cp_args,
+            ws_args=self.ws_args,
+            tl_strategy=tl_strategy,
+            tl_args=self.tl_args,
+            cp_args=self.cp_args,
             _logger_kwargs=self._logger_kwargs,
+            method_id=method_id,
             **advisor_config.to_dict(),
-            **random_kwargs
+            **self.random_kwargs
         )
-        self.scheduler = schedulers[scheduler_type](num_nodes=len(LIST_SPARK_NODES), **scheduler_kwargs)
+
         self.timeout = per_run_time_limit
         self.save_info()
+
 
     def build_path(self):
         self.res_dir = os.path.join(self.save_dir, self.target)
@@ -145,7 +156,9 @@ class BaseOptimizer:
         iter_full_eval_configs, iter_full_eval_perfs = [], []
         candidates = []
 
-        s = self.scheduler.get_bracket_index(self.iter_id - self.advisor.init_num)
+        s = self.scheduler.get_bracket_index(
+            self.iter_id - self.advisor.init_num - self.advisor.has_default_config
+        )
 
         for i in range(s + 1):
             n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
@@ -165,7 +178,8 @@ class BaseOptimizer:
 
     def run_one_iter(self):
         self.iter_id += 1
-        num_config_evaluated = len(self.advisor.history)
+        logger.info("iter =========================================================================== {:3d}".format(self.iter_id))
+        num_config_evaluated = self.advisor.get_num_evaluated_exclude_default()
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
             logger.info(f"Initialization phase: need to evaluate {self.scheduler.num_nodes} configs, generated {len(candidates)} initial candidates")
@@ -176,31 +190,77 @@ class BaseOptimizer:
         self.log_iteration_results(candidates, perfs)
         self.save_info(interval=1)
 
-    def log_iteration_results(self, configs, performances, iteration_id=None):
-        iter_id = iteration_id if iteration_id is not None else self.iter_id
-        
-        logger.info("iter {:5d} ---------------------------------------------------------".format(iter_id))
-        
+    def log_iteration_results(self, configs, performances):
+        logger.info("------------------------------------------------------------------------------")
         for idx, config in enumerate(configs):
             if hasattr(config, 'origin') and config.origin:
                 logger.warn("!!!!!!!!!! {} !!!!!!!!!!".format(config.origin))
             
             logger.info('Config: ' + str(config.get_dictionary()))
             logger.info('Obj: {}'.format(performances[idx]))
-        
+            logger.info("-------------------------------------------------------------------------------")
+
         logger.info('best obj: {}'.format(self.advisor.history.get_incumbent_value()))
-        logger.info("===========================================================================")
+        logger.info("===============================================================================")
 
     def save_info(self, interval=1):
-        if self.tl_strategy != 'none' or 'MFSE' in self.method_id:
+        if self.tl_strategy != 'none' or 'MFES' in self.method_id:
             hist_ws = self.advisor.surrogate.hist_ws.copy()
             self.advisor.history.meta_info['tl_ws'] = hist_ws
         
         if self.iter_id == self.iter_num or self.iter_id % interval == 0:    
-            self.advisor.history.save_json(self.result_path)
+            self._save_json_atomic(self.result_path)
             
             if self.iter_id == self.iter_num and self.backup_flag:
                 self.record_task()
-                with open(self.ts_backup_file, 'wb') as ts:
-                    pkl.dump(self.ts_recorder, ts)
-
+                self._save_pkl_atomic(self.ts_backup_file, self.ts_recorder)
+    
+    def _save_json_atomic(self, filepath: str):
+        try:
+            temp_dir = os.path.dirname(filepath) or '.'
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix='.json',
+                dir=temp_dir,
+                prefix=os.path.basename(filepath) + '.tmp.'
+            )
+            try:
+                os.close(temp_fd)
+                self.advisor.history.save_json(temp_path)
+                shutil.move(temp_path, filepath)
+                logger.debug(f"Successfully saved history to {filepath}")
+            except Exception as e:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to save history to {filepath}: {e}")
+            raise
+    
+    def _save_pkl_atomic(self, filepath: str, data):
+        try:
+            temp_dir = os.path.dirname(filepath) or '.'
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix='.pkl',
+                dir=temp_dir,
+                prefix=os.path.basename(filepath) + '.tmp.'
+            )
+            
+            try:
+                with open(temp_path, 'wb') as f:
+                    pkl.dump(data, f)
+                
+                shutil.move(temp_path, filepath)
+                logger.debug(f"Successfully saved backup to {filepath}")
+            except Exception as e:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to save backup to {filepath}: {e}")
+            raise
