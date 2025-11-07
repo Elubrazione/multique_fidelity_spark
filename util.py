@@ -85,7 +85,7 @@ def gen_task_embedding(task_id):
         for sql_id in sqls:
             with open(f"{sql_base_path}/{str.lower(workload)}/{sql_id}.sql") as sql_file:
                 sql = sql_file.read()
-                sql_embeddings.append(encode(sql))
+                sql_embeddings.append(encode(sql)) # 这个encode函数是编码的重点!
         sql_embeddings = torch.tensor(sql_embeddings)
         sql_embedding = torch.max(sql_embeddings, dim=0)[0].tolist()
         norm = np.linalg.norm(sql_embedding)
