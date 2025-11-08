@@ -7,7 +7,7 @@ from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 
 from .base import DimensionSelectionStep
-from ...utils import prepare_historical_data
+from ...utils import prepare_historical_data, extract_numeric_hyperparameters
 
 
 class SHAPDimensionStep(DimensionSelectionStep):    
@@ -30,16 +30,10 @@ class SHAPDimensionStep(DimensionSelectionStep):
         return super().compress(input_space, space_history)
     
     def _extract_numeric_hyperparameters(self, input_space: ConfigurationSpace):
-        param_names = input_space.get_hyperparameter_names()
-        self.numeric_hyperparameter_names = []
-        self.numeric_hyperparameter_indices = []
+        self.numeric_hyperparameter_names, \
+        self.numeric_hyperparameter_indices \
+            = extract_numeric_hyperparameters(input_space)
         
-        for i, name in enumerate(param_names):
-            hp = input_space.get_hyperparameter(name)
-            if hasattr(hp, 'lower') and hasattr(hp, 'upper'):
-                self.numeric_hyperparameter_names.append(name)
-                self.numeric_hyperparameter_indices.append(i)
-    
     def _select_parameters(self, 
                         input_space: ConfigurationSpace,
                         space_history: Optional[List[History]] = None) -> List[int]:
