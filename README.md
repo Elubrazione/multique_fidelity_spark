@@ -35,3 +35,19 @@ This repository contains the source code for our paper: **LOFTune: A Low-overhea
 1. Download datasets
 2. Set mode and workloads in run_tests.sh
 3. Execute run_tests.sh
+
+# Baseline复现
+使用的指令为:
+```bash
+python main.py --mode multi \
+               --workload "TPCDS" \
+               --data_size "100" \
+               --type recommend-config \
+               --task_id "q1_q2" \
+               --model tbcnn \
+               --epochs 5 \
+               --task_suffix ""
+```
+实际使用时, 由于task_id关联到embedding vector的计算, 所以需正确设置, 对于MFTune这种使用99条query的实验略显负责, 可以将query的字符串放入new_tasks的文件中, 利用类似`run_test.sh`中的脚本进行运行.
+
+关于历史数据以及相关query的路径配置, 都在common.py中, 注意, 默认数据路径与`workload`(诸如TPCDS), `data_size`(诸如100), `mode`(诸如multi)是相关的, 如有需要可以后续进行修改.
