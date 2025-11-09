@@ -36,6 +36,7 @@ class KPCAProjectionStep(TransformativeProjectionStep):
         self.active_hps: List = []
         self.numeric_param_names: List[str] = []
         self.numeric_param_indices: List[int] = []
+        self._projected_samples: Optional[np.ndarray] = None
         
         self.space_history = space_history
     
@@ -111,6 +112,8 @@ class KPCAProjectionStep(TransformativeProjectionStep):
             else:
                 self.n_components = n_components
                 logger.warning(f"Could not determine actual n_components, using requested: {n_components}")
+            
+            self._projected_samples = self._kpca.transform(X_scaled)
             
             logger.info(f"KPCA trained successfully: {X_scaled.shape[1]} features -> {self.n_components} components "
                         f"(kernel={self.kernel}, samples={X_scaled.shape[0]})")

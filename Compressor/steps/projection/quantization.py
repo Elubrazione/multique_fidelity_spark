@@ -77,16 +77,21 @@ class QuantizationProjectionStep(TransformativeProjectionStep):
         )
         root.add_hyperparameters(root_hyperparams)
         
+        if quantized_params:
+            avg_compression_ratio = sum(p['compression_ratio'] for p in quantized_params) / len(quantized_params)
+        else:
+            avg_compression_ratio = 1.0
+        
         self.compression_info = {
             'compressed_params': quantized_params,
             'unchanged_params': unchanged_params,
-            'total_quantized': len(quantized_params)
+            'total_quantized': len(quantized_params),
+            'avg_compression_ratio': avg_compression_ratio
         }
         
         return root
     
     def _needs_quantization(self, hp: CSH.UniformIntegerHyperparameter) -> bool:
-        """Check if hyperparameter needs quantization."""
         return (hp.upper - hp.lower + 1) > self._max_num_values
     
     def unproject_point(self, point: Configuration) -> dict:
