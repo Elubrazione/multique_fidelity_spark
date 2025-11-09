@@ -31,7 +31,8 @@ class RangeCompressionStep(CompressionStep):
                                     compressed_space: ConfigurationSpace) -> dict:
         details = {
             'compressed_params': [],
-            'unchanged_params': []
+            'unchanged_params': [],
+            'avg_compression_ratio': 1.0
         }
         
         for hp in input_space.get_hyperparameters():
@@ -70,6 +71,11 @@ class RangeCompressionStep(CompressionStep):
                     })
                 else:
                     details['unchanged_params'].append(name)
+        
+        if details['compressed_params']:
+            details['avg_compression_ratio'] = sum(p['compression_ratio'] for p in details['compressed_params']) / len(details['compressed_params'])
+        else:
+            details['avg_compression_ratio'] = 1.0
         
         return details
     
