@@ -249,3 +249,7 @@ dmypy.json
 
 **/.idea/
 */.DS_Store
+
+# unimportant examples for scripts
+scripts/*.json
+scripts/*.csv

@@ -86,7 +86,7 @@ def gen_task_embedding(task_id):
         sqls = task_id.split('_')
         sql_embeddings = []
         for sql_id in sqls:
-            with open(f"{sql_base_path}/{str.lower(workload)}/{sql_id}.sql") as sql_file:
+            with open(f"{sql_base_path}/{str.lower(workload)}/{sql_id}.sql") as sql_file: # 附注, config设置的并非query的全部路径, 实际使用时还有一部分在这里
                 sql = sql_file.read()
                 sql_embeddings.append(fake_encode(sql)) # TODO: 复现功能检查时这里使用fake_encode()函数, 正常使用encode()函数
         sql_embeddings = torch.tensor(sql_embeddings)
