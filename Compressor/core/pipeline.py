@@ -28,9 +28,6 @@ class CompressionPipeline:
         if self.original_space is None:
             self.original_space = original_space
         
-        # Store space_history for re-compression
-        self._last_space_history = space_history
-        
         logger.debug(f"Starting compression pipeline with {len(self.steps)} steps")
         
         current_space = copy.deepcopy(original_space)
@@ -55,8 +52,8 @@ class CompressionPipeline:
         logger.debug(f"Sample space: {self.sample_space}")
         logger.debug(f"Surrogate space: {self.surrogate_space}")
         logger.debug(f"Sampling strategy: {self.sampling_strategy}")
-        
-        return self.sample_space, self.surrogate_space
+
+        return self.surrogate_space, self.sample_space
     
     def _determine_spaces(self):
         sample_space_idx = 0
@@ -90,9 +87,9 @@ class CompressionPipeline:
                     logger.info(f"Step {step.name} updated compression strategy")
         
         if updated and self.original_space is not None:
-            space_history = getattr(self, '_last_space_history', None)
-            if space_history is None:
-                space_history = [history] if history else None
+            # Use current history for re-compression during adaptive update
+            # This ensures we use the latest optimization data, not the initial transfer learning data
+            space_history = [history] if history else None
             self.compress_space(self.original_space, space_history)
             return True
         
@@ -107,15 +104,7 @@ class CompressionPipeline:
         return any(step.needs_unproject() for step in self.steps)
     
     def unproject_point(self, point) -> dict:
-        """
-        Unproject a point through all steps (in reverse order).
-        
-        Args:
-            point: Configuration in final space
-            
-        Returns:
-            Dictionary of configuration in original space
-        """
+        # Unproject a point through all steps (in reverse order)
         current_dict = point.get_dictionary() if hasattr(point, 'get_dictionary') else dict(point)
 
         for step in reversed(self.steps):
@@ -126,15 +115,7 @@ class CompressionPipeline:
         return current_dict
     
     def project_point(self, point) -> dict:
-        """
-        Project a point through all steps (in forward order).
-        
-        Args:
-            point: Configuration in original space
-            
-        Returns:
-            Dictionary of configuration in final space
-        """
+        # project a point through all steps (in forward order)
         current_dict = point.get_dictionary() if hasattr(point, 'get_dictionary') else dict(point)
         
         for step in self.steps:

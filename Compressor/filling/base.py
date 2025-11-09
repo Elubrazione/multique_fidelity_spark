@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-from ConfigSpace import ConfigurationSpace, Hyperparameter
+from ConfigSpace import ConfigurationSpace
 from openbox import logger
 
 
@@ -20,7 +20,7 @@ class FillingStrategy(ABC):
                                 target_space: ConfigurationSpace) -> Dict[str, Any]:
         pass
     
-    def get_default_value(self, hp: Hyperparameter) -> Any:
+    def get_default_value(self, hp) -> Any:
         if hasattr(hp, 'default_value') and hp.default_value is not None:
             return hp.default_value
         

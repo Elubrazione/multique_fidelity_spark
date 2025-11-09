@@ -23,10 +23,14 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
                  enable_mixed_sampling: bool = True,
                  initial_prob: float = 0.9,
                  seed: Optional[int] = None,
+                 top_ratio: Optional[float] = None,
                  **kwargs):
+        if top_ratio is None:
+            top_ratio = source_top_ratio
+        
         super().__init__(
             method=method,
-            top_ratio=source_top_ratio,
+            top_ratio=top_ratio,
             sigma=2.0,  # Not used in KDE method
             enable_mixed_sampling=enable_mixed_sampling,
             initial_prob=initial_prob,
@@ -48,8 +52,8 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
             self._similarity_dict = {}
     
     def _compute_compressed_space(self,
-                                  input_space: ConfigurationSpace,
-                                  space_history: Optional[List[History]] = None) -> ConfigurationSpace:
+                                input_space: ConfigurationSpace,
+                                space_history: Optional[List[History]] = None) -> ConfigurationSpace:
         if not space_history:
             logger.warning("No space history provided for KDE boundary compression, returning input space")
             return copy.deepcopy(input_space)
@@ -70,9 +74,9 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
         return compressed_space
     
     def _compute_kde_based_ranges(self,
-                                  space_history: List[History],
-                                  numeric_param_names: List[str],
-                                  original_space: ConfigurationSpace) -> Dict[str, Tuple[float, float]]:
+                                space_history: List[History],
+                                numeric_param_names: List[str],
+                                original_space: ConfigurationSpace) -> Dict[str, Tuple[float, float]]:
         median_top_ratio = self.source_top_ratio
         
         compressed_ranges = {}

@@ -19,7 +19,7 @@ class REMBOProjectionStep(TransformativeProjectionStep):
                  **kwargs):
         super().__init__(method=method, **kwargs)
         self.low_dim = low_dim
-        self.max_num_values = max_num_values
+        self._max_num_values = max_num_values
         self.seed = seed
         self._rs = np.random.RandomState(seed=seed)
         
