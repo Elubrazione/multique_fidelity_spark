@@ -18,6 +18,7 @@ def write_config_file(config, file_name):
 
 
 def run_task(task_id, config):
+    # 运行spark-sql任务并返回"app_id_1/app_id_2/app_id_3/..."的字符串格式
     cur_time = int(round(time.time() * 1000))
     sqls = task_id.split("_")
 

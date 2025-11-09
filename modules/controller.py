@@ -10,6 +10,12 @@ import pandas as pd
 import math
 import logging.config
 
+# TODO: fake init_tuning_data
+from mock.history import fake_init_tuning_data, fake_update_data
+from mock.recommender import fake_recommend_config
+from mock.executor import fake_executor
+from mock.knowledge_base_updater import fake_update_history
+
 logging.config.dictConfig(LOGGING_CONFIG)
 
 
@@ -18,16 +24,24 @@ def gen_result_file_name(task_id, type, num_epochs):
 
 
 def run_task_and_update(task_id, config, logger, update=True):
-    app_idx = run_task(task_id, config)
-    if app_idx == "":
-        logger.error(f"App launch failed. Please refer to the spark output logs.")
-        return None
-    event_log_content_of_apps = load_event_log_content(app_idx)
-    run_time, app_succeeded = load_info_from_lines(event_log_content_of_apps)
+    # TODO: 此函数中, 涉及运行以及更新历史数据库的部分, 都需要进行相应的替换. 目前观测是run_task以及update_data需要替换
+    # app_idx = run_task(task_id, config)
+    # if app_idx == "":
+    #     logger.error(f"App launch failed. Please refer to the spark output logs.")
+    #     return None
+    # event_log_content_of_apps = load_event_log_content(app_idx)
+    # run_time, app_succeeded = load_info_from_lines(event_log_content_of_apps)
+    # TODO: 上面的三个函数可以总计为MFTune中的executor部分:
+    # run_task提供app_id, load_event_log_content利用[app_id]返回日志的列表, load_info_from_lines从日志中获取信息, 返回"总运行时间"和"是否全部成功(bool)", 后续这里会被替换成executor
+    # 暂时先用fake_executor代替
+    app_idx = "not-important"
+    run_time, app_succeeded = fake_executor(task_id, config)
     if app_succeeded:
         logger.info(f"Run successfully. Duration = {run_time} ms.")
         if update:
-            update_data(app_idx, task_id, config, run_time, logger)
+            # TODO: fake_update_data <->  update_data
+            # update_data(app_idx, task_id, config, run_time, logger)
+            fake_update_data(app_idx, task_id, config, run_time, logger)
     else:
         logger.error(f"Run failed.")
         run_time = 3600000
@@ -180,7 +194,9 @@ def update_history_task(update_task_id, num_epochs):
 
 
 def recommend_config_for_new_task(task_id, num_epochs=1):
-    init_tuning_data(all_history_data_file_path)
+    # TODO: fake_init_tuning_data <-> init_tuning_data
+    # init_tuning_data(all_history_data_file_path)
+    fake_init_tuning_data(all_history_data_file_path)
 
     weights = [1.0, 1.0]
 
@@ -191,11 +207,14 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
     if data is None:
         return
     data['task_id'] = task_id
-    config, _ = recommend_config(data, logger)
+    # TODO: fake_recommend_config <-> recommend_config
+    # config, _ = recommend_config(data, logger)
+    config, _ = fake_recommend_config(data, logger)
     if config is None:
         return
     config = add_scale_dict(config)
     logger.info(f"Suggested config using similar history task for {task_id} = {config}.")
+    # breakpoint()
     tuning_data = run_task_and_update(task_id, config, logger)
     logger.info(f"Start {num_epochs - 1} iters of further tuning for task {task_id}.")
     all_tuning_data = [tuning_data]
@@ -209,7 +228,9 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
             break
 
         logger.info(small_gap)
-        config, probabilities, selected_index = update_history(task_id, epochs, logger, weights)
+        # TODO: fake_update_history <-> update_history
+        # config, probabilities, selected_index = update_history(task_id, epochs, logger, weights)
+        config, probabilities, selected_index = fake_update_history(task_id, epochs, logger, weights)
         logger.info(small_gap)
         if config is None:
             return

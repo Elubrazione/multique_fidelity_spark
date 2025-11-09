@@ -9,6 +9,7 @@ import json
 
 
 def encode(sql):
+    print(f"./sql_encoder/schema/{workload}.json")
     sql = rewrite_query(sql, json.load(open(f"./sql_encoder/schema/{workload}.json", "r")))
     sql_encoder = SQLEncoder()
     if not sql_encoder.load_encoder():

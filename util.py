@@ -14,6 +14,9 @@ from config.encoder_config import sql_embedding_dim
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine
 
+# Fake part by myself
+from mock.encoder import fake_encode
+
 find_number = lambda x: re.search("\d+(\.\d+)?", x).group()
 embedding_columns = [f'task_embedding_{_}' for _ in range(0, sql_embedding_dim)]
 
@@ -38,7 +41,7 @@ def load_event_log_content(app_idx):
             for line in event_log_file:
                 lines.append(line)
         lines_of_all_apps.append(lines)
-    return lines_of_all_apps
+    return lines_of_all_apps # lines是日志中每行字符串的列表, lines_of_all_apps是lines的列表
 
 
 def load_info_from_lines(lines_of_apps):
@@ -85,7 +88,7 @@ def gen_task_embedding(task_id):
         for sql_id in sqls:
             with open(f"{sql_base_path}/{str.lower(workload)}/{sql_id}.sql") as sql_file:
                 sql = sql_file.read()
-                sql_embeddings.append(encode(sql)) # 这个encode函数是编码的重点!
+                sql_embeddings.append(fake_encode(sql)) # TODO: 复现功能检查时这里使用fake_encode()函数, 正常使用encode()函数
         sql_embeddings = torch.tensor(sql_embeddings)
         sql_embedding = torch.max(sql_embeddings, dim=0)[0].tolist()
         norm = np.linalg.norm(sql_embedding)

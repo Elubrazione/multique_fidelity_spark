@@ -5,6 +5,8 @@ import config.config
 import pymysql
 from sqlalchemy_utils import database_exists, create_database
 
+import pdb
+
 
 def conf_check():
     from config.common import sql_base_path, loftune_db_url, cwd, db_name, config_path
@@ -18,14 +20,16 @@ def conf_check():
         print(f"The path for Spark Configuration files does not exist, creating directory {config_path}.")
         os.makedirs(config_path)
 
-    if not os.path.exists(tree_sitter_sql_lib_path): # Tree-sitter SQL语法解析器编译后的动态库路径
-        print("sql.so is not found, please specify `tree_sitter_sql_lib_path` in encoder_config.py.")
-        sys.exit()
+    # TODO: 若使用fake_encode, 则可以跳过这一步检查
+    # if not os.path.exists(tree_sitter_sql_lib_path): # Tree-sitter SQL语法解析器编译后的动态库路径
+    #     print("sql.so is not found, please specify `tree_sitter_sql_lib_path` in encoder_config.py.")
+    #     sys.exit()
 
-    pymysql.install_as_MySQLdb()
-    if not database_exists(loftune_db_url): # 这里是一个MySQL数据库 (猜测是它们存储history的地方)
-        print(f"Database {db_name} does not exist, creating database according to the connection in config.py.")
-        create_database(loftune_db_url)
+    # TODO: 若使用pandas代替MySQL进行历史管理, 则可以跳过这一步检查
+    # pymysql.install_as_MySQLdb()
+    # if not database_exists(loftune_db_url): # 这里是一个MySQL数据库 (它们存储history的地方)
+    #     print(f"Database {db_name} does not exist, creating database according to the connection in config.py.")
+    #     create_database(loftune_db_url)
 
     if not os.path.exists(f'{cwd}/data'):
         os.makedirs(f'{cwd}/data')
