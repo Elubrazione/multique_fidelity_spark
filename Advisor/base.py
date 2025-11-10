@@ -71,9 +71,6 @@ class BaseAdvisor:
         # otherwise it is the number of initial configurations for warm start
         self.init_num = ws_args['init_num'] if tl_strategy == 'none' else tl_args['topk']
 
-        if tl_strategy != 'none':
-            self._compress_history_observations()
-
     def get_num_evaluated_exclude_default(self):
         """
         Get the number of evaluated configurations excluding the default configuration.
@@ -155,13 +152,3 @@ class BaseAdvisor:
         obs = build_observation(config, results)
         self._cache_low_dim_config(config, obs)
         self.history.update_observation(obs)
-
-    def _compress_history_observations(self):
-        if self.history is None or len(self.history) == 0:
-            return
-        for obs in self.history.observations:
-            config = obs.config
-            new_config = self.compressor.convert_config_to_surrogate_space(config)
-            obs.config = new_config
-        if self.tl_strategy != 'none':
-            self.history.config_space = self.surrogate_space

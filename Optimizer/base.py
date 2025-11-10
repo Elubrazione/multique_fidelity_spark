@@ -118,7 +118,7 @@ class BaseOptimizer:
 
 
     def build_path(self):
-        self.res_dir = os.path.join(self.save_dir, self.target)
+        self.res_dir = os.path.join(self.save_dir, self.target, self.method_id)
         if not os.path.exists(self.res_dir):
             os.makedirs(self.res_dir)
 
