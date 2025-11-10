@@ -40,30 +40,21 @@ class BaseOptimizer:
         )
         task_mgr.register_scheduler(self.scheduler)
 
-        self.ws_args = task_mgr.get_ws_args()
-        self.tl_args = task_mgr.get_tl_args()
-        self.cp_args = task_mgr.get_cp_args().copy()
         self.random_kwargs = task_mgr.get_random_kwargs()
         self._logger_kwargs = task_mgr.get_logger_kwargs()
         self.iter_id = len(task_mgr.current_task_history) - 1 if resume is not None else 0
         
-
-        ws_str = ws_strategy
-        if method_id != 'RS':
-            init_num = self.ws_args['init_num']
-            if 'rgpe' not in ws_strategy:
-                ws_str = '%s%d' % (ws_strategy, init_num)
-            else:
-                ws_topk = self.ws_args['topk']
-                ws_str = '%s%dk%d' % (ws_strategy, init_num, ws_topk)
-        tl_topk = self.tl_args['topk'] if tl_strategy != 'none' else -1
-        tl_str = '%sk%d' % (tl_strategy, tl_topk)
-        
-        cp_str = task_mgr._config_manager.get_cp_string(config_space)
-
         self.method_id = method_id
-        self.task_id = '%s__%s__W%sT%sC%s__S%s__s%d' % (task_id, self.method_id + 'rs' if self.random_kwargs.get('rand_mode', 'ran') == 'rs' else '',
-                                                        ws_str, tl_str, cp_str, scheduler_type, self.random_kwargs.get('seed', 42))
+        self.task_id = task_mgr.generate_task_id(
+            task_name=task_id,
+            method_id=method_id,
+            ws_strategy=ws_strategy,
+            tl_strategy=tl_strategy,
+            scheduler_type=scheduler_type,
+            config_space=config_space,
+            rand_mode=self.random_kwargs.get('rand_mode', 'ran'),
+            seed=self.random_kwargs.get('seed', 42)
+        )
 
         self.ws_strategy = ws_strategy
         self.tl_strategy = tl_strategy
@@ -84,10 +75,7 @@ class BaseOptimizer:
             config_space=config_space,
             task_id=self.task_id,
             ws_strategy=ws_strategy,
-            ws_args=self.ws_args,
             tl_strategy=tl_strategy,
-            tl_args=self.tl_args,
-            cp_args=self.cp_args,
             _logger_kwargs=self._logger_kwargs,
             method_id=method_id,
             **advisor_config.to_dict(),

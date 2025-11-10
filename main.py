@@ -26,8 +26,7 @@ executor = ExecutorManager(
 task_manager = TaskManager.instance(
     config_space=config_space,
     config_manager=config_manager,
-    logger_kwargs=logger_kwargs,
-    cp_args=config_manager.get_cp_args(config_space)
+    logger_kwargs=logger_kwargs
 )
 task_manager.calculate_meta_feature(
     eval_func=executor, task_id=args.task,

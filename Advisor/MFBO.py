@@ -11,14 +11,12 @@ from .utils import build_observation
 class MFBO(BO):
     def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 surrogate_type='prf', acq_type='ei', task_id='test',
-                ws_strategy='none', ws_args={'init_num': 5},
-                tl_strategy='none', tl_args={'topk': 5},
+                ws_strategy='none', tl_strategy='none',
                 random_kwargs={}, **kwargs):
         super().__init__(config_space,
                         surrogate_type=surrogate_type, acq_type=acq_type,
                         task_id=task_id, method_id=method_id,
-                        ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_strategy=tl_strategy, tl_args=tl_args,
+                        ws_strategy=ws_strategy, tl_strategy=tl_strategy,
                         random_kwargs=random_kwargs,
                         **kwargs)
 

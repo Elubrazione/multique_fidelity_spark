@@ -22,7 +22,6 @@ class TaskManager:
                 config_space: ConfigurationSpace,
                 config_manager: ConfigManager,
                 logger_kwargs,
-                cp_args,
                 **kwargs):
         if hasattr(self, "_initialized") and self._initialized:
             return
@@ -36,7 +35,6 @@ class TaskManager:
         method_args = config_manager.method_args
         self.ws_args = method_args.get('ws_args')
         self.tl_args = method_args.get('tl_args')
-        self.cp_args = cp_args
         self.scheduler_kwargs = method_args.get('scheduler_kwargs')
         self.logger_kwargs = logger_kwargs
         self.random_kwargs = method_args.get('random_kwargs')
@@ -78,16 +76,6 @@ class TaskManager:
 
 
     def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default", **kwargs):
-        """
-        Get runtime metric for current task by running default config and parsing latest Spark log.
-        
-        Args:
-            eval_func: Evaluator function (ExecutorManager)
-            task_id: Task ID
-            kwargs: Additional keyword arguments
-                - resume: Resume from a previous task
-                - test_mode: Test mode
-        """
         # skip meta_feature collecting and default config evaluation
         if kwargs.get('resume', None) is not None:
             self.current_task_history = History.load_json(
@@ -127,12 +115,6 @@ class TaskManager:
 
 
     def update_history_meta_info(self, meta_info: dict):
-        """
-        Update meta information of historical tasks.
-        
-        Args:
-            meta_info: Meta information of historical tasks
-        """
         self.current_task_history.meta_info.update(meta_info)
 
     def register_scheduler(self, scheduler):
@@ -175,6 +157,18 @@ class TaskManager:
     def get_compressor(self):
         return self._compressor
 
+    def get_cp_string(self, config_space) -> str:
+        return self._config_manager.get_cp_string(config_space)
+    
+    def generate_task_id(self, task_name: str, method_id: str, ws_strategy: str,
+                        tl_strategy: str, scheduler_type: str, config_space,
+                        rand_mode: str = 'ran', seed: int = 42) -> str:
+        """Generate complete task ID string from ConfigManager"""
+        return self._config_manager.generate_task_id(
+            task_name, method_id, ws_strategy, tl_strategy, 
+            scheduler_type, config_space, rand_mode, seed
+        )
+
     def _mark_sql_plan_dirty(self) -> None:
         if self._sql_partitioner is not None:
             logger.warning("Marking SQL plan dirty")
@@ -186,8 +180,10 @@ class TaskManager:
     def get_tl_args(self) -> Dict[str, Any]:
         return dict(self.tl_args)
 
-    def get_cp_args(self) -> Dict[str, Any]:
-        return dict(self.cp_args)
+    def get_cp_args(self, config_space=None) -> Dict[str, Any]:
+        if config_space is None:
+            config_space = self.config_space
+        return self._config_manager.get_cp_args(config_space)
 
     def get_scheduler_kwargs(self) -> Dict[str, Any]:
         return dict(self.scheduler_kwargs)

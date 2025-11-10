@@ -303,3 +303,35 @@ class ConfigManager:
                 cp_args.get('sigma', 2.0), 
                 cp_args.get('top_ratio', 0.8)
             )
+    
+    def get_ws_string(self, ws_strategy: str, method_id: str) -> str:
+        ws_args = self.method_args.get('ws_args', {})
+        ws_str = ws_strategy
+        
+        if method_id != 'RS':
+            init_num = ws_args.get('init_num', 5)
+            if 'rgpe' not in ws_strategy:
+                ws_str = '%s%d' % (ws_strategy, init_num)
+            else:
+                ws_topk = ws_args.get('topk', 5)
+                ws_str = '%s%dk%d' % (ws_strategy, init_num, ws_topk)
+        
+        return ws_str
+    
+    def get_tl_string(self, tl_strategy: str) -> str:
+        tl_args = self.method_args.get('tl_args', {})
+        tl_topk = tl_args.get('topk', 5) if tl_strategy != 'none' else -1
+        return '%sk%d' % (tl_strategy, tl_topk)
+    
+    def generate_task_id(self, task_name: str, method_id: str, ws_strategy: str, 
+                        tl_strategy: str, scheduler_type: str, config_space, 
+                        rand_mode: str = 'ran', seed: int = 42) -> str:
+        ws_str = self.get_ws_string(ws_strategy, method_id)
+        tl_str = self.get_tl_string(tl_strategy)
+        cp_str = self.get_cp_string(config_space)
+        
+        method_suffix = method_id + 'rs' if rand_mode == 'rs' else method_id
+        
+        return '%s__%s__W%sT%sC%s__S%s__s%d' % (
+            task_name, method_suffix, ws_str, tl_str, cp_str, scheduler_type, seed
+        )

@@ -9,8 +9,8 @@ from .utils import build_observation, is_valid_spark_config, sanitize_spark_conf
 
 class BaseAdvisor:
     def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
-                task_id='test', ws_strategy='none', ws_args=None,
-                tl_strategy='none', tl_args=None,
+                task_id='test', ws_strategy='none',
+                tl_strategy='none',
                 seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
         # Delay import to avoid circular dependency
@@ -25,12 +25,14 @@ class BaseAdvisor:
         self.rand_mode = rand_mode
         
         self.task_manager = TaskManager.instance()
+        self.ws_args = self.task_manager.get_ws_args()
+        self.tl_args = self.task_manager.get_tl_args()
         
         self.compressor = self.task_manager.get_compressor()
         if self.compressor is None:
             raise RuntimeError("Compressor must be initialized and registered to TaskManager before creating Advisor")
 
-        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk']) if tl_strategy != 'none' else ([], [])
+        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=self.tl_args['topk']) if tl_strategy != 'none' else ([], [])
         if tl_strategy != 'none':
             # Compress space: pass source_hpo_data only if using transfer learning and compressor supports it
             self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
@@ -52,18 +54,13 @@ class BaseAdvisor:
         self.task_manager.update_history_meta_info(meta_feature)
 
         self.ws_strategy = ws_strategy
-        self.ws_args = ws_args
         self.tl_strategy = tl_strategy
-        self.tl_args = tl_args        
         self.method_id = method_id
         self.history = self.task_manager.current_task_history
-        
-        # if self.history is not None:
-        #     self.history.config_space = self.config_space
 
         # init_num is equal to the number of topk similar tasks if use transfer learning,
         # otherwise it is the number of initial configurations for warm start
-        self.init_num = ws_args['init_num'] if tl_strategy == 'none' else tl_args['topk']
+        self.init_num = self.ws_args['init_num'] if tl_strategy == 'none' else self.tl_args['topk']
 
     def get_num_evaluated_exclude_default(self):
         """
