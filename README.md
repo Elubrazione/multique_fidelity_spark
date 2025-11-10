@@ -404,10 +404,10 @@
         <td></td>
         <td></td>
         <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>153</td>
+        <td><a href="log/tpcds_600g/SMAC/64u240n2_2025-11-10-20-53-30-482504.log">查看日志</a></td>
+        <td><a href="">查看结果</a></td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td rowspan="4">3节点</td>
@@ -448,7 +448,7 @@
         <td></td>
         <td>76</td>
         <td><a href="log/tpcds_600g/SMAC/32u240n3_2025-11-10-08-31-04-787671.log">查看日志</a></td>
-        <td><a href="">查看结果</a></td>
+        <td><a href="results/tpcds_600g/32u240n3____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-10-09-16-25-408598.json">查看结果</a></td>
         <td>⏸️</td>
     </tr>
     <tr>
@@ -481,118 +481,7 @@
         <td>✅</td>
     </tr>
     <tr>
-        <td rowspan="16">JOB</td>
-        <td rowspan="8">100G</td>
-        <td rowspan="4">2节点</td>
-        <td rowspan="2">128G</td>
-        <td>32u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td rowspan="2">256G</td>
-        <td>32u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td>S</td>
-        <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td rowspan="4">3节点</td>
-        <td rowspan="2">128G</td>
-        <td>32u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td rowspan="2">256G</td>
-        <td>32u</td>
-        <td>S</td>
-        <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td>S</td>
-        <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
+        <td rowspan="8">JOB</td>
         <td rowspan="8">600G</td>
         <td rowspan="4">2节点</td>
         <td rowspan="2">128G</td>
@@ -707,7 +596,7 @@
 
 ## History Collecting
 ```bash
-nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_num 200 --ws_init_num 29 --task 64u240n3 --target tpcds_100g --opt SMAC > /dev/null 2>&1 &
+nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_num 200 --ws_init_num 29 --task 64u240n2 --target tpcds_600g --opt SMAC > /dev/null 2>&1 &
 
 nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_num 200 --ws_init_num 29 --task 32u240n3 --target tpcds_600g --opt SMAC > /dev/null 2>&1 &
 ```
