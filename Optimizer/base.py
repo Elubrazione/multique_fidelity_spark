@@ -44,13 +44,6 @@ class BaseOptimizer:
         self.tl_args = task_mgr.get_tl_args()
         self.cp_args = task_mgr.get_cp_args().copy()
         self.random_kwargs = task_mgr.get_random_kwargs()
-        
-        if 'REMBO' in method_id or 'HESBO' in method_id or 'LLAMATUNE' in method_id:
-            self.cp_args['strategy'] = 'llamatune'
-            if 'REMBO' in method_id:
-                self.cp_args['adapter_alias'] = 'rembo'
-            elif 'HESBO' in method_id:
-                self.cp_args['adapter_alias'] = 'hesbo'
         self._logger_kwargs = task_mgr.get_logger_kwargs()
         self.iter_id = len(task_mgr.current_task_history) - 1 if resume is not None else 0
         
@@ -66,19 +59,7 @@ class BaseOptimizer:
         tl_topk = self.tl_args['topk'] if tl_strategy != 'none' else -1
         tl_str = '%sk%d' % (tl_strategy, tl_topk)
         
-        compressor_type = self.cp_args.get('strategy', 'none')
-        if compressor_type == 'llamatune':
-            adapter_alias = self.cp_args.get('adapter_alias', 'none')
-            le_low_dim = self.cp_args.get('le_low_dim', 'auto')
-            quant = self.cp_args.get('quantization_factor', 'none')
-            cp_str = f'llamatune_{adapter_alias}_dim{le_low_dim}_quant{quant}'
-        else:
-            cp_topk = len(self.cp_args.get('expert_params', [])) if self.cp_args.get('strategy') == 'expert' \
-                        else len(config_space) if self.cp_args.get('strategy') == 'none' or self.cp_args.get('topk', 0) <= 0 \
-                            else self.cp_args.get('topk', len(config_space))
-            cp_str = '%sk%dsigma%.1ftop_ratio%.1f' % (self.cp_args.get('strategy', 'none'), cp_topk, 
-                                                      self.cp_args.get('sigma', 2.0), 
-                                                      self.cp_args.get('top_ratio', 0.8))
+        cp_str = task_mgr._config_manager.get_cp_string(config_space)
 
         self.method_id = method_id
         self.task_id = '%s__%s__W%sT%sC%s__S%s__s%d' % (task_id, self.method_id + 'rs' if self.random_kwargs.get('rand_mode', 'ran') == 'rs' else '',

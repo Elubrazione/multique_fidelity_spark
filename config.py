@@ -49,6 +49,7 @@ class ConfigManager:
         self.config_file = config_file
         self.root_dir = os.path.dirname(os.path.abspath(__file__))
         self.config = self._load_config()
+        self.method_id = args.opt if args else None
         self._apply_args_overrides(args)
     
     
@@ -270,4 +271,35 @@ class ConfigManager:
         expert_params = load_expert_params(self.expert_space)
         cp_args['expert_params'] = [p for p in expert_params 
                                     if p in config_space.get_hyperparameter_names()]
+        
+        if self.method_id and ('REMBO' in self.method_id or 'HESBO' in self.method_id or 'LLAMATUNE' in self.method_id):
+            cp_args['strategy'] = 'llamatune'
+            if 'REMBO' in self.method_id:
+                cp_args['adapter_alias'] = 'rembo'
+            elif 'HESBO' in self.method_id:
+                cp_args['adapter_alias'] = 'hesbo'
+        
         return cp_args
+    
+    def get_cp_string(self, config_space) -> str:
+        cp_args = self.get_cp_args(config_space)
+        compressor_type = cp_args.get('strategy', 'none')
+        if compressor_type == 'llamatune':
+            adapter_alias = cp_args.get('adapter_alias', 'none')
+            le_low_dim = cp_args.get('le_low_dim', 'auto')
+            quant = cp_args.get('quantization_factor', 'none')
+            return f'llamatune_{adapter_alias}_dim{le_low_dim}_quant{quant}'
+        else:
+            if cp_args.get('strategy') == 'expert':
+                cp_topk = len(cp_args.get('expert_params', []))
+            elif cp_args.get('strategy') == 'none' or cp_args.get('topk', 0) <= 0:
+                cp_topk = len(config_space)
+            else:
+                cp_topk = cp_args.get('topk', len(config_space))
+            
+            return '%sk%ds%.1fr%.1f' % (
+                cp_args.get('strategy', 'none'), 
+                cp_topk,
+                cp_args.get('sigma', 2.0), 
+                cp_args.get('top_ratio', 0.8)
+            )

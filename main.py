@@ -5,6 +5,7 @@ from Evaluator.executor import ExecutorManager
 from Optimizer import get_optimizer
 from Optimizer.utils import load_space_from_json
 from task_manager import TaskManager
+from Compressor import get_compressor
 
 args = ConfigManager.parse_args()
 config_manager = ConfigManager(config_file=args.config, args=args)
@@ -32,6 +33,14 @@ task_manager.calculate_meta_feature(
     eval_func=executor, task_id=args.task,
     test_mode=args.test_mode, resume=args.resume
 )
+
+cp_args = config_manager.get_cp_args(config_space)
+compressor = get_compressor(
+    compressor_type=cp_args.get('strategy', 'none'),
+    config_space=config_space,
+    **cp_args
+)
+task_manager.register_compressor(compressor)
 
 opt_kwargs = {
     'config_space': config_space,

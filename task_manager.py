@@ -53,6 +53,7 @@ class TaskManager:
         self._scheduler: Optional[object] = None
         self._sql_partitioner: Optional[object] = None
         self._planner: Optional[object] = None
+        self._compressor: Optional[object] = None
         
         self._load_historical_tasks()
 
@@ -62,7 +63,6 @@ class TaskManager:
             logger.warning(f"History directory {self.history_dir} does not exist.")
             return
         
-        # 默认History里面observations的配置是全空间的配置而非压缩过的
         for filename in os.listdir(self.history_dir):
             if filename.endswith('.json'):
                 filepath = os.path.join(self.history_dir, filename)
@@ -165,6 +165,15 @@ class TaskManager:
 
     def get_planner(self):
         return self._planner
+
+    def register_compressor(self, compressor) -> None:
+        if self._compressor is not None and self._compressor is not compressor:
+            logger.warning("Compressor already registered; replacing with new instance")
+        self._compressor = compressor
+        logger.info(f"Registered Compressor: {self._compressor}")
+
+    def get_compressor(self):
+        return self._compressor
 
     def _mark_sql_plan_dirty(self) -> None:
         if self._sql_partitioner is not None:

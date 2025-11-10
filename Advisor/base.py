@@ -4,14 +4,13 @@ from openbox import logger
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
-from Compressor import get_compressor
 from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
 
 
 class BaseAdvisor:
     def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 task_id='test', ws_strategy='none', ws_args=None,
-                tl_strategy='none', tl_args=None, cp_args=None,
+                tl_strategy='none', tl_args=None,
                 seed=42, rand_prob=0.15, rand_mode='ran', 
                 **kwargs):
         # Delay import to avoid circular dependency
@@ -27,18 +26,15 @@ class BaseAdvisor:
         
         self.task_manager = TaskManager.instance()
         
-        self.compressor = get_compressor(
-            compressor_type=cp_args.get('strategy', 'none'),
-            config_space=config_space,
-            **(cp_args or {})
-        )
+        self.compressor = self.task_manager.get_compressor()
+        if self.compressor is None:
+            raise RuntimeError("Compressor must be initialized and registered to TaskManager before creating Advisor")
 
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=tl_args['topk']) if tl_strategy != 'none' else ([], [])
         if tl_strategy != 'none':
             # Compress space: pass source_hpo_data only if using transfer learning and compressor supports it
             self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
         else:
-            # For compressors that need compression even without transfer learning (e.g., REMBO/HesBO projection)
             self.surrogate_space, self.sample_space = self.compressor.compress_space()
         
         self.config_space = config_space
@@ -58,9 +54,7 @@ class BaseAdvisor:
         self.ws_strategy = ws_strategy
         self.ws_args = ws_args
         self.tl_strategy = tl_strategy
-        self.tl_args = tl_args
-        self.cp_args = cp_args
-        
+        self.tl_args = tl_args        
         self.method_id = method_id
         self.history = self.task_manager.current_task_history
         
