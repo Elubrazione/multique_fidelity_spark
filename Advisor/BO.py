@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 from openbox import logger
+from openbox.utils.history import Observation
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from .base import BaseAdvisor
@@ -167,8 +168,6 @@ class BO(BaseAdvisor):
             
             return batch
         
-        # After initialization, use acquisition function for sampling
-        # Get configuration array in surrogate space for training
         X = self._get_surrogate_config_array()
         Y = self.history.get_objectives()
 
@@ -181,11 +180,15 @@ class BO(BaseAdvisor):
             
         self.surrogate.train(X, Y)
 
-        incumbent_value = self.history.get_incumbent_value()
-        self.acq_func.update(model=self.surrogate, eta=incumbent_value, num_data=len(self.history))
-
-        observations = self.history.observations
-        challengers = self.acq_optimizer.maximize(observations=observations, num_points=2000)
+        self.acq_func.update(
+            model=self.surrogate,
+            eta=self.history.get_incumbent_value(),
+            num_data=len(self.history)
+        )
+        challengers = self.acq_optimizer.maximize(
+            observations=self._convert_observations_to_surrogate_space(self.history.observations),
+            num_points=2000
+        )
     
         _is_valid = is_valid_spark_config
         _sanitize = sanitize_spark_config
@@ -251,6 +254,21 @@ class BO(BaseAdvisor):
             surrogate_config = self.compressor.convert_config_to_surrogate_space(obs.config)
             X_surrogate.append(surrogate_config.get_array())
         return np.array(X_surrogate)
+    
+    def _convert_observations_to_surrogate_space(self, observations):
+        converted_observations = []
+        for obs in observations:
+            surrogate_config = self.compressor.convert_config_to_surrogate_space(obs.config)
+            converted_obs = Observation(
+                config=surrogate_config,
+                objectives=obs.objectives,
+                constraints=obs.constraints,
+                trial_state=obs.trial_state,
+                elapsed_time=obs.elapsed_time,
+                extra_info=obs.extra_info
+            )
+            converted_observations.append(converted_obs)
+        return converted_observations
     
     def update_compression(self, history):
         updated = self.compressor.update_compression(history)
