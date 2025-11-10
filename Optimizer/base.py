@@ -203,6 +203,9 @@ class BaseOptimizer:
             perfs = self._evaluate_configurations(candidates, resource_ratio=round(float(1.0), 5))
         else:
             candidates, perfs = self._iterate()
+        
+        if hasattr(self.advisor, 'update_compression'):
+            self.advisor.update_compression(self.advisor.history)
 
         self.log_iteration_results(candidates, perfs)
         self.save_info(interval=1)

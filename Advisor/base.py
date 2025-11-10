@@ -38,16 +38,18 @@ class BaseAdvisor:
             # Compress space: pass source_hpo_data only if using transfer learning and compressor supports it
             self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
         else:
-            # For compressors that need compression even without transfer learning (e.g., LlamaTuneCompressor)
+            # For compressors that need compression even without transfer learning (e.g., REMBO/HesBO projection)
             self.surrogate_space, self.sample_space = self.compressor.compress_space()
         
+        self.config_space = config_space
+        self.config_space.seed(self.seed)
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)
         self.ini_configs = list()
 
         meta_feature = {}
         meta_feature['random'] = {'seed': seed, 'rand_prob': rand_prob, 'rand_mode': rand_mode}
-        meta_feature['space'] = {'original': js.loads(write(config_space)),
+        meta_feature['space'] = {'original': js.loads(write(self.config_space)),
                                 'dimension': js.loads(write(self.surrogate_space)),
                                 'range': js.loads(write(self.sample_space))}
         meta_feature['compressor'] = self.compressor.compression_info
@@ -61,6 +63,9 @@ class BaseAdvisor:
         
         self.method_id = method_id
         self.history = self.task_manager.current_task_history
+        
+        # if self.history is not None:
+        #     self.history.config_space = self.config_space
 
         # init_num is equal to the number of topk similar tasks if use transfer learning,
         # otherwise it is the number of initial configurations for warm start
@@ -96,23 +101,6 @@ class BaseAdvisor:
 
     @staticmethod
     def sample_random_configs(config_space, num_configs=1, excluded_configs=None):
-        """
-        Sample a batch of random configurations.
-
-        Parameters
-        ----------
-        config_space: ConfigurationSpace
-            Configuration space object.
-        num_configs: int
-            Number of configurations to sample.
-        excluded_configs: optional, List[Configuration] or Set[Configuration]
-            A list of excluded configurations.
-
-        Returns
-        -------
-        configs: List[Configuration]
-            A list of sampled configurations.
-        """
         if excluded_configs is None:
             excluded_configs = set()
 
@@ -140,27 +128,40 @@ class BaseAdvisor:
         sampled_configs = list(configs)
         return sampled_configs
 
+    def _cache_low_dim_config(self, config, obs):
+        if not self.compressor.needs_unproject():
+            return
+        
+        if hasattr(config, '_low_dim_config'):
+            low_dim_dict = config._low_dim_config
+            if obs.extra_info is None:
+                obs.extra_info = {}
+            obs.extra_info['low_dim_config'] = low_dim_dict
+            logger.debug(f"Saved cached low_dim_config to observation (for record)")
+        else:
+            try:
+                low_dim_dict = self.compressor.project_point(config)
+                if low_dim_dict:
+                    if obs.extra_info is None:
+                        obs.extra_info = {}
+                    obs.extra_info['low_dim_config'] = low_dim_dict
+                    logger.debug(f"Computed and saved low_dim_config to observation (for record)")
+            except Exception as e:
+                logger.debug(f"Could not cache low-dim config for observation: {e}")
+    
     def update(self, config, results, **kwargs):
         if not kwargs.get('update', True):
             return
         obs = build_observation(config, results)
+        self._cache_low_dim_config(config, obs)
         self.history.update_observation(obs)
 
     def _compress_history_observations(self):
         if self.history is None or len(self.history) == 0:
             return
-
-        surrogate_names = self.surrogate_space.get_hyperparameter_names()
         for obs in self.history.observations:
             config = obs.config
-            if config.configuration_space == self.surrogate_space:
-                continue
-
-            config_dict = config.get_dictionary()
-            filtered_values = {name: config_dict[name] for name in surrogate_names if name in config_dict}
-            new_config = Configuration(self.surrogate_space, values=filtered_values)
-            if hasattr(config, 'origin') and config.origin is not None:
-                new_config.origin = config.origin
+            new_config = self.compressor.convert_config_to_surrogate_space(config)
             obs.config = new_config
-
-        self.history.config_space = self.surrogate_space
+        if self.tl_strategy != 'none':
+            self.history.config_space = self.surrogate_space

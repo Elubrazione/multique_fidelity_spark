@@ -74,7 +74,10 @@ class MFBO(BO):
     def update(self, config, results, resource_ratio=1, update=True):
         if not update:
             return
+        
         obs = build_observation(config, results)
+        self._cache_low_dim_config(config, obs)
+        
         resource_ratio = round(resource_ratio, 5)
         if resource_ratio != 1:
             if resource_ratio not in self.resource_identifiers:
@@ -82,7 +85,7 @@ class MFBO(BO):
                 history = History(task_id="res%.5f_%s" % (resource_ratio, self.task_id),
                                   num_objectives=self.history.num_objectives,
                                   num_constraints=self.history.num_constraints,
-                                  config_space=self.sample_space)
+                                  config_space=self.config_space)
                 self.history_list.append(history)
             self.history_list[self.get_resource_index(resource_ratio)].update_observation(obs)
         else:
