@@ -10,7 +10,9 @@ class ConfigManager:
         parser = argparse.ArgumentParser()
         parser.add_argument('--config', type=str, default='configs/base.yaml', help='Path to config YAML file')
         parser.add_argument('--opt', type=str, default='MFES_SMAC',
-                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC'])
+                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 
+                                    'LLAMATUNE_SMAC', 'LLAMATUNE_GP', 'REMBO_SMAC', 'REMBO_GP', 
+                                    'HESBO_SMAC', 'HESBO_GP'])
         parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
         parser.add_argument('--iter_num', type=int, default=40)
         parser.add_argument('--R', type=int, default=27)
@@ -47,6 +49,7 @@ class ConfigManager:
         self.config_file = config_file
         self.root_dir = os.path.dirname(os.path.abspath(__file__))
         self.config = self._load_config()
+        self.method_id = args.opt if args else None
         self._apply_args_overrides(args)
     
     
@@ -268,4 +271,67 @@ class ConfigManager:
         expert_params = load_expert_params(self.expert_space)
         cp_args['expert_params'] = [p for p in expert_params 
                                     if p in config_space.get_hyperparameter_names()]
+        
+        if self.method_id and ('REMBO' in self.method_id or 'HESBO' in self.method_id or 'LLAMATUNE' in self.method_id):
+            cp_args['strategy'] = 'llamatune'
+            if 'REMBO' in self.method_id:
+                cp_args['adapter_alias'] = 'rembo'
+            elif 'HESBO' in self.method_id:
+                cp_args['adapter_alias'] = 'hesbo'
+        
         return cp_args
+    
+    def get_cp_string(self, config_space) -> str:
+        cp_args = self.get_cp_args(config_space)
+        compressor_type = cp_args.get('strategy', 'none')
+        if compressor_type == 'llamatune':
+            adapter_alias = cp_args.get('adapter_alias', 'none')
+            le_low_dim = cp_args.get('le_low_dim', 'auto')
+            quant = cp_args.get('quantization_factor', 'none')
+            return f'llamatune_{adapter_alias}_dim{le_low_dim}_quant{quant}'
+        else:
+            if cp_args.get('strategy') == 'expert':
+                cp_topk = len(cp_args.get('expert_params', []))
+            elif cp_args.get('strategy') == 'none' or cp_args.get('topk', 0) <= 0:
+                cp_topk = len(config_space)
+            else:
+                cp_topk = cp_args.get('topk', len(config_space))
+            
+            return '%sk%ds%.1fr%.1f' % (
+                cp_args.get('strategy', 'none'), 
+                cp_topk,
+                cp_args.get('sigma', 2.0), 
+                cp_args.get('top_ratio', 0.8)
+            )
+    
+    def get_ws_string(self, ws_strategy: str, method_id: str) -> str:
+        ws_args = self.method_args.get('ws_args', {})
+        ws_str = ws_strategy
+        
+        if method_id != 'RS':
+            init_num = ws_args.get('init_num', 5)
+            if 'rgpe' not in ws_strategy:
+                ws_str = '%s%d' % (ws_strategy, init_num)
+            else:
+                ws_topk = ws_args.get('topk', 5)
+                ws_str = '%s%dk%d' % (ws_strategy, init_num, ws_topk)
+        
+        return ws_str
+    
+    def get_tl_string(self, tl_strategy: str) -> str:
+        tl_args = self.method_args.get('tl_args', {})
+        tl_topk = tl_args.get('topk', 5) if tl_strategy != 'none' else -1
+        return '%sk%d' % (tl_strategy, tl_topk)
+    
+    def generate_task_id(self, task_name: str, method_id: str, ws_strategy: str, 
+                        tl_strategy: str, scheduler_type: str, config_space, 
+                        rand_mode: str = 'ran', seed: int = 42) -> str:
+        ws_str = self.get_ws_string(ws_strategy, method_id)
+        tl_str = self.get_tl_string(tl_strategy)
+        cp_str = self.get_cp_string(config_space)
+        
+        method_suffix = method_id + 'rs' if rand_mode == 'rs' else method_id
+        
+        return '%s__%s__W%sT%sC%s__S%s__s%d' % (
+            task_name, method_suffix, ws_str, tl_str, cp_str, scheduler_type, seed
+        )

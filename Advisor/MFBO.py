@@ -11,14 +11,12 @@ from .utils import build_observation
 class MFBO(BO):
     def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 surrogate_type='prf', acq_type='ei', task_id='test',
-                ws_strategy='none', ws_args={'init_num': 5},
-                tl_strategy='none', tl_args={'topk': 5}, cp_args={},
+                ws_strategy='none', tl_strategy='none',
                 random_kwargs={}, **kwargs):
         super().__init__(config_space,
                         surrogate_type=surrogate_type, acq_type=acq_type,
                         task_id=task_id, method_id=method_id,
-                        ws_strategy=ws_strategy, ws_args=ws_args,
-                        tl_strategy=tl_strategy, tl_args=tl_args, cp_args=cp_args,
+                        ws_strategy=ws_strategy, tl_strategy=tl_strategy,
                         random_kwargs=random_kwargs,
                         **kwargs)
 
@@ -74,7 +72,10 @@ class MFBO(BO):
     def update(self, config, results, resource_ratio=1, update=True):
         if not update:
             return
+        
         obs = build_observation(config, results)
+        self._cache_low_dim_config(config, obs)
+        
         resource_ratio = round(resource_ratio, 5)
         if resource_ratio != 1:
             if resource_ratio not in self.resource_identifiers:
@@ -82,7 +83,7 @@ class MFBO(BO):
                 history = History(task_id="res%.5f_%s" % (resource_ratio, self.task_id),
                                   num_objectives=self.history.num_objectives,
                                   num_constraints=self.history.num_constraints,
-                                  config_space=self.sample_space)
+                                  config_space=self.config_space)
                 self.history_list.append(history)
             self.history_list[self.get_resource_index(resource_ratio)].update_observation(obs)
         else:
