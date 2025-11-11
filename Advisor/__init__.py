@@ -1,9 +1,12 @@
 from .Tuneful import Tuneful
+from .Rover import Rover
 
 advisors = {
-    'tuneful': Tuneful
+    'tuneful': Tuneful,
+    'rover': Rover,
 }
 
 __all__ = [
-    'Tuneful'
+    'Tuneful',
+    'Rover'
 ]

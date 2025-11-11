@@ -10,7 +10,7 @@ class ConfigManager:
         parser = argparse.ArgumentParser()
         parser.add_argument('--config', type=str, default='configs/base.yaml', help='Path to config YAML file')
         parser.add_argument('--opt', type=str, default='MFES_SMAC',
-                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC', 'tuneful'])
+                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC', 'tuneful', 'rover'])
         parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
         parser.add_argument('--iter_num', type=int, default=40)
         parser.add_argument('--R', type=int, default=27)
@@ -22,7 +22,7 @@ class ConfigManager:
         
         parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
         parser.add_argument('--cp_topk', type=int, default=40)
-        parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_rover', 'best_all'])
+        parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_rover', 'best_all']) # 需进一步探索rover的warm-start的方式
         parser.add_argument('--ws_init_num', type=int, default=4)
         parser.add_argument('--ws_topk', type=int, default=4)
         parser.add_argument('--ws_inner_surrogate_model', type=str, default='prf')

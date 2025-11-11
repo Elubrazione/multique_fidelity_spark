@@ -13,3 +13,8 @@ nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_n
 ```bash
 python main.py --opt tuneful --iter_num 30 --test_mode --history_dir mock/history --save_dir tuneful_test
 ```
+
+# Rover
+```bash
+python main.py --opt rover --iter_num 30 --test_mode --history_dir mock/history --save_dir rover_test --warm_start best_rover --tl_topk 5 --compress shap --tl_strategy reacq
+```
