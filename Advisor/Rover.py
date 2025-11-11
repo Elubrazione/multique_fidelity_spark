@@ -14,6 +14,7 @@ from openbox import logger
 from .mtgp import MultiTaskGP
 from .utils import build_observation
 
+MAXINT = 2 ** 31 - 1
 
 class Rover:
     default_openbox_kwargs = dict(
@@ -29,154 +30,327 @@ class Rover:
         random_state=0,
         n_jobs=1,
     )
-
+    
     def __init__(self, config_space: ConfigurationSpace,
-                 sa_fraction=0.6,
-                 sa_rounds=2,
-                 sa_iterations=10,
-                 num_objs=1,
-                 num_constraints=0,
-                 rfr_kwargs: dict = None,
-                 openbox_kwargs: dict = None,
-                 **kwargs):
-                 
-        self._logger_kwargs = kwargs.get('_logger_kwargs', None)
+                 meta_feature=None, source_hpo_data=None,
+                 surrogate_type='prf', acq_type='ei', task_id='test',
+                 ws_strategy='none', ws_args={'init_num': 5}, tl_args={'topk': 5},
+                 context_flag=False, safe_flag=False,
+                 seed=42, rng=None, rand_prob=0.15, rand_mode='ran', **kwargs):
         
-        from task_manager import TaskManager
-        self.task_manager = TaskManager.instance()
+        self._logger_kwargs = kwargs.get('_logger_kwargs', None)
 
         self.config_space = config_space
-        self.sample_condition = None
-        self.original_config_space = config_space
-        self.source_hpo_data, _ = self.task_manager.get_similar_tasks(topk=1)
-        self.source_hpo_data = self.source_hpo_data[0]
 
-        self.rfr_kwargs = deepcopy(self.default_rfr_kwargs)
-        if rfr_kwargs is not None:
-            self.rfr_kwargs.update(rfr_kwargs)
-        logger.info('rfr_kwargs: %s' % self.rfr_kwargs)
+        # 随机种子
+        self.seed = seed
+        if rng is None:
+            rng = np.random.RandomState(self.seed)
+        self.rng = rng
+        config_space_seed = self.rng.randint(MAXINT)
+        self.config_space.seed(config_space_seed)
 
-        self.openbox_kwargs = deepcopy(self.default_openbox_kwargs)
-        if openbox_kwargs is not None:
-            self.openbox_kwargs.update(openbox_kwargs)
-        logger.info('openbox_kwargs: %s' % self.openbox_kwargs)
+        self.context_flag = context_flag
 
-        self.sa_fraction = sa_fraction
-        self.sa_rounds = sa_rounds
-        self.sa_rounds_count = 0
-        self.sa_iterations = sa_iterations
-        logger.info('sa_fraction=%f, sa_rounds=%d, sa_iterations=%d' %
-                    (self.sa_fraction, self.sa_rounds, self.sa_iterations))
+        self.last_context = meta_feature['ini_context']
 
-        self.num_objs = num_objs
-        self.num_constraints = num_constraints
+        meta_feature['seed'] = seed
+        meta_feature['rand_prob'] = rand_prob
+        meta_feature['rand_mode'] = rand_mode
+        # 历史数据
+        self.history = History(task_id=task_id, config_space=config_space, meta_info=meta_feature)
 
-        self.saved_configurations = []
-        self.advisor = self.build_advisor(self.config_space)
-        
-        # task_manager里面的history有一个默认配置表现，初始化过来
-        self.advisor.history = self.task_manager.current_task_history
+        self.task_id = task_id
+        self.ws_strategy = ws_strategy
+        self.ws_args = ws_args
+        self.tl_args = tl_args
 
-    def build_config_space(self, parameter_names: list):
-        cs = ConfigurationSpace()
-        hps = [self.original_config_space.get_hyperparameter(name) for name in parameter_names]
-        cs.add_hyperparameters(hps)
-        logger.info('New config space built. size: %d. hps: %s.' % (len(hps), str(cs)))
-        return cs
+        self.source_hpo_data_sims = None
+        self.source_hpo_data = self.filter_source_hpo_data(source_hpo_data)
 
-    def build_advisor(self, config_space, old_history_container=None):
-        assert self.num_objs == 1
-        advisor = Advisor(
-            config_space=config_space,
-            num_objectives=self.num_objs,
-            num_constraints=self.num_constraints,
-            initial_trials=2,
-            logger_kwargs=self._logger_kwargs,
-            **self.openbox_kwargs,
-        )
-        advisor.logger = logger
+        # 初始化
+        self.ini_configs = list()
+        default_config = self.config_space.get_default_configuration()
+        default_config.origin = "default"
+        self.ini_configs.append(default_config)
 
-        new_history = History(task_id=f'history{id}', config_space=config_space)
-        for obs in self.source_hpo_data.observations:
-            conf = obs.config
-            objs = obs.objectives
-            new_config = self.build_config(conf, config_space)
-            new_history.update_observation(Observation(config = new_config, objectives = objs))
-        advisor.surrogate_model = MultiTaskGP(new_history)
+        self.ws_strategy = ws_strategy
+        self.ws_args = ws_args
+        self.safe_flag = safe_flag
 
-        if old_history_container is not None:
-            h = old_history_container
-            assert len(h.configurations) == len(self.saved_configurations)
-            for obs in h.observations:
-                config = obs.config
-                objs = obs.objectives
-                new_config = self.build_config(config, config_space)
-                obs = Observation(config = new_config, objectives = objs)
-                advisor.update_observation(obs)
-        logger.info('New advisor built. %d observations loaded.' % len(advisor.history.configurations))
-        return advisor
+        self.acq_type = acq_type
+        self.surrogate_type = surrogate_type
 
-    def build_config(self, config, config_space):
-        default_config = config_space.get_default_configuration()
-        config_dict = deepcopy(config.get_dictionary())
-        new_config_dict = deepcopy(default_config.get_dictionary())
+        ini_context = meta_feature['ini_context']
 
-        # new_config_dict.update(config_dict)
-        for k, v in config_dict.items():
-            if k in new_config_dict:
-                new_config_dict[k] = v
+        self.extra_dim = 0
+        if self.context_flag:
+            self.extra_dim = len(ini_context)
 
-        new_config = Configuration(config_space, values=new_config_dict)
-        return new_config
+        self.norm_y = True
+        if 'wrk' in acq_type:
+            self.norm_y = False
 
-    def get_significant_parameters(self, top_k):
-        h = self.advisor.history
-        X = h.get_config_array(transform='scale')
-        Y = h.get_objectives(transform='infeasible')
-        model = RandomForestRegressor(**self.rfr_kwargs)
-        model.fit(X, Y)
-        importance = model.feature_importances_.tolist()
-        parameter_names = self.config_space.get_hyperparameter_names()
-        name_score = list(zip(parameter_names, importance))
-        name_score.sort(key=lambda x: x[1], reverse=True)
-        significant_parameters = [name for name, score in name_score[:top_k]]
-        logger.info('Parameter importance:\n%s' % '\n'.join(map(str, name_score)))
-        logger.info('Get %d significant parameters: %s' % (top_k, significant_parameters))
-        return significant_parameters
+        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space, rng=self.rng,
+                                            transfer_learning_history=self.source_hpo_data,
+                                            extra_dim=self.extra_dim, norm_y=self.norm_y)
 
-    def decide_config_space(self):
-        n = len(self.saved_configurations)
-        if n == 0 or self.sa_rounds_count >= self.sa_rounds or n % self.sa_iterations != 0:
-            return
+        self.init_num = ws_args['init_num']
 
-        self.sa_rounds_count += 1
-        n_parameters_old = len(self.config_space)
-        n_parameters_new = int(np.ceil(n_parameters_old * self.sa_fraction))
-        logger.info('SA round %d/%d. cs size: %d -> %d' %
-                    (self.sa_rounds_count, self.sa_rounds, n_parameters_old, n_parameters_new))
+        self.acq_func = build_my_acq_func(func_str=acq_type, model=self.surrogate)
 
-        if n_parameters_new == n_parameters_old:
-            logger.info('No need to change config space.')
-            return
+        self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func, rand_prob=rand_prob, rand_mode=rand_mode,
+                                                             config_space=self.config_space, rng=self.rng,
+                                                             context=ini_context, context_flag=context_flag)
+    
 
-        significant_parameters = self.get_significant_parameters(top_k=n_parameters_new)
-        self.config_space = self.build_config_space(significant_parameters)
-        self.advisor = self.build_advisor(self.config_space, old_history_container=self.advisor.history)
+    def filter_source_hpo_data(self, source_hpo_data):
 
-    def sample(self, batch_size=1):
-        self.decide_config_space()
-        conf = self.advisor.get_suggestion()
-        # Caution: advisor.get_suggestion() may still suggest config that doesn't meet condition
-        return [self.build_config(conf, self.original_config_space)]
+        if source_hpo_data is None or len(source_hpo_data) == 0:
+            logger.info("No source hpo data provided.")
+            return list()
 
-    def update(self, config, results, **kwargs):
-        new_conf = self.build_config(config, self.config_space)
-        new_obs = build_observation(new_conf, results)
-        self.saved_configurations.append(new_obs.config)
+        map_strategy = self.ws_strategy
+        if map_strategy == 'none':
+            map_strategy = 'rover'
+        new_source_hpo_data = list()
+        sims = map_source_hpo_data(map_strategy=map_strategy,
+                                   target_his=self.history, source_hpo_data=source_hpo_data, **self.ws_args)
+        tl_topk = len(source_hpo_data)
+        if self.tl_args['topk'] > 0:
+            tl_topk = self.tl_args['topk']
 
-        return self.advisor.update_observation(new_obs)
+        self.source_hpo_data_sims = []  # 重新排序
+        for i in range(tl_topk):
+            new_source_hpo_data.append(source_hpo_data[sims[i][0]])
+            self.source_hpo_data_sims.append([i, sims[i][1]])
+            logger.info("The %d-th similar task(%s): %s" % (sims[i][0], source_hpo_data[sims[i][0]].task_id, sims[i][1]))
 
+        logger.info("Successfully filter source hpo data to %d tasks." % len(new_source_hpo_data))
+
+        return new_source_hpo_data
 
     @property
-    def history(self):
-        return self.advisor.history
+    def contexts(self):
+        contexts = self.history.observations[0]['last_context']
+        for idx in range(1, len(self.history)):
+            contexts = np.vstack([contexts, self.history.observations[idx]['last_context']])
+
+        return contexts
+
+    def warm_start(self):
+
+        raise NotImplementedError
+
+    def sample(self):
+        raise NotImplementedError
+
+    @staticmethod
+    def sample_random_configs(config_space, num_configs=1, excluded_configs=None):
+        """
+        Sample a batch of random configurations.
+
+        Parameters
+        ----------
+        config_space: ConfigurationSpace
+            Configuration space object.
+        num_configs: int
+            Number of configurations to sample.
+        excluded_configs: optional, List[Configuration] or Set[Configuration]
+            A list of excluded configurations.
+
+        Returns
+        -------
+        configs: List[Configuration]
+            A list of sampled configurations.
+        """
+        if excluded_configs is None:
+            excluded_configs = set()
+
+        configs = list()
+        sample_cnt = 0
+        max_sample_cnt = 1000
+        while len(configs) < num_configs:
+            config = config_space.sample_configuration()
+            sample_cnt += 1
+            if config not in configs and config not in excluded_configs:
+                config.origin = "Random Sample!"
+                configs.append(config)
+                sample_cnt = 0
+                continue
+            if sample_cnt >= max_sample_cnt:
+                logger.warning('Cannot sample non duplicate configuration after %d iterations.' % max_sample_cnt)
+                config.origin = "Random Sample(duplicate)!"
+                configs.append(config)
+                sample_cnt = 0
+        return configs
+
+    def update(self, config, results):
+
+        obs = build_observation(config, results, last_context=self.last_context)
+
+        self.history.update_observation(obs)
+
+        self.last_context = results['result']['context']
+        
+    def warm_start(self):
+
+        if self.ws_strategy == 'none':
+            return
+
+        sims = self.source_hpo_data_sims
+
+        for i, sim in enumerate(sims):
+            logger.info("The %d-th similar task(%s): %s" % (sim[0], self.source_hpo_data[i].task_id, sim[1]))
+
+        warm_str_list = []
+        for i in range(len(sims)):
+            idx, sim = sims[i]
+            task_str = self.source_hpo_data[idx].task_id
+            warm_str = "%s: sim%.4f" % (task_str, sim)
+            warm_str_list.append(warm_str)
+
+        if 'warm_start' not in self.history.meta_info:
+            self.history.meta_info['warm_start'] = [warm_str_list]
+        else:
+            self.history.meta_info['warm_start'].append(warm_str_list)
+
+        num_evaluated = len(self.history)
+        if self.ws_strategy.startswith('best'):
+            for i, sim in enumerate(sims):
+                sim_obs = copy.deepcopy(self.source_hpo_data[sim[0]].observations)
+                sim_obs = sorted(sim_obs, key=lambda x: x.objectives[0])
+
+                task_num = 3 if i == 0 else 1
+                for j in range(task_num):
+                    config_warm = sim_obs[j].config
+                    config_warm.origin = self.ws_strategy + self.source_hpo_data[sim[0]].task_id
+                    # 后加的更差，因为是从后往前取的，所以往前加
+                    self.ini_configs = [config_warm] + self.ini_configs
+                if len(self.ini_configs) + num_evaluated >= self.init_num:
+                    break
+
+            while len(self.ini_configs) + num_evaluated < self.init_num:
+                config = self.sample_random_configs(self.config_space, 1,
+                                                    excluded_configs=self.history.configurations)[0]
+                self.ini_configs = [config] + self.ini_configs
+
+            logger.info("Successfully warm start %d configurations with %s!" % (len(self.ini_configs), self.ws_strategy))
+
+        elif self.ws_strategy.startswith('rgpe'):
+            topk = self.ws_args.get('topk', 3)
+
+            src_history = [self.source_hpo_data[sims[i][0]] for i in range(topk)]
+            target_history = self.history
+
+            while len(self.ini_configs) + num_evaluated < self.init_num:
+                final_config = get_transfer_suggestion(src_history, target_history, _logger_kwargs=self._logger_kwargs)
+                final_config.origin = self.ws_strategy
+                if final_config not in self.history.configurations + self.ini_configs:
+                    self.ini_configs.append(final_config)
+
+            logger.info("Successfully warm start %d configurations with %s!" % (len(self.ini_configs), self.ws_strategy))
+
+        else:
+
+            raise ValueError('Invalid ws_strategy: %s' % self.ws_strategy)
+
+    """
+    evaluate后更新contextBO配置
+    """
+
+    def update(self, config, results):
+        super(BO, self).update(config, results)
+        if self.context_flag:
+            self.acq_optimizer.update_contex(results['result']['context'])
+            print("successfully update context!")
+
+    """
+    采样(使用ini_configs进行热启动和普通采样)
+    以及安全约束 (40轮后阈值为 0.85 * incumbent_value)
+    """
+
+    def sample(self, return_list=False):
+        num_config_evaluated = len(self.history)
+        if len(self.ini_configs) == 0 and num_config_evaluated < self.init_num:
+            self.warm_start()
+
+        if num_config_evaluated < self.init_num:
+            if len(self.ini_configs) > 0:
+                config = self.ini_configs[-1]
+                self.ini_configs.pop()
+            else:
+                config = self.sample_random_configs(self.config_space, 1,
+                                                    excluded_configs=self.history.configurations)[0]
+            if return_list:
+                return [config]
+            else:
+                return config
+
+        X = self.history.get_config_array()
+
+        if self.context_flag:
+            X = np.hstack((X, self.contexts))
+        Y = self.history.get_objectives()
+
+        if self.surrogate_type == 'gpf':
+            self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.config_space,
+                                                rng=self.rng,
+                                                transfer_learning_history=self.source_hpo_data,
+                                                extra_dim=self.extra_dim, norm_y=self.norm_y)
+            logger.info("Successfully rebuild the surrogate model GP!")
+        self.surrogate.train(X, Y)
+
+        self.acq_func.update(model=self.surrogate,
+                             eta=self.history.get_incumbent_value(),
+                             num_data=num_config_evaluated)
+
+        challengers = self.acq_optimizer.maximize(observations=self.history.observations,
+                                                  num_points=5000)
+
+        if return_list:
+            return challengers.challengers
+
+        cur_config = challengers.challengers[0]
+
+        # 对1个任务，在40轮之后引入安全约束（阈值85%)
+        if self.safe_flag:
+            recommend_flag = True
+            if len(self.history) >= 10:
+                recommend_flag = False
+                for config in challengers.challengers:
+                    X = convert_configurations_to_array([config])
+                    if self.context_flag:
+                        X = np.hstack((X, [self.last_context]))
+                    pred_mean, pred_var = self.surrogate.predict(X)
+                    if pred_mean[0] < 0.85 * self.history.get_incumbent_value():  # 满足约束 (perf是负数)
+                        logger.warn(
+                            '-----------The config_%d meet the security constraint-----------' % challengers.challengers.index(
+                                config))
+                        cur_config = config
+                        recommend_flag = True
+                        break
+
+            if recommend_flag:
+                logger.warn("Successfully recommend a configuration through Advisor!")
+            else:
+                logger.error(
+                    "Failed to recommend a configuration that meets the security constraint! Return the incumbent_config")
+                cur_config = self.history.get_incumbent_configs()[0]
+
+        else:
+            recommend_flag = False
+            # 避免推荐已经评估过的配置
+            for config in challengers:
+                if config not in self.history.configurations:
+                    cur_config = config
+                    recommend_flag = True
+                    break
+
+            if recommend_flag:
+                logger.warn("Successfully recommend a configuration through Advisor!")
+            else:
+                logger.error("Failed to recommend am unique configuration ! Return a random config")
+                cur_config = self.sample_random_configs(self.config_space, 1, excluded_configs=self.history.configurations)
+
+        return cur_config

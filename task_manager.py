@@ -226,19 +226,22 @@ class TaskManager:
         Returns:
             Tuple of (filtered_histories, similarity_scores)
         """
-        if not self.similar_tasks_cache:
-            return [], []
-        if topk is None:
-            topk = self.tl_args.get('topk') or len(self.similar_tasks_cache)
-        topk = min(topk, len(self.similar_tasks_cache))
-        filtered_histories = []
-        filtered_sims = []
-        for i in range(topk):
-            idx, sim = self.similar_tasks_cache[i]
-            filtered_histories.append(self.historical_tasks[idx])
-            filtered_sims.append((i, sim))
-            logger.info(f"Similar task {i}: {self.historical_tasks[idx].task_id} (similarity: {sim:.3f})")
-        return filtered_histories, filtered_sims
+        # if not self.similar_tasks_cache:
+        #     return [], []
+        # if topk is None:
+        #     topk = self.tl_args.get('topk') or len(self.similar_tasks_cache)
+        # topk = min(topk, len(self.similar_tasks_cache))
+        # filtered_histories = []
+        # filtered_sims = []
+        # for i in range(topk):
+        #     idx, sim = self.similar_tasks_cache[i]
+        #     filtered_histories.append(self.historical_tasks[idx])
+        #     filtered_sims.append((i, sim))
+        #     logger.info(f"Similar task {i}: {self.historical_tasks[idx].task_id} (similarity: {sim:.3f})")
+        # return filtered_histories, filtered_sims
+    
+        # TODO: 为了使用Rover的方式对任务进行选择, 这里直接返回"未过滤"的历史任务, 全权交给rover处理剩余的部分
+        return self.historical_tasks
 
 
     def update_current_task_history(self, config, results):

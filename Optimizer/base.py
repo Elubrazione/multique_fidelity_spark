@@ -210,6 +210,9 @@ class RoverOptimizer:
 
         self.build_path()
         
+        # TODO: source_hpo_data从task_manager中获取, 可能需要传入advisor, 以及最后的filter的操作需要找地方完成
+        source_hpo_data = task_mgr.get_similar_tasks()
+
         advisor_class = advisors['rover']
         self.advisor = advisor_class(
             config_space=config_space,
