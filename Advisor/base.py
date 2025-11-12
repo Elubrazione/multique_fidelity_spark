@@ -34,8 +34,11 @@ class BaseAdvisor:
 
         self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=self.tl_args['topk']) if tl_strategy != 'none' else ([], [])
         if tl_strategy != 'none':
-            # Compress space: pass source_hpo_data only if using transfer learning and compressor supports it
-            self.surrogate_space, self.sample_space = self.compressor.compress_space(self.source_hpo_data)
+            # pass source_hpo_data as space_history and similarities
+            self.surrogate_space, self.sample_space = self.compressor.compress_space(
+                space_history=self.source_hpo_data,
+                source_similarities=self.source_hpo_data_sims
+            )
         else:
             self.surrogate_space, self.sample_space = self.compressor.compress_space()
         
