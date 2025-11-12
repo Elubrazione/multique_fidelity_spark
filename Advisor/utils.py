@@ -6,6 +6,8 @@ from openbox.utils.history import Observation
 from openbox.utils.util_funcs import get_types
 from openbox.utils.constants import SUCCESS, TIMEOUT, FAILED
 
+from .workload_mapping.rov import RoverMapper
+
 
 def _to_dict(config):
     try:
@@ -93,6 +95,28 @@ def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_lear
                     surrogate_type=inner_model, norm_y=norm_y)
     else:
         raise ValueError('Invalid string %s for surrogate!' % func_str)
+
+
+def calculate_ranking(score_list, ascending=False):
+    rank_list = list()
+    for i in range(len(score_list)):
+        value_list = pd.Series(list(score_list[i]))
+        rank_array = np.array(value_list.rank(ascending=ascending))
+        rank_list.append(rank_array)
+
+    return rank_list
+
+
+def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
+    sims = None
+    inner_sm = kwargs.get('inner_surrogate_model', 'gp')
+    rover = RoverMapper(surrogate_type=inner_sm)
+    if not source_hpo_data:
+        logger.warning('No source HPO data available. Returning empty similarity list.')
+        return []
+    rover.fit(source_hpo_data, config_space)
+    sims = rover.map(target_his, source_hpo_data)   # 没有阈值过滤, 返回所有任务的相似度（theta=-float('inf')）
+    return sims
 
 
 def build_observation(config, results, **kwargs):
