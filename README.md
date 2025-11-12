@@ -16,5 +16,5 @@ python main.py --opt tuneful --iter_num 30 --test_mode --history_dir mock/histor
 
 # Rover
 ```bash
-python main.py --opt rover --iter_num 30 --test_mode --history_dir mock/history --save_dir rover_test --warm_start best_rover --tl_topk 5 --compress shap --tl_strategy reacq
+python main.py --opt rover --iter_num 10 --test_mode --history_dir mock/history --save_dir rover_test --warm_start none --tl_topk 5 --compress shap
 ```

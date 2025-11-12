@@ -179,9 +179,6 @@ class RoverOptimizer:
                  target='redis', save_dir='./results', 
                  ws_strategy='none', tl_strategy='none',
                  backup_flag=False, resume: Optional[str] = None):
-        # TODO: 删除了task_str='run'(忽略), ws_args=None, tl_args=None(迁移至task_manager了)
-        # TODO: meta_feature=None, source_hpo_data=None, 前者rover从文件中读取, 后者曾经通过传参传入, 如今从task_manager中获取
-        # TODO: 删除了seed=42, rand_prob=0.15, rand_mode='ran'等随机信息, 应该是从task_manager中获取
 
         assert method_id in ['rover']
 
@@ -205,13 +202,11 @@ class RoverOptimizer:
         self.method_id = method_id
         self.task_id = '%s__%s__S%s__s%d' % (task_id, self.method_id, scheduler_type, self.random_kwargs.get('seed', 42))
 
+        self.save_dir = save_dir
         self.target = target
         self.result_path = None
 
         self.build_path()
-        
-        # TODO: source_hpo_data从task_manager中获取, 可能需要传入advisor, 以及最后的filter的操作需要找地方完成
-        source_hpo_data = task_mgr.get_similar_tasks()
 
         advisor_class = advisors['rover']
         self.advisor = advisor_class(

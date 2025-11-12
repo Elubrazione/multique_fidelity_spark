@@ -11,10 +11,10 @@ from config import ConfigManager
 
 
 def build_optimizer(args, **kwargs):
-    from Optimizer.base import TunefulOptimizer
+    from Optimizer.base import RoverOptimizer
     config_manager: ConfigManager = kwargs.get('config_manager')
 
-    optimizer = TunefulOptimizer(
+    optimizer = RoverOptimizer(
         config_space=kwargs['config_space'],
         eval_func=kwargs['eval_func'],
         iter_num=args.iter_num,
