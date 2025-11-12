@@ -231,6 +231,9 @@ class TaskManager:
             filtered_histories.append(self.historical_tasks[idx])
             filtered_sims.append((i, sim))
             logger.info(f"Similar task {i}: {self.historical_tasks[idx].task_id} (similarity: {sim:.3f})")
+        sims_sum = sum(sim for _, sim in filtered_sims)
+        filtered_sims = [(idx, sim / sims_sum) for idx, sim in filtered_sims]
+        logger.debug(f"Normalized similarities: {filtered_sims}")
         return filtered_histories, filtered_sims
 
 

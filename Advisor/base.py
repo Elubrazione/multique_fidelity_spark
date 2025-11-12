@@ -37,7 +37,7 @@ class BaseAdvisor:
             # pass source_hpo_data as space_history and similarities
             self.surrogate_space, self.sample_space = self.compressor.compress_space(
                 space_history=self.source_hpo_data,
-                source_similarities=self.source_hpo_data_sims
+                source_similarities={idx: sim for idx, sim in self.source_hpo_data_sims}
             )
         else:
             self.surrogate_space, self.sample_space = self.compressor.compress_space()
