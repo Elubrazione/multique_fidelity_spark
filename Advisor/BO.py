@@ -272,7 +272,21 @@ class BO(BaseAdvisor):
         updated = self.compressor.update_compression(history)
         if updated:
             logger.info("Compression updated, re-compressing space and retraining surrogate model")
-            self.surrogate_space, self.sample_space = self.compressor.compress_space(history)
+            # compressor.update_compression already updated the spaces
+            self.surrogate_space = self.compressor.surrogate_space
+            self.sample_space = self.compressor.sample_space
+            
+            # Rebuild surrogate model with new space dimensions
+            self.surrogate = build_my_surrogate(
+                func_str=self.surrogate_type,
+                config_space=self.surrogate_space,
+                rng=self.rng,
+                transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
+                extra_dim=0,
+                norm_y=self.norm_y
+            )
+            logger.info(f"Successfully rebuilt the surrogate model ({self.surrogate_type}) with {len(self.surrogate_space.get_hyperparameters())} dimensions")
+            
             self.acq_optimizer = InterleavedLocalAndRandomSearch(
                 acquisition_function=self.acq_func,
                 rand_prob=self.rand_prob,
@@ -280,16 +294,6 @@ class BO(BaseAdvisor):
                 rng=self.rng,
                 config_space=self.sample_space
             )
-            if self.surrogate_type == 'gpf':
-                self.surrogate = build_my_surrogate(
-                    func_str=self.surrogate_type,
-                    config_space=self.surrogate_space,
-                    rng=self.rng,
-                    transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
-                    extra_dim=self.extra_dim,
-                    norm_y=self.norm_y
-                )
-                logger.info("Successfully rebuilt the surrogate model GP!")
             
             X_surrogate = self._get_surrogate_config_array()
             Y = self.history.get_objectives()
