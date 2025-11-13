@@ -1,5 +1,5 @@
 import copy
-from typing import Optional, List
+from typing import Optional, List, Dict
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
@@ -15,11 +15,12 @@ class DimensionSelectionStep(CompressionStep):
         self.selected_param_names: Optional[List[str]] = None
     
     def compress(self, input_space: ConfigurationSpace, 
-                space_history: Optional[List[History]] = None) -> ConfigurationSpace:
+                space_history: Optional[List[History]] = None,
+                source_similarities: Optional[Dict[int, float]] = None) -> ConfigurationSpace:
         if self.strategy == 'none':
             logger.debug("Dimension selection disabled, returning input space")
             return input_space
-        selected_indices = self._select_parameters(input_space, space_history)
+        selected_indices = self._select_parameters(input_space, space_history, source_similarities)
         if not selected_indices:
             logger.warning("No parameters selected, returning input space")
             return input_space
@@ -34,7 +35,8 @@ class DimensionSelectionStep(CompressionStep):
     
     def _select_parameters(self, 
                           input_space: ConfigurationSpace,
-                          space_history: Optional[List[History]] = None) -> List[int]:
+                          space_history: Optional[List[History]] = None,
+                          source_similarities: Optional[Dict[int, float]] = None) -> List[int]:
         """
         Select parameters to keep.
         
@@ -94,4 +96,14 @@ class DimensionSelectionStep(CompressionStep):
     def affects_sampling_space(self) -> bool:
         # Dimension selection affects sampling space
         return True
-
+    
+    def get_step_info(self) -> dict:
+        info = super().get_step_info()
+        if self.selected_param_names:
+            info['selected_parameters'] = self.selected_param_names
+        if self.selected_indices:
+            info['selected_indices'] = self.selected_indices
+        if hasattr(self, '_calculator') and self._calculator:
+            info['calculator'] = type(self._calculator).__name__
+        info['compression_ratio'] = len(self.selected_indices) / len(self.input_space.get_hyperparameters())
+        return info

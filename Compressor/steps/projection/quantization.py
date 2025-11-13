@@ -14,7 +14,7 @@ class QuantizationProjectionStep(TransformativeProjectionStep):
     def __init__(self, 
                  method: str = 'quantization',
                  max_num_values: int = 10,
-                 seed: int = 42,
+                 seed: int = 42, adaptive: bool = False,
                  **kwargs):
         super().__init__(method=method, **kwargs)
         self._max_num_values = max_num_values
@@ -22,6 +22,7 @@ class QuantizationProjectionStep(TransformativeProjectionStep):
         self._rs = np.random.RandomState(seed=seed)
         
         self._knobs_scalers: dict = {}
+        self.adaptive = adaptive
     
     def _build_projected_space(self, input_space: ConfigurationSpace) -> ConfigurationSpace:
         self._knobs_scalers = {}
@@ -95,7 +96,7 @@ class QuantizationProjectionStep(TransformativeProjectionStep):
         return (hp.upper - hp.lower + 1) > self._max_num_values
     
     def unproject_point(self, point: Configuration) -> dict:
-        coords = point.get_dictionary()
+        coords = point.get_dictionary() if hasattr(point, 'get_dictionary') else dict(point)
         valid_dim_names = [dim.name for dim in self.input_space.get_hyperparameters()]
         unproject_coords = {}
         
@@ -149,7 +150,7 @@ class QuantizationProjectionStep(TransformativeProjectionStep):
         return quantized_dict
     
     def supports_adaptive_update(self) -> bool:
-        return True
+        return self.adaptive
     
     def update(self, progress: OptimizerProgress, history: History) -> bool:
         # Stagnant: reduce quantization (increase max_num_values) to expand search space
@@ -169,4 +170,8 @@ class QuantizationProjectionStep(TransformativeProjectionStep):
                 return True
         
         return False
-
+    
+    def get_step_info(self) -> dict:
+        info = super().get_step_info()
+        info['max_num_values'] = self._max_num_values
+        return info

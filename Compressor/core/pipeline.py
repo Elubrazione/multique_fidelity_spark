@@ -1,5 +1,5 @@
 import copy
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
@@ -19,13 +19,15 @@ class CompressionPipeline:
         self.space_after_steps: List[ConfigurationSpace] = []
         self.sample_space: Optional[ConfigurationSpace] = None
         self.surrogate_space: Optional[ConfigurationSpace] = None
+        self.unprojected_space: Optional[ConfigurationSpace] = None  # Target space after unprojection
         
         self.sampling_strategy: Optional[SamplingStrategy] = None
         self.filling_strategy = None
     
     def compress_space(self, 
                       original_space: ConfigurationSpace,
-                      space_history: Optional[List] = None) -> Tuple[ConfigurationSpace, ConfigurationSpace]:
+                      space_history: Optional[List] = None,
+                      source_similarities: Optional[Dict[int, float]] = None) -> Tuple[ConfigurationSpace, ConfigurationSpace]:
         if self.original_space is None:
             self.original_space = original_space
         
@@ -42,7 +44,7 @@ class CompressionPipeline:
             
             step.input_space = current_space
             step.filling_strategy = self.filling_strategy
-            current_space = step.compress(current_space, space_history)
+            current_space = step.compress(current_space, space_history, source_similarities)
             current_space.seed(self.seed)
             step.output_space = current_space
             
@@ -66,19 +68,6 @@ class CompressionPipeline:
         
         self._build_sampling_strategy(original_space)
         
-        original_dim = len(original_space.get_hyperparameters())
-        sample_dim = len(self.sample_space.get_hyperparameters())
-        surrogate_dim = len(self.surrogate_space.get_hyperparameters())
-        
-        logger.info("=" * 60)
-        logger.info("Compression Pipeline Summary")
-        logger.info("=" * 60)
-        logger.info(f"Original space: {original_dim} parameters")
-        logger.info(f"Sample space: {sample_dim} parameters (ratio: {sample_dim/original_dim:.2%})")
-        logger.info(f"Surrogate space: {surrogate_dim} parameters (ratio: {surrogate_dim/original_dim:.2%})")
-        logger.info(f"Sampling strategy: {type(self.sampling_strategy).__name__}")
-        logger.info("=" * 60)
-
         return self.surrogate_space, self.sample_space
     
     def _determine_spaces(self):
@@ -91,7 +80,15 @@ class CompressionPipeline:
         self.surrogate_space = self.space_after_steps[-1]
         # Sample space is determined by the last step that affects it
         self.sample_space = self.space_after_steps[sample_space_idx]
-    
+        
+        # Unprojected space is the input to the first transformative step (that needs unproject)
+        # Default: unproject to original space
+        self.unprojected_space = self.space_after_steps[0]  # original space
+        for i, step in enumerate(self.steps):
+            if step.needs_unproject():
+                self.unprojected_space = self.space_after_steps[i]
+                break
+
     def _build_sampling_strategy(self, original_space: ConfigurationSpace):
         # Check from last to first, only range compression can provide a mixed sampling strategy
         for step in reversed(self.steps):
@@ -105,18 +102,42 @@ class CompressionPipeline:
         self.progress.update_from_history(history)
         
         updated = False
+        updated_steps = []
         for step in self.steps:
-            # only boundary range and periodic dimension selection can support adaptive update
             if step.supports_adaptive_update():
                 if step.update(self.progress, history):
                     updated = True
+                    updated_steps.append(step)
                     logger.info(f"Step {step.name} updated compression strategy")
         
         if updated and self.original_space is not None:
-            # Use current history for re-compression during adaptive update
-            # This ensures we use the latest optimization data, not the initial transfer learning data
+            # Check if any step needs to increase dimensions
+            # For dimension increase, we must start from original_space
+            # For dimension decrease, we can use progressive compression from surrogate_space
+            needs_original_space = False
+            for step in updated_steps:
+                if hasattr(step, 'current_topk') and hasattr(step, 'initial_topk'):
+                    # If current_topk > number of params in surrogate_space, need original_space
+                    if self.surrogate_space and step.current_topk > len(self.surrogate_space.get_hyperparameters()):
+                        needs_original_space = True
+                        break
+            
+            if needs_original_space:
+                start_space = self.original_space
+                logger.debug(f"Dimension increase detected, re-compressing from original space with {len(start_space.get_hyperparameters())} parameters")
+            else:
+                uses_progressive = all(step.uses_progressive_compression() for step in updated_steps)
+                if uses_progressive:
+                    start_space = self.surrogate_space
+                    logger.debug(f"Using progressive compression, starting from {len(start_space.get_hyperparameters())} parameters")
+                else:
+                    start_space = self.original_space
+                    logger.debug(f"Using re-compression, starting from {len(start_space.get_hyperparameters())} parameters")
+            
             space_history = [history] if history else None
-            self.compress_space(self.original_space, space_history)
+            # Note: source_similarities should be passed from the caller (compressor/advisor)
+            # Here use None since we're updating based on current task's history
+            self.compress_space(start_space, space_history, source_similarities=None)
             return True
         
         return False
@@ -135,9 +156,7 @@ class CompressionPipeline:
 
         for step in reversed(self.steps):
             if step.needs_unproject():
-                from ConfigSpace import Configuration
-                temp_config = Configuration(step.output_space, values=current_dict)
-                current_dict = step.unproject_point(temp_config)
+                current_dict = step.unproject_point(current_dict)
         return current_dict
     
     def project_point(self, point) -> dict:
@@ -145,9 +164,7 @@ class CompressionPipeline:
         current_dict = point.get_dictionary() if hasattr(point, 'get_dictionary') else dict(point)
         
         for step in self.steps:
-            from ConfigSpace import Configuration
             if step.input_space is not None:
-                temp_config = Configuration(step.input_space, values=current_dict)
-                current_dict = step.project_point(temp_config)
+                current_dict = step.project_point(current_dict)
         return current_dict
 

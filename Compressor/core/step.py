@@ -3,7 +3,7 @@ Compression step base class and interface.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, Dict, TYPE_CHECKING
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 
@@ -22,7 +22,9 @@ class CompressionStep(ABC):
     
     @abstractmethod
     def compress(self, input_space: ConfigurationSpace, 
-                 space_history: Optional[List[History]] = None) -> ConfigurationSpace:
+                 space_history: Optional[List[History]] = None,
+                 source_similarities: Optional[Dict[int, float]] = None,
+                 **kwargs) -> ConfigurationSpace:
         pass
     
     def project_point(self, point) -> dict:
@@ -65,4 +67,28 @@ class CompressionStep(ABC):
     
     def supports_adaptive_update(self) -> bool:
         return False
+    
+    def uses_progressive_compression(self) -> bool:
+        """
+        Whether this step uses progressive compression (compress on top of previous compression)
+        or re-compression (compress from original space).
+        
+        Progressive: periodic dimension reduction (30d -> 24d -> 19d)
+        Re-compression: re-evaluate from scratch based on new data
+        """
+        return False
+    
+    def get_step_info(self) -> dict:
+        info = {
+            'name': self.name,
+            'type': type(self).__name__,
+            'input_space_params': len(self.input_space.get_hyperparameters()) if self.input_space else 0,
+            'output_space_params': len(self.output_space.get_hyperparameters()) if self.output_space else 0,
+            'supports_adaptive_update': self.supports_adaptive_update(),
+            'uses_progressive_compression': self.uses_progressive_compression()
+        }
+        
+        if hasattr(self, 'compression_info') and self.compression_info:
+            info['compression_info'] = self.compression_info
+        return info
 

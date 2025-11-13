@@ -19,7 +19,6 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
                  method: str = 'kde_boundary',
                  source_top_ratio: float = 0.3,  # Top 30% of source task configs
                  kde_coverage: float = 0.6,  # Coverage ratio for KDE interval
-                 source_similarities: Optional[List[Tuple[int, float]]] = None,  # [(task_idx, similarity), ...]
                  enable_mixed_sampling: bool = True,
                  initial_prob: float = 0.9,
                  seed: Optional[int] = None,
@@ -34,26 +33,17 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
             sigma=2.0,  # Not used in KDE method
             enable_mixed_sampling=enable_mixed_sampling,
             initial_prob=initial_prob,
-            use_shap=False,
             seed=seed,
             **kwargs
         )
         self.source_top_ratio = source_top_ratio
         self.kde_coverage = kde_coverage
-        self.source_similarities = source_similarities or []
-        if self.source_similarities:
-            total_sim = sum(sim for _, sim in self.source_similarities)
-            if total_sim > 0:
-                self._similarity_dict = {idx: sim / total_sim for idx, sim in self.source_similarities}
-            else:
-                n_histories = len(self.source_similarities)
-                self._similarity_dict = {idx: 1.0 / n_histories for idx, _ in self.source_similarities}
-        else:
-            self._similarity_dict = {}
+
     
     def _compute_compressed_space(self,
                                 input_space: ConfigurationSpace,
-                                space_history: Optional[List[History]] = None) -> ConfigurationSpace:
+                                space_history: Optional[List[History]] = None,
+                                source_similarities: Optional[Dict[int, float]] = None) -> ConfigurationSpace:
         if not space_history:
             logger.warning("No space history provided for KDE boundary compression, returning input space")
             return copy.deepcopy(input_space)
@@ -65,7 +55,7 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
             return copy.deepcopy(input_space)
         
         compressed_ranges = self._compute_kde_based_ranges(
-            space_history, numeric_param_names, input_space
+            space_history, numeric_param_names, input_space, source_similarities
         )
         
         compressed_space = create_space_from_ranges(input_space, compressed_ranges)
@@ -76,7 +66,8 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
     def _compute_kde_based_ranges(self,
                                 space_history: List[History],
                                 numeric_param_names: List[str],
-                                original_space: ConfigurationSpace) -> Dict[str, Tuple[float, float]]:
+                                original_space: ConfigurationSpace,
+                                source_similarities: Optional[Dict[int, float]] = None) -> Dict[str, Tuple[float, float]]:
         median_top_ratio = self.source_top_ratio
         
         compressed_ranges = {}
@@ -89,8 +80,8 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
                 if len(history) == 0:
                     continue
                 
-                if self._similarity_dict:
-                    similarity = self._similarity_dict.get(task_idx, 0.0)
+                if source_similarities:
+                    similarity = source_similarities.get(task_idx, 0.0)
                     if similarity <= 0:
                         continue
                 else:
@@ -171,4 +162,10 @@ class KDEBoundaryRangeStep(BoundaryRangeStep):
         
         logger.info(f"KDE-based ranges computed for {len(compressed_ranges)} parameters")
         return compressed_ranges
+    
+    def get_step_info(self) -> dict:
+        info = super().get_step_info()
+        info['source_top_ratio'] = self.source_top_ratio
+        info['kde_coverage'] = self.kde_coverage
+        return info
 
