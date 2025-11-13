@@ -236,10 +236,14 @@ class BO(BaseAdvisor):
     
     def _unproject_batch(self, batch):
         unprojected_batch = []
+        # Determine the target space for unprojection
+        # If compressor has unprojected_space, use it; otherwise use original config_space
+        target_space = self.compressor.get_unprojected_space()
+        
         for compressed_config in batch:
             compressed_dict = compressed_config.get_dictionary() if hasattr(compressed_config, 'get_dictionary') else dict(compressed_config)
             unprojected_dict = self.compressor.unproject_point(compressed_config)
-            unprojected_config = Configuration(self.config_space, values=unprojected_dict)
+            unprojected_config = Configuration(target_space, values=unprojected_dict)
             if hasattr(compressed_config, 'origin') and compressed_config.origin:
                 unprojected_config.origin = compressed_config.origin
             unprojected_config._low_dim_config = compressed_dict
