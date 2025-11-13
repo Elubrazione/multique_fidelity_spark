@@ -53,7 +53,7 @@ class BaseAdvisor:
         meta_feature['space'] = {'original': js.loads(write(self.config_space)),
                                 'dimension': js.loads(write(self.surrogate_space)),
                                 'range': js.loads(write(self.sample_space))}
-        meta_feature['compressor'] = self.compressor.compression_info
+        meta_feature['compressor'] = self.compressor.get_compression_summary()
         self.task_manager.update_history_meta_info(meta_feature)
 
         self.ws_strategy = ws_strategy
