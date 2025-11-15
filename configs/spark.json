@@ -1,7 +1,7 @@
 {
     "log_dir": "log",
     "result_dir": "results",
-    "database": "tpcds_100g",
+    "database": "tpcds_600g",
     "spark": {
       "nodes": ["agent1", "agent2", "server1"],
       "server_node": "server1",
@@ -10,10 +10,10 @@
     },
     "multi_cluster": {
       "usernames": ["root"],
-      "passwords": ["root"],
-      "servers": ["192.168.90.76"],
+      "passwords": ["rootroot"],
+      "servers": ["192.168.90.153"],
       "nodes": [
-        ["192.168.90.76", "192.168.90.77", "192.168.90.78"]
+        ["192.168.90.151", "192.168.90.152", "192.168.90.153"]
       ]
     },
     "env": {

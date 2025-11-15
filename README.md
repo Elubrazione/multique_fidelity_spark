@@ -405,7 +405,7 @@
         <td></td>
         <td></td>
         <td>153</td>
-        <td><a href="log/tpcds_600g/SMAC/64u240n2_2025-11-10-20-53-30-482504.log">查看日志</a></td>
+        <td><a href="log/tpcds_600g/SMAC/64u240n2_2025-11-11-09-19-26-804930.log">查看日志</a></td>
         <td><a href="">查看结果</a></td>
         <td>⏸️</td>
     </tr>
