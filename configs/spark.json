@@ -1,7 +1,7 @@
 {
     "log_dir": "log",
     "result_dir": "results",
-    "database": "tpcds_100g",
+    "database": "tpcds_600g",
     "spark": {
       "nodes": ["agent1", "agent2", "server1"],
       "server_node": "server1",
