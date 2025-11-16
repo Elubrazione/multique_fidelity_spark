@@ -5,7 +5,7 @@ from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 from Advisor.utils import map_source_hpo_data, build_observation
-from config import ConfigManager
+from config_manager import ConfigManager
 from utils.spark import resolve_runtime_metrics
 
 

@@ -1,4 +1,4 @@
-from config import ConfigManager
+from config_manager import ConfigManager
 from .base import BaseOptimizer
 
 def get_optimizer(args, **kwargs):

@@ -1,6 +1,6 @@
 from openbox import logger
 
-from config import ConfigManager
+from config_manager import ConfigManager
 from Evaluator.executor import ExecutorManager
 from Optimizer import get_optimizer
 from Optimizer.utils import load_space_from_json

@@ -16,7 +16,7 @@ from .partitioner import SQLPartitioner
 from .mock_executor import MockExecutor
 from .utils import config_to_dict
 from utils.spark import create_spark_session, execute_sql_with_timing, stop_active_spark_session
-from config import ConfigManager
+from config_manager import ConfigManager
 
 
 _DEFAULT_EXTRA_INFO = {'qt_time': {}, 'et_time': {}}
