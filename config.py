@@ -265,7 +265,7 @@ class ConfigManager:
         return logger_kwargs
     
     def get_cp_args(self, config_space) -> Dict[str, Any]:
-        from Compressor.utils import load_expert_params
+        from dimensio.utils import load_expert_params
         
         cp_args = self.method_args.get('cp_args', {}).copy()
         expert_params = load_expert_params(self.expert_space)

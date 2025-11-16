@@ -5,7 +5,7 @@ from Evaluator.executor import ExecutorManager
 from Optimizer import get_optimizer
 from Optimizer.utils import load_space_from_json
 from task_manager import TaskManager
-from Compressor import get_compressor
+from dimensio import get_compressor
 
 args = ConfigManager.parse_args()
 config_manager = ConfigManager(config_file=args.config, args=args)
