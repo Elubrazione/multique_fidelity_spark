@@ -43,19 +43,6 @@ def sanitize_spark_config(config):
         pass
     return config
 
-
-def build_my_acq_func(func_str='ei', model=None, **kwargs):
-    func_str = func_str.lower()
-    if func_str.startswith('wrk'):
-        inner_acq_func = func_str.split('_')[1]
-        from .acq_function.weighted_rank import WeightedRank
-        return WeightedRank(model=model, acq_func=inner_acq_func)
-    elif func_str == 'ei':
-        from openbox.acquisition_function import EI
-        return EI(model=model)
-    else:
-        raise ValueError('Invalid string %s for acquisition function!' % func_str)
-
 def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_learning_history=None, **kwargs):
     extra_dim = kwargs.get('extra_dim', 0)
     seed = kwargs.get('seed', 42)
@@ -95,16 +82,6 @@ def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_lear
                     surrogate_type=inner_model, norm_y=norm_y)
     else:
         raise ValueError('Invalid string %s for surrogate!' % func_str)
-
-
-def calculate_ranking(score_list, ascending=False):
-    rank_list = list()
-    for i in range(len(score_list)):
-        value_list = pd.Series(list(score_list[i]))
-        rank_array = np.array(value_list.rank(ascending=ascending))
-        rank_list.append(rank_array)
-
-    return rank_list
 
 
 def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):

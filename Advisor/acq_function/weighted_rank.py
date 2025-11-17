@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from .base import TransferLearningAcquisition, SurrogateModel
 from ..surrogate.base import BaseTLSurrogate
-from . import get_acq
 
 
 class WeightedRank(TransferLearningAcquisition):
@@ -40,7 +39,7 @@ class WeightedRank(TransferLearningAcquisition):
         self.weights = np.array(model.get_weights())
         assert len(self.weights) == model.K + 1
         
-        # Build acquisition functions for source tasks
+        from . import get_acq
         self.source_acq_funcs = []
         for i in range(model.K):
             acq_func = get_acq(acq_type=self.inner_acq_type, model=model.source_surrogates[i])

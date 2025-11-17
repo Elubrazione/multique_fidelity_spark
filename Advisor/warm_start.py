@@ -79,7 +79,7 @@ class BestConfigsWarmStart(WarmStarter):
             logger.info(f"Source task {source_hpo_data[idx].task_id}: selected top {len(top_obs)} configurations")
         
         ini_list = []
-        target_length = init_num * self.ws_topk if self.ws_topk > 1 else init_num
+        target_length = init_num * self.ws_topk
         
         for rank in range(self.ws_topk):
             if len(ini_list) + num_evaluated >= target_length:

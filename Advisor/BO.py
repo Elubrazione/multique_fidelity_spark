@@ -5,8 +5,9 @@ from openbox.utils.history import Observation
 from ConfigSpace import ConfigurationSpace
 
 from .base import BaseAdvisor
-from .utils import build_my_surrogate, build_my_acq_func
-from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
+from .utils import build_my_surrogate
+from .acq_function import get_acq
+from .acq_function.optimizer import InterleavedLocalAndRandomSearch
 
 
 class BO(BaseAdvisor):
@@ -25,7 +26,7 @@ class BO(BaseAdvisor):
         self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
                                             transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
                                             extra_dim=0, norm_y=self.norm_y)
-        self.acq_func = build_my_acq_func(func_str=self.acq_type, model=self.surrogate)
+        self.acq_func = get_acq(acq_type=self.acq_type, model=self.surrogate)
         self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func,
                                                             rand_prob=self.rand_prob, rand_mode=self.rand_mode, rng=self.rng,
                                                             config_space=self.sample_space,
