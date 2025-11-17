@@ -5,8 +5,7 @@ from openbox.utils.history import Observation
 from ConfigSpace import Configuration, ConfigurationSpace
 
 from .base import BaseAdvisor
-from .utils import build_my_surrogate, build_my_acq_func, \
-    is_valid_spark_config, sanitize_spark_config
+from .utils import build_my_surrogate, build_my_acq_func
 from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
 
 
@@ -29,7 +28,8 @@ class BO(BaseAdvisor):
         self.acq_func = build_my_acq_func(func_str=self.acq_type, model=self.surrogate)
         self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func,
                                                             rand_prob=self.rand_prob, rand_mode=self.rand_mode, rng=self.rng,
-                                                            config_space=self.sample_space)
+                                                            config_space=self.sample_space,
+                                                            sampling_strategy=self.sampling_strategy)
 
     def warm_start(self):
         # no warm start if ws_strategy or tl_strategy is none
@@ -98,8 +98,7 @@ class BO(BaseAdvisor):
         self.ini_configs = ini_list[::-1] + self.ini_configs
 
         while len(self.ini_configs) + num_evaluated_exclude_default < target_length:
-            config = self.sample_random_configs(self.sample_space, 1,
-                                                excluded_configs=self.history.configurations)[0]
+            config = self.sample_random_configs(1, excluded_configs=self.history.configurations)[0]
             config.origin = self.ws_strategy + " Warm Start Random Sample"
             logger.debug("Warm start configuration from random sample: %s" % config.origin)
             self.ini_configs = [config] + self.ini_configs
@@ -140,8 +139,7 @@ class BO(BaseAdvisor):
                         batch.append(config)
                 remaining = batch_size - len(batch)
                 for _ in range(remaining):
-                    config = self.sample_random_configs(self.sample_space, 1,
-                                                        excluded_configs=self.history.configurations)[0]
+                    config = self.sample_random_configs(1, excluded_configs=self.history.configurations)[0]
                     config.origin = prefix + 'BO Warm Start Random Sample'
                     logger.debug("BOHB: take random config: %s" % config.origin)
                     batch.append(config)
@@ -155,15 +153,12 @@ class BO(BaseAdvisor):
                         config.origin = prefix + 'BO Warm Start ' + str(config.origin)
                         logger.debug("Regular BO: take config from warm start: %s" % config.origin)
                     else:
-                        config = self.sample_random_configs(self.sample_space, 1,
-                                                            excluded_configs=self.history.configurations)[0]
+                        config = self.sample_random_configs(1, excluded_configs=self.history.configurations)[0]
                         config.origin = prefix + 'BO Warm Start Random Sample'
                         logger.debug("Regular BO: take random config: %s" % config.origin)
                     batch.append(config)
             
-            if self.compressor.needs_unproject():
-                batch = self._unproject_batch(batch)
-            
+            self.compressor.unproject_points(batch)
             return batch
         
         X = self._get_surrogate_config_array()
@@ -187,9 +182,6 @@ class BO(BaseAdvisor):
             observations=self._convert_observations_to_surrogate_space(self.history.observations),
             num_points=2000
         )
-    
-        _is_valid = is_valid_spark_config
-        _sanitize = sanitize_spark_config
 
         batch = []
         # For BOHB/MFES in low-fidelity stage: take q configs from warm start, then fill rest with acquisition function
@@ -212,16 +204,16 @@ class BO(BaseAdvisor):
                 break
             if config in self.history.configurations:
                 continue
-            if not _is_valid(config):
-                config = _sanitize(config)
-            if _is_valid(config):
+            if not self.validation_strategy.is_valid(config):
+                config = self.validation_strategy.sanitize(config)
+            if self.validation_strategy.is_valid(config):
                 config.origin = prefix + 'BO Acquisition'
                 batch.append(config)
                 logger.debug("BOHB/MFES: take config from acquisition function: %s" % config.origin)
         # Fill any remaining with random samples
         if len(batch) < batch_size:
             random_configs = self.sample_random_configs(
-                self.sample_space, batch_size - len(batch),
+                batch_size - len(batch),
                 excluded_configs=self.history.configurations + batch
             )
             for config in random_configs:
@@ -229,26 +221,9 @@ class BO(BaseAdvisor):
                 logger.debug("BOHB/MFES: take random config: %s" % config.origin)
                 batch.append(config)
         
-        if self.compressor.needs_unproject():
-            batch = self._unproject_batch(batch)
-
+        self.compressor.unproject_points(batch)
         return batch
     
-    def _unproject_batch(self, batch):
-        unprojected_batch = []
-        # Determine the target space for unprojection
-        # If compressor has unprojected_space, use it; otherwise use original config_space
-        target_space = self.compressor.get_unprojected_space()
-        
-        for compressed_config in batch:
-            compressed_dict = compressed_config.get_dictionary() if hasattr(compressed_config, 'get_dictionary') else dict(compressed_config)
-            unprojected_dict = self.compressor.unproject_point(compressed_config)
-            unprojected_config = Configuration(target_space, values=unprojected_dict)
-            if hasattr(compressed_config, 'origin') and compressed_config.origin:
-                unprojected_config.origin = compressed_config.origin
-            unprojected_config._low_dim_config = compressed_dict
-            unprojected_batch.append(unprojected_config)
-        return unprojected_batch
     
     def _get_surrogate_config_array(self):
         X_surrogate = []
@@ -291,12 +266,14 @@ class BO(BaseAdvisor):
             )
             logger.info(f"Successfully rebuilt the surrogate model ({self.surrogate_type}) with {len(self.surrogate_space.get_hyperparameters())} dimensions")
             
+            self.sampling_strategy = self.compressor.get_sampling_strategy()
             self.acq_optimizer = InterleavedLocalAndRandomSearch(
                 acquisition_function=self.acq_func,
                 rand_prob=self.rand_prob,
                 rand_mode=self.rand_mode,
                 rng=self.rng,
-                config_space=self.sample_space
+                config_space=self.sample_space,
+                sampling_strategy=self.sampling_strategy
             )
             
             X_surrogate = self._get_surrogate_config_array()

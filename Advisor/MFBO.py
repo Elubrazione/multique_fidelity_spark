@@ -54,8 +54,7 @@ class MFBO(BO):
             # Fill remaining with random if needed
             remaining = batch_size - len(batch)
             for _ in range(remaining):
-                config = self.sample_random_configs(self.sample_space, 1,
-                                                    excluded_configs=self.history.configurations + batch)[0]
+                config = self.sample_random_configs(1, excluded_configs=self.history.configurations + batch)[0]
                 config.origin = 'MFBO Warm Start Random Sample'
                 logger.debug("MFBO: take random config: %s" % config.origin)
                 batch.append(config)
