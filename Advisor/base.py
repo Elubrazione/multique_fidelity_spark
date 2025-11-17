@@ -8,6 +8,7 @@ from ConfigSpace.read_and_write.json import write
 
 from .utils import build_observation
 from .validation import ValidationStrategy, SparkConfigValidation
+from .warm_start import create_warm_starter
 
 
 class BaseAdvisor:
@@ -41,7 +42,9 @@ class BaseAdvisor:
         if self.compressor is None:
             raise RuntimeError("Compressor must be initialized and registered to TaskManager before creating Advisor")
 
-        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=self.tl_args['topk']) if tl_strategy != 'none' else ([], [])
+        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager. \
+                                                        get_similar_tasks(topk=self.tl_args['topk']) \
+                                                        if tl_strategy != 'none' else ([], [])
         if tl_strategy != 'none':
             # pass source_hpo_data as space_history and similarities
             self.surrogate_space, self.sample_space = self.compressor.compress_space(
@@ -59,6 +62,14 @@ class BaseAdvisor:
         
         self.sampling_strategy = self.compressor.get_sampling_strategy()
         logger.info(f"Using sampling strategy: {type(self.sampling_strategy).__name__}")
+        
+        self.warm_starter = create_warm_starter(
+            ws_strategy=ws_strategy,
+            tl_strategy=tl_strategy,
+            method_id=method_id,
+            ws_args=self.ws_args
+        )
+        logger.info(f"Using warm starter: {type(self.warm_starter).__name__}")
 
         meta_feature = {}
         meta_feature['random'] = {'seed': seed, 'rand_prob': rand_prob, 'rand_mode': rand_mode}

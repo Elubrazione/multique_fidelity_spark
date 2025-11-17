@@ -2,7 +2,7 @@ import numpy as np
 import copy
 from openbox import logger
 from openbox.utils.history import Observation
-from ConfigSpace import Configuration, ConfigurationSpace
+from ConfigSpace import ConfigurationSpace
 
 from .base import BaseAdvisor
 from .utils import build_my_surrogate, build_my_acq_func
@@ -32,79 +32,38 @@ class BO(BaseAdvisor):
                                                             sampling_strategy=self.sampling_strategy)
 
     def warm_start(self):
-        # no warm start if ws_strategy or tl_strategy is none
         if self.ws_strategy == 'none' or self.tl_strategy == 'none':
             return
+        self._update_ws_info()
+        num_evaluated = self.get_num_evaluated_exclude_default()
+        logger.info("Begin using warm starter: %s" % type(self.warm_starter).__name__)
         
-        sims = self.source_hpo_data_sims
+        ini_configs = self.warm_starter.get_initial_configs(
+            source_hpo_data=self.source_hpo_data,
+            source_hpo_data_sims=self.source_hpo_data_sims,
+            init_num=self.init_num,
+            compressor=self.compressor,
+            num_evaluated=num_evaluated,
+            sampling_func=lambda n: self.sample_random_configs(
+                n, excluded_configs=self.history.configurations
+            )
+        )
+        self.ini_configs = ini_configs + self.ini_configs
+        
+        logger.info("Successfully use warm starter %d configurations with %s!" 
+                % (len(self.ini_configs), type(self.warm_starter).__name__))
+    
+    def _update_ws_info(self):
         warm_str_list = []
-        for i in range(len(sims)):
-            idx, sim = sims[i]
+        for idx, sim in self.source_hpo_data_sims:
             task_str = self.source_hpo_data[idx].task_id
             warm_str = "%s: sim%.4f" % (task_str, sim)
             warm_str_list.append(warm_str)
-
         if 'warm_start' not in self.history.meta_info:
             self.history.meta_info['warm_start'] = [warm_str_list]
         else:
             self.history.meta_info['warm_start'].append(warm_str_list)
-
-        # warm_start strategy: select the best ws_args['topk'] configurations from each similar task
-        # organize configurations by ranking, here K is the number of similar tasks (tl_args['topk'])
-        #   task1_config1, task2_config1, task3_config1, ..., task_{K}_config1,
-        #   task1_config2, task2_config2, task3_config2, ..., task_{K}_config2,
-        #   ...
-        #   task1_config{ws_topk}, task2_config{ws_topk}, task3_config{ws_topk}, ..., task_{K}_config{ws_topk},
-        
-        # For BOHB/MFES: ws_topk = ws_args['topk'], length of ini_configs = self.init_num * ws_topk
-        # For others: ws_topk = 1, length of ini_configs = self.init_num
-        ws_topk = int(self.ws_args['topk']) if 'BOHB' in self.method_id or 'MFES' in self.method_id else 1
-
-        # prepare sorted configurations for each similar task
-        source_observations = []
-        for idx, sim in sims:
-            sim_obs = copy.deepcopy(self.source_hpo_data[idx].observations)
-            sim_obs = sorted(sim_obs, key=lambda x: x.objectives[0])
-            # select the best ws_args['topk'] configurations
-            top_obs = sim_obs[: min(ws_topk, len(sim_obs))]
-            source_observations.append((idx, top_obs))
-            logger.info("Source task %s: selected top %d configurations" \
-                % (self.source_hpo_data[idx].task_id, len(top_obs)))
-
-        ini_list = []
-        target_length = self.init_num * ws_topk if ws_topk > 1 else self.init_num
-        num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
-        
-        for rank in range(ws_topk):
-            if len(ini_list) + num_evaluated_exclude_default >= target_length:
-                break
-            for idx, top_obs in source_observations:
-                if len(ini_list) + num_evaluated_exclude_default >= target_length:
-                    break
-                if rank < len(top_obs):
-                    config_warm_old = top_obs[rank].config
-                    # Use compressor to convert config to surrogate space
-                    # This handles both projection (if needed) and parameter filtering
-                    config_warm = self.compressor.convert_config_to_surrogate_space(config_warm_old)
-                    config_warm.origin = self.ws_strategy + "_" + self.source_hpo_data[idx].task_id + "_" + str(sims[idx][1]) + "_rank" + str(rank)
-                    ini_list.append(config_warm)
-                    logger.info("Warm start configuration from task %s, rank %d, objective: %s, %s" % 
-                                (self.source_hpo_data[idx].task_id, rank, top_obs[rank].objectives[0], config_warm.origin))
-
-        # the best configurations should be at the end of the list, so we need to reverse the list
-        # the reversed order: task3_config2, ..., task3_config1, task2_config1, task1_config1
-        # (the last one is the first one to be used)
-        # the usage order: task1_config1, task2_config1, task3_config1, task1_config2, task2_config2
-        self.ini_configs = ini_list[::-1] + self.ini_configs
-
-        while len(self.ini_configs) + num_evaluated_exclude_default < target_length:
-            config = self.sample_random_configs(1, excluded_configs=self.history.configurations)[0]
-            config.origin = self.ws_strategy + " Warm Start Random Sample"
-            logger.debug("Warm start configuration from random sample: %s" % config.origin)
-            self.ini_configs = [config] + self.ini_configs
-
-        logger.info("Successfully warm start %d configurations with %s!" \
-                    % (len(self.ini_configs), self.ws_strategy))
+        logger.debug("Updated warm start meta info: %s" % warm_str_list)
 
 
     def sample(self, batch_size=1, prefix=''):

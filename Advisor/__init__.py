@@ -3,9 +3,9 @@ from .BO import BO
 from .MFBO import MFBO
 from .validation import ValidationStrategy, NoOpValidation, \
                         SparkConfigValidation, CompositeValidation
-from .warm_start import WarmStartStrategy, NoWarmStart, \
-                        BestConfigsWarmStart, BOHBWarmStart, \
-                        MFESWarmStart, create_warm_start_strategy
+from .warm_start import NoWarmStart, \
+                        BestConfigsWarmStart, \
+                        create_warm_starter
 
 _ADVISOR_REGISTRY = {
     'bo': BO,
@@ -90,10 +90,8 @@ __all__ = [
     'SparkConfigValidation',
     'CompositeValidation',
     # Warm start strategies
-    'WarmStartStrategy',
+    'WarmStarter',
     'NoWarmStart',
     'BestConfigsWarmStart',
-    'BOHBWarmStart',
-    'MFESWarmStart',
-    'create_warm_start_strategy',
+    'create_warm_starter',
 ]

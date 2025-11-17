@@ -11,7 +11,8 @@ from ..acq_function.weighted_rank import WeightedRank
 class InterleavedLocalAndRandomSearch(AcquisitionOptimizer):
 
     def __init__(self, acquisition_function, config_space, rng=None, max_steps=None,
-                 n_steps_plateau_walk=10, n_sls_iterations=50, rand_prob=0.15, rand_mode='ran'):
+                 n_steps_plateau_walk=10, n_sls_iterations=50, rand_prob=0.15, rand_mode='ran',
+                 sampling_strategy=None):
         super().__init__(acquisition_function, config_space, rng)
 
         self.local_search = LocalSearch(
@@ -29,6 +30,7 @@ class InterleavedLocalAndRandomSearch(AcquisitionOptimizer):
         self.n_sls_iterations = n_sls_iterations
         self.random_chooser = ChooserProb(prob=rand_prob, rng=rng)
         self.rand_mode = rand_mode
+        self.sampling_strategy = sampling_strategy
 
     def _maximize(self, observations, num_points: int, **kwargs):
         raise NotImplementedError
@@ -63,18 +65,21 @@ class InterleavedLocalAndRandomSearch(AcquisitionOptimizer):
 
         challengers = ChallengerList(next_configs_by_acq_value,
                                      self.config_space,
-                                     self.random_chooser, self.rand_mode)
+                                     self.random_chooser, self.rand_mode,
+                                     sampling_strategy=self.sampling_strategy)
         self.random_chooser.next_smbo_iteration()
         return challengers
 
 class ChallengerList(object):
-    def __init__(self, challengers, configuration_space, random_configuration_chooser, rand_mode='ran'):
+    def __init__(self, challengers, configuration_space, random_configuration_chooser, rand_mode='ran',
+                 sampling_strategy=None):
         self.challengers = challengers
         self.configuration_space = configuration_space
         self._index = 0
         self._iteration = 1  # 1-based to prevent from starting with a random configuration
         self.random_configuration_chooser = random_configuration_chooser
         self.rand_mode = rand_mode
+        self.sampling_strategy = sampling_strategy
 
     def __iter__(self):
         return self
@@ -85,13 +90,19 @@ class ChallengerList(object):
         else:
             if self.random_configuration_chooser.check(self._iteration):
                 if self.rand_mode == 'ran':  # 纯随机
-                    config = self.configuration_space.sample_configuration()
+                    if self.sampling_strategy is not None:
+                        config = self.sampling_strategy.sample(1)[0]
+                    else:
+                        config = self.configuration_space.sample_configuration()
                     config.origin = 'Random Search challenger!'
                 elif self.rand_mode == 'rs':  # 用random search(sorted)
                     config = self.challengers[self._index]
                     if config.origin == 'Random Search (sorted)':
                         # 已经是了，就再降一级
-                        config = self.configuration_space.sample_configuration()
+                        if self.sampling_strategy is not None:
+                            config = self.sampling_strategy.sample(1)[0]
+                        else:
+                            config = self.configuration_space.sample_configuration()
                         config.origin = 'Random Search challenger!'
                     else:
                         while config.origin != 'Random Search (sorted)':
