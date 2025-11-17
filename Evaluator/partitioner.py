@@ -4,7 +4,7 @@ import numpy as np
 from openbox import logger
 from openbox.utils.history import History
 
-from task_manager import TaskManager
+from manager import TaskManager
 from .utils import (
     build_weighted_dataframe,
     compute_subset_correlation,

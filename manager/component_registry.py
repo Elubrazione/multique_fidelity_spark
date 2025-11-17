@@ -1,11 +1,11 @@
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List
 from openbox import logger
 
 
 class ComponentRegistry:
     def __init__(self):
         self._components: Dict[str, Any] = {}
-        self._listeners: Dict[str, list[Callable]] = {}
+        self._listeners: Dict[str, List[Callable]] = {}
     
     def register(self, name: str, component: Any, replace: bool = False) -> None:
         if name in self._components and not replace:
@@ -46,6 +46,6 @@ class ComponentRegistry:
                 except Exception as e:
                     logger.error(f"Error calling listener for '{component_name}': {e}")
     
-    def list_components(self) -> list[str]:
+    def list_components(self) -> List[str]:
         return list(self._components.keys())
 

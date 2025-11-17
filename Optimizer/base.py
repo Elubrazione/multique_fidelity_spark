@@ -11,7 +11,7 @@ from openbox import logger
 from typing import List, Optional
 from .scheduler import schedulers
 from Advisor import get_advisor_config, get_advisor
-from task_manager import TaskManager
+from manager import TaskManager
 
 
 class BaseOptimizer:

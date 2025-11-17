@@ -66,24 +66,23 @@ class HistoryManager:
         if meta_feature is not None:
             self.current_meta_feature = np.array(meta_feature)
         logger.info(f"Resumed current task from {history_file}")
-        logger.info(f"Current task meta feature: {self.current_meta_feature}")
         logger.info(f"Current task history: {self.current_task_history.objectives}")
     
-    def update_current_history(self, observation):
-        if not self.current_task_history:
+    def update_current_history(self, observation):    
+        if self.current_task_history is None:
             logger.warning("Current task not initialized, cannot update history")
             return
         self.current_task_history.update_observation(observation)
         logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
     
     def update_history_meta_info(self, meta_info: dict):
-        if not self.current_task_history:
+        if self.current_task_history is None:
             logger.warning("Current task not initialized, cannot update meta info")
             return
         self.current_task_history.meta_info.update(meta_info)
     
     def compute_similarity(self, similarity_func, **kwargs):
-        if not self.current_task_history:
+        if self.current_task_history is None:
             logger.warning("Current task not initialized, cannot compute similarity")
             return
         if not self.historical_tasks:

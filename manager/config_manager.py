@@ -47,7 +47,7 @@ class ConfigManager:
 
     def __init__(self, config_file='configs/base.yaml', args=None):
         self.config_file = config_file
-        self.root_dir = os.path.dirname(os.path.abspath(__file__))
+        self.root_dir = os.path.dirname(os.path.dirname(__file__))
         self.config = self._load_config()
         self.method_id = args.opt if args else None
         self._apply_args_overrides(args)
