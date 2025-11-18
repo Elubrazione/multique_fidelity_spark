@@ -55,8 +55,6 @@ class ProbabilisticSelector(StrategySelector):
         
     Select a strategy from the list of strategies according to the given probability distribution.
     
-    This is a generalization of the original RandomConfigurationChooser, supporting multiple strategies.
-    
     Parameters
     ----------
     probabilities : List[float]

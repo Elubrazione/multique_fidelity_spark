@@ -7,7 +7,7 @@ from ConfigSpace import ConfigurationSpace
 from .base import BaseAdvisor
 from .utils import build_my_surrogate
 from .acq_function import get_acq
-from .acq_function.optimizer import InterleavedLocalAndRandomSearch
+from .acq_function.optimizer import create_local_random_optimizer
 
 
 class BO(BaseAdvisor):
@@ -27,10 +27,15 @@ class BO(BaseAdvisor):
                                             transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
                                             extra_dim=0, norm_y=self.norm_y)
         self.acq_func = get_acq(acq_type=self.acq_type, model=self.surrogate)
-        self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func,
-                                                            rand_prob=self.rand_prob, rand_mode=self.rand_mode, rng=self.rng,
-                                                            config_space=self.sample_space,
-                                                            sampling_strategy=self.sampling_strategy)
+        
+        self.acq_optimizer = create_local_random_optimizer(
+            acquisition_function=self.acq_func,
+            config_space=self.sample_space,
+            sampling_strategy=self.sampling_strategy,
+            rand_prob=self.rand_prob,
+            rng=self.rng,
+            candidate_multiplier=3.0
+        )
 
     def warm_start(self):
         if self.ws_strategy == 'none' or self.tl_strategy == 'none':
@@ -158,8 +163,8 @@ class BO(BaseAdvisor):
                 batch.append(config)
             logger.info(f"[BOHB/MFES] Take {q} configurations from warm start in low-fidelity stage, remaining: {len(self.ini_configs)}")
         
-        # Fill remaining with acquisition function samples
-        for config in challengers.challengers:
+
+        for config in challengers:
             if len(batch) >= batch_size:
                 break
             if config in self.history.configurations:
@@ -167,7 +172,7 @@ class BO(BaseAdvisor):
             if not self.validation_strategy.is_valid(config):
                 config = self.validation_strategy.sanitize(config)
             if self.validation_strategy.is_valid(config):
-                config.origin = prefix + 'BO Acquisition'
+                config.origin = prefix + 'BO Acquisition' + str(config.origin)
                 batch.append(config)
                 logger.debug("BOHB/MFES: take config from acquisition function: %s" % config.origin)
         # Fill any remaining with random samples
@@ -227,13 +232,14 @@ class BO(BaseAdvisor):
             logger.info(f"Successfully rebuilt the surrogate model ({self.surrogate_type}) with {len(self.surrogate_space.get_hyperparameters())} dimensions")
             
             self.sampling_strategy = self.compressor.get_sampling_strategy()
-            self.acq_optimizer = InterleavedLocalAndRandomSearch(
+            
+            self.acq_optimizer = create_local_random_optimizer(
                 acquisition_function=self.acq_func,
-                rand_prob=self.rand_prob,
-                rand_mode=self.rand_mode,
-                rng=self.rng,
                 config_space=self.sample_space,
-                sampling_strategy=self.sampling_strategy
+                sampling_strategy=self.sampling_strategy,
+                rand_prob=self.rand_prob,
+                rng=self.rng,
+                candidate_multiplier=3.0
             )
             
             X_surrogate = self._get_surrogate_config_array()

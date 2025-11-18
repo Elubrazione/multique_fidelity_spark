@@ -64,7 +64,7 @@ class LocalSearchGenerator(SearchGenerator):
         if self.remove_duplicates:
             all_candidates = self._remove_duplicates(all_candidates)
         
-        target_size = max(num_points * 3, len(all_candidates))
+        target_size = min(num_points * 2, len(all_candidates))
         return all_candidates[: target_size]
     
     def _generate_neighbors_batch(self, 
