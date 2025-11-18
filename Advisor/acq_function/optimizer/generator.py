@@ -28,7 +28,10 @@ class RandomSearchGenerator(SearchGenerator):
                  num_points: int,
                  rng: np.random.RandomState,
                  **kwargs) -> List[Configuration]:
-        return self.sampling_strategy.sample(num_points)
+        configs = self.sampling_strategy.sample(num_points)
+        for config in configs:
+            config.origin = f'Random Search'
+        return configs
 
 
 class LocalSearchGenerator(SearchGenerator):    
@@ -52,7 +55,10 @@ class LocalSearchGenerator(SearchGenerator):
                  **kwargs) -> List[Configuration]:
         start_points = self._get_start_points(observations, self.n_start_points)
         if not start_points:
-            return self.sampling_strategy.sample(num_points)
+            configs = self.sampling_strategy.sample(num_points)
+            for config in configs:
+                config.origin = f'Local Search (Random Fallback)'
+            return configs
         
         all_candidates = []
         for point in start_points:
@@ -63,6 +69,9 @@ class LocalSearchGenerator(SearchGenerator):
         
         if self.remove_duplicates:
             all_candidates = self._remove_duplicates(all_candidates)
+        
+        for config in all_candidates:
+            config.origin = f'Local Search Neighbor'
         
         target_size = min(num_points * 2, len(all_candidates))
         return all_candidates[: target_size]
@@ -115,11 +124,17 @@ class MixedGenerator(SearchGenerator):
             n_points = int(num_points * weight)
             if n_points > 0:
                 configs = strategy.generate(observations, n_points, rng, **kwargs)
+                strategy_name = type(strategy).__name__
+                for config in configs:
+                    config.origin = f'Mixed ({strategy_name})'
                 all_configs.extend(configs)
         
         if len(all_configs) < num_points:
             n_missing = num_points - len(all_configs)
             extra = self.strategies[0].generate(observations, n_missing, rng, **kwargs)
+            strategy_name = type(self.strategies[0]).__name__
+            for config in extra:
+                config.origin = f'Mixed (Fallback {strategy_name})'
             all_configs.extend(extra)
         
         return all_configs[: num_points * 2]  # Return 2x for subsequent selection

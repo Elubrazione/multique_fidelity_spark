@@ -172,7 +172,7 @@ class BO(BaseAdvisor):
             if not self.validation_strategy.is_valid(config):
                 config = self.validation_strategy.sanitize(config)
             if self.validation_strategy.is_valid(config):
-                config.origin = prefix + 'BO Acquisition' + str(config.origin)
+                config.origin = prefix + 'BO Acquisition ' + str(config.origin)
                 batch.append(config)
                 logger.debug("BOHB/MFES: take config from acquisition function: %s" % config.origin)
         # Fill any remaining with random samples
