@@ -1,0 +1,1584 @@
+{
+  "task_id": "64u240n3",
+  "num_objectives": 1,
+  "num_constraints": 0,
+  "ref_point": null,
+  "meta_info": {
+    "meta_feature": [
+      0.0,
+      144481583.47899026,
+      2279115.919810696,
+      1.9702799826942263,
+      162.16856353249688,
+      754274.502326567,
+      146479.61221822933,
+      1.0017129184068092,
+      0.0,
+      0.0,
+      0.0,
+      72724614.10505311,
+      0.008546933081398943,
+      44139.00691347996,
+      2.6488428971277714e-05,
+      99.91844212719744,
+      1000900.9053656728,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      44744.52033869871,
+      830417.6314753172,
+      39615.3116893437,
+      1587912.8731998906
+    ],
+    "random": {
+      "seed": 42,
+      "rand_prob": 0.15,
+      "rand_mode": "ran"
+    },
+    "space": {
+      "original": {
+        "hyperparameters": [
+          {
+            "name": "spark.broadcast.blockSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 32,
+            "default": 7
+          },
+          {
+            "name": "spark.default.parallelism",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 495
+          },
+          {
+            "name": "spark.driver.cores",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 16,
+            "default": 1
+          },
+          {
+            "name": "spark.driver.maxResultSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 2048,
+            "upper": 6144,
+            "default": 3484
+          },
+          {
+            "name": "spark.driver.memory",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 120,
+            "default": 75
+          },
+          {
+            "name": "spark.driver.memoryOverhead",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 384,
+            "upper": 20480,
+            "default": 8266
+          },
+          {
+            "name": "spark.executor.cores",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 32,
+            "default": 14
+          },
+          {
+            "name": "spark.executor.heartbeatInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 5,
+            "upper": 100,
+            "default": 91
+          },
+          {
+            "name": "spark.executor.instances",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 24,
+            "default": 9
+          },
+          {
+            "name": "spark.executor.memory",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 180,
+            "default": 93
+          },
+          {
+            "name": "spark.executor.memoryOverhead",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 384,
+            "upper": 20480,
+            "default": 16133
+          },
+          {
+            "name": "spark.files.fetchTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 119
+          },
+          {
+            "name": "spark.files.maxPartitionBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10485760,
+            "upper": 524288000,
+            "default": 330115300
+          },
+          {
+            "name": "spark.files.openCostInBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 10485760,
+            "default": 9186861
+          },
+          {
+            "name": "spark.io.compression.snappy.blockSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 96,
+            "default": 92
+          },
+          {
+            "name": "spark.kryoserializer.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 45
+          },
+          {
+            "name": "spark.kryoserializer.buffer.max",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 1024,
+            "default": 949
+          },
+          {
+            "name": "spark.locality.wait",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 0,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.memory.fraction",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 0.9,
+            "default": 0.3
+          },
+          {
+            "name": "spark.memory.offHeap.size",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 0,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.memory.storageFraction",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 0.9,
+            "default": 0.9
+          },
+          {
+            "name": "spark.network.timeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 120,
+            "upper": 30000,
+            "default": 14839
+          },
+          {
+            "name": "spark.network.timeoutInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 30,
+            "upper": 600,
+            "default": 217
+          },
+          {
+            "name": "spark.reducer.maxSizeInFlight",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 191
+          },
+          {
+            "name": "spark.scheduler.excludeOnFailure.unschedulableTaskSetTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 600,
+            "default": 220
+          },
+          {
+            "name": "spark.scheduler.maxRegisteredResourcesWaitingTime",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 120,
+            "default": 18
+          },
+          {
+            "name": "spark.scheduler.minRegisteredResourcesRatio",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.5,
+            "upper": 1.0,
+            "default": 0.55
+          },
+          {
+            "name": "spark.scheduler.revive.interval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 2
+          },
+          {
+            "name": "spark.shuffle.accurateBlockThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 314572800,
+            "default": 48673750
+          },
+          {
+            "name": "spark.shuffle.file.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 42
+          },
+          {
+            "name": "spark.shuffle.mapOutput.minSizeForBroadcast",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 1959
+          },
+          {
+            "name": "spark.shuffle.registration.maxAttempts",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 5,
+            "default": 1
+          },
+          {
+            "name": "spark.shuffle.registration.timeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1000,
+            "upper": 10000,
+            "default": 4111
+          },
+          {
+            "name": "spark.shuffle.service.index.cache.size",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 270
+          },
+          {
+            "name": "spark.shuffle.spill.diskWriteBufferSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 104857600,
+            "default": 50250071
+          },
+          {
+            "name": "spark.shuffle.unsafe.file.output.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 201
+          },
+          {
+            "name": "spark.speculation.interval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 1000,
+            "default": 255
+          },
+          {
+            "name": "spark.speculation.quantile",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 1.0,
+            "default": 0.25
+          },
+          {
+            "name": "spark.sql.adaptive.rebalancePartitionsSmallPartitionFactor",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 1.0,
+            "default": 0.1
+          },
+          {
+            "name": "spark.sql.autoBroadcastJoinThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 3000,
+            "default": 515
+          },
+          {
+            "name": "spark.sql.broadcastTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 300,
+            "upper": 30000,
+            "default": 8574
+          },
+          {
+            "name": "spark.sql.files.maxPartitionBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10485760,
+            "upper": 524288000,
+            "default": 101434143
+          },
+          {
+            "name": "spark.sql.shuffle.partitions",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 357
+          },
+          {
+            "name": "spark.sql.sources.parallelPartitionDiscovery.parallelism",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 500,
+            "default": 69
+          },
+          {
+            "name": "spark.stage.maxConsecutiveAttempts",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.storage.localDiskByExecutors.cacheSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 698
+          },
+          {
+            "name": "spark.storage.memoryMapThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 4
+          },
+          {
+            "name": "spark.storage.unrollMemoryThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 8388608,
+            "default": 4743675
+          },
+          {
+            "name": "spark.task.cpus",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 8,
+            "default": 6
+          },
+          {
+            "name": "spark.task.maxFailures",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 1
+          },
+          {
+            "name": "spark.task.reaper.pollingInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 5,
+            "upper": 60,
+            "default": 49
+          }
+        ],
+        "conditions": [],
+        "forbiddens": [],
+        "python_module_version": "0.6.1",
+        "json_format_version": 0.4
+      },
+      "dimension": {
+        "hyperparameters": [
+          {
+            "name": "spark.broadcast.blockSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 32,
+            "default": 7
+          },
+          {
+            "name": "spark.default.parallelism",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 495
+          },
+          {
+            "name": "spark.driver.cores",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 16,
+            "default": 1
+          },
+          {
+            "name": "spark.driver.maxResultSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 2048,
+            "upper": 6144,
+            "default": 3484
+          },
+          {
+            "name": "spark.driver.memory",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 120,
+            "default": 75
+          },
+          {
+            "name": "spark.driver.memoryOverhead",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 384,
+            "upper": 20480,
+            "default": 8266
+          },
+          {
+            "name": "spark.executor.cores",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 32,
+            "default": 14
+          },
+          {
+            "name": "spark.executor.heartbeatInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 5,
+            "upper": 100,
+            "default": 91
+          },
+          {
+            "name": "spark.executor.instances",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 24,
+            "default": 9
+          },
+          {
+            "name": "spark.executor.memory",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 180,
+            "default": 93
+          },
+          {
+            "name": "spark.executor.memoryOverhead",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 384,
+            "upper": 20480,
+            "default": 16133
+          },
+          {
+            "name": "spark.files.fetchTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 119
+          },
+          {
+            "name": "spark.files.maxPartitionBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10485760,
+            "upper": 524288000,
+            "default": 330115300
+          },
+          {
+            "name": "spark.files.openCostInBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 10485760,
+            "default": 9186861
+          },
+          {
+            "name": "spark.io.compression.snappy.blockSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 96,
+            "default": 92
+          },
+          {
+            "name": "spark.kryoserializer.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 45
+          },
+          {
+            "name": "spark.kryoserializer.buffer.max",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 1024,
+            "default": 949
+          },
+          {
+            "name": "spark.locality.wait",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 0,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.memory.fraction",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 0.9,
+            "default": 0.3
+          },
+          {
+            "name": "spark.memory.offHeap.size",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 0,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.memory.storageFraction",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 0.9,
+            "default": 0.9
+          },
+          {
+            "name": "spark.network.timeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 120,
+            "upper": 30000,
+            "default": 14839
+          },
+          {
+            "name": "spark.network.timeoutInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 30,
+            "upper": 600,
+            "default": 217
+          },
+          {
+            "name": "spark.reducer.maxSizeInFlight",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 191
+          },
+          {
+            "name": "spark.scheduler.excludeOnFailure.unschedulableTaskSetTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 600,
+            "default": 220
+          },
+          {
+            "name": "spark.scheduler.maxRegisteredResourcesWaitingTime",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 120,
+            "default": 18
+          },
+          {
+            "name": "spark.scheduler.minRegisteredResourcesRatio",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.5,
+            "upper": 1.0,
+            "default": 0.55
+          },
+          {
+            "name": "spark.scheduler.revive.interval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 2
+          },
+          {
+            "name": "spark.shuffle.accurateBlockThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 314572800,
+            "default": 48673750
+          },
+          {
+            "name": "spark.shuffle.file.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 42
+          },
+          {
+            "name": "spark.shuffle.mapOutput.minSizeForBroadcast",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 1959
+          },
+          {
+            "name": "spark.shuffle.registration.maxAttempts",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 5,
+            "default": 1
+          },
+          {
+            "name": "spark.shuffle.registration.timeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1000,
+            "upper": 10000,
+            "default": 4111
+          },
+          {
+            "name": "spark.shuffle.service.index.cache.size",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 270
+          },
+          {
+            "name": "spark.shuffle.spill.diskWriteBufferSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 104857600,
+            "default": 50250071
+          },
+          {
+            "name": "spark.shuffle.unsafe.file.output.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 201
+          },
+          {
+            "name": "spark.speculation.interval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 1000,
+            "default": 255
+          },
+          {
+            "name": "spark.speculation.quantile",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 1.0,
+            "default": 0.25
+          },
+          {
+            "name": "spark.sql.adaptive.rebalancePartitionsSmallPartitionFactor",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 1.0,
+            "default": 0.1
+          },
+          {
+            "name": "spark.sql.autoBroadcastJoinThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 3000,
+            "default": 515
+          },
+          {
+            "name": "spark.sql.broadcastTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 300,
+            "upper": 30000,
+            "default": 8574
+          },
+          {
+            "name": "spark.sql.files.maxPartitionBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10485760,
+            "upper": 524288000,
+            "default": 101434143
+          },
+          {
+            "name": "spark.sql.shuffle.partitions",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 357
+          },
+          {
+            "name": "spark.sql.sources.parallelPartitionDiscovery.parallelism",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 500,
+            "default": 69
+          },
+          {
+            "name": "spark.stage.maxConsecutiveAttempts",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.storage.localDiskByExecutors.cacheSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 698
+          },
+          {
+            "name": "spark.storage.memoryMapThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 4
+          },
+          {
+            "name": "spark.storage.unrollMemoryThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 8388608,
+            "default": 4743675
+          },
+          {
+            "name": "spark.task.cpus",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 8,
+            "default": 6
+          },
+          {
+            "name": "spark.task.maxFailures",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 1
+          },
+          {
+            "name": "spark.task.reaper.pollingInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 5,
+            "upper": 60,
+            "default": 49
+          }
+        ],
+        "conditions": [],
+        "forbiddens": [],
+        "python_module_version": "0.6.1",
+        "json_format_version": 0.4
+      },
+      "range": {
+        "hyperparameters": [
+          {
+            "name": "spark.broadcast.blockSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 32,
+            "default": 7
+          },
+          {
+            "name": "spark.default.parallelism",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 495
+          },
+          {
+            "name": "spark.driver.cores",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 16,
+            "default": 1
+          },
+          {
+            "name": "spark.driver.maxResultSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 2048,
+            "upper": 6144,
+            "default": 3484
+          },
+          {
+            "name": "spark.driver.memory",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 120,
+            "default": 75
+          },
+          {
+            "name": "spark.driver.memoryOverhead",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 384,
+            "upper": 20480,
+            "default": 8266
+          },
+          {
+            "name": "spark.executor.cores",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 32,
+            "default": 14
+          },
+          {
+            "name": "spark.executor.heartbeatInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 5,
+            "upper": 100,
+            "default": 91
+          },
+          {
+            "name": "spark.executor.instances",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 24,
+            "default": 9
+          },
+          {
+            "name": "spark.executor.memory",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 180,
+            "default": 93
+          },
+          {
+            "name": "spark.executor.memoryOverhead",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 384,
+            "upper": 20480,
+            "default": 16133
+          },
+          {
+            "name": "spark.files.fetchTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 119
+          },
+          {
+            "name": "spark.files.maxPartitionBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10485760,
+            "upper": 524288000,
+            "default": 330115300
+          },
+          {
+            "name": "spark.files.openCostInBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 10485760,
+            "default": 9186861
+          },
+          {
+            "name": "spark.io.compression.snappy.blockSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 96,
+            "default": 92
+          },
+          {
+            "name": "spark.kryoserializer.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 45
+          },
+          {
+            "name": "spark.kryoserializer.buffer.max",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 1024,
+            "default": 949
+          },
+          {
+            "name": "spark.locality.wait",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 0,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.memory.fraction",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 0.9,
+            "default": 0.3
+          },
+          {
+            "name": "spark.memory.offHeap.size",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 0,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.memory.storageFraction",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 0.9,
+            "default": 0.9
+          },
+          {
+            "name": "spark.network.timeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 120,
+            "upper": 30000,
+            "default": 14839
+          },
+          {
+            "name": "spark.network.timeoutInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 30,
+            "upper": 600,
+            "default": 217
+          },
+          {
+            "name": "spark.reducer.maxSizeInFlight",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 191
+          },
+          {
+            "name": "spark.scheduler.excludeOnFailure.unschedulableTaskSetTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 600,
+            "default": 220
+          },
+          {
+            "name": "spark.scheduler.maxRegisteredResourcesWaitingTime",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 120,
+            "default": 18
+          },
+          {
+            "name": "spark.scheduler.minRegisteredResourcesRatio",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.5,
+            "upper": 1.0,
+            "default": 0.55
+          },
+          {
+            "name": "spark.scheduler.revive.interval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 2
+          },
+          {
+            "name": "spark.shuffle.accurateBlockThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 314572800,
+            "default": 48673750
+          },
+          {
+            "name": "spark.shuffle.file.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 42
+          },
+          {
+            "name": "spark.shuffle.mapOutput.minSizeForBroadcast",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 1959
+          },
+          {
+            "name": "spark.shuffle.registration.maxAttempts",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 5,
+            "default": 1
+          },
+          {
+            "name": "spark.shuffle.registration.timeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1000,
+            "upper": 10000,
+            "default": 4111
+          },
+          {
+            "name": "spark.shuffle.service.index.cache.size",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 270
+          },
+          {
+            "name": "spark.shuffle.spill.diskWriteBufferSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 104857600,
+            "default": 50250071
+          },
+          {
+            "name": "spark.shuffle.unsafe.file.output.buffer",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 300,
+            "default": 201
+          },
+          {
+            "name": "spark.speculation.interval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 1000,
+            "default": 255
+          },
+          {
+            "name": "spark.speculation.quantile",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 1.0,
+            "default": 0.25
+          },
+          {
+            "name": "spark.sql.adaptive.rebalancePartitionsSmallPartitionFactor",
+            "type": "uniform_float",
+            "log": false,
+            "lower": 0.1,
+            "upper": 1.0,
+            "default": 0.1
+          },
+          {
+            "name": "spark.sql.autoBroadcastJoinThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 3000,
+            "default": 515
+          },
+          {
+            "name": "spark.sql.broadcastTimeout",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 300,
+            "upper": 30000,
+            "default": 8574
+          },
+          {
+            "name": "spark.sql.files.maxPartitionBytes",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10485760,
+            "upper": 524288000,
+            "default": 101434143
+          },
+          {
+            "name": "spark.sql.shuffle.partitions",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 357
+          },
+          {
+            "name": "spark.sql.sources.parallelPartitionDiscovery.parallelism",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 10,
+            "upper": 500,
+            "default": 69
+          },
+          {
+            "name": "spark.stage.maxConsecutiveAttempts",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 5
+          },
+          {
+            "name": "spark.storage.localDiskByExecutors.cacheSize",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 100,
+            "upper": 3000,
+            "default": 698
+          },
+          {
+            "name": "spark.storage.memoryMapThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 4
+          },
+          {
+            "name": "spark.storage.unrollMemoryThreshold",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1048576,
+            "upper": 8388608,
+            "default": 4743675
+          },
+          {
+            "name": "spark.task.cpus",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 8,
+            "default": 6
+          },
+          {
+            "name": "spark.task.maxFailures",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 1,
+            "upper": 10,
+            "default": 1
+          },
+          {
+            "name": "spark.task.reaper.pollingInterval",
+            "type": "uniform_int",
+            "log": false,
+            "lower": 5,
+            "upper": 60,
+            "default": 49
+          }
+        ],
+        "conditions": [],
+        "forbiddens": [],
+        "python_module_version": "0.6.1",
+        "json_format_version": 0.4
+      }
+    },
+    "compressor": {
+      "strategy": "none",
+      "original_params": 51,
+      "compressed_params": 51,
+      "computed_params": 0,
+      "range_compression_details": {}
+    }
+  },
+  "global_start_time": "2025-11-17T11:43:30.007832",
+  "observations": [
+    {
+      "config": {
+        "spark.broadcast.blockSize": 7,
+        "spark.default.parallelism": 495,
+        "spark.driver.cores": 1,
+        "spark.driver.maxResultSize": 3484,
+        "spark.driver.memory": 75,
+        "spark.driver.memoryOverhead": 8266,
+        "spark.executor.cores": 14,
+        "spark.executor.heartbeatInterval": 91,
+        "spark.executor.instances": 9,
+        "spark.executor.memory": 93,
+        "spark.executor.memoryOverhead": 16133,
+        "spark.files.fetchTimeout": 119,
+        "spark.files.maxPartitionBytes": 330115300,
+        "spark.files.openCostInBytes": 9186861,
+        "spark.io.compression.snappy.blockSize": 92,
+        "spark.kryoserializer.buffer": 45,
+        "spark.kryoserializer.buffer.max": 949,
+        "spark.locality.wait": 5,
+        "spark.memory.fraction": 0.3,
+        "spark.memory.offHeap.size": 5,
+        "spark.memory.storageFraction": 0.9,
+        "spark.network.timeout": 14839,
+        "spark.network.timeoutInterval": 217,
+        "spark.reducer.maxSizeInFlight": 191,
+        "spark.scheduler.excludeOnFailure.unschedulableTaskSetTimeout": 220,
+        "spark.scheduler.maxRegisteredResourcesWaitingTime": 18,
+        "spark.scheduler.minRegisteredResourcesRatio": 0.55,
+        "spark.scheduler.revive.interval": 2,
+        "spark.shuffle.accurateBlockThreshold": 48673750,
+        "spark.shuffle.file.buffer": 42,
+        "spark.shuffle.mapOutput.minSizeForBroadcast": 1959,
+        "spark.shuffle.registration.maxAttempts": 1,
+        "spark.shuffle.registration.timeout": 4111,
+        "spark.shuffle.service.index.cache.size": 270,
+        "spark.shuffle.spill.diskWriteBufferSize": 50250071,
+        "spark.shuffle.unsafe.file.output.buffer": 201,
+        "spark.speculation.interval": 255,
+        "spark.speculation.quantile": 0.25,
+        "spark.sql.adaptive.rebalancePartitionsSmallPartitionFactor": 0.1,
+        "spark.sql.autoBroadcastJoinThreshold": 515,
+        "spark.sql.broadcastTimeout": 8574,
+        "spark.sql.files.maxPartitionBytes": 101434143,
+        "spark.sql.shuffle.partitions": 357,
+        "spark.sql.sources.parallelPartitionDiscovery.parallelism": 69,
+        "spark.stage.maxConsecutiveAttempts": 5,
+        "spark.storage.localDiskByExecutors.cacheSize": 698,
+        "spark.storage.memoryMapThreshold": 4,
+        "spark.storage.unrollMemoryThreshold": 4743675,
+        "spark.task.cpus": 6,
+        "spark.task.maxFailures": 1,
+        "spark.task.reaper.pollingInterval": 49
+      },
+      "objectives": [
+        5050.763939142227
+      ],
+      "constraints": null,
+      "trial_state": 0,
+      "elapsed_time": 5078.142928600311,
+      "create_time": "2025-11-17T11:43:30.008406",
+      "extra_info": {
+        "origin": "Default Configuration",
+        "qt_time": {
+          "q10": 30.270331144332886,
+          "q11": 88.10182738304138,
+          "q12": 3.507558822631836,
+          "q13": 20.123307466506958,
+          "q14a": 160.1736557483673,
+          "q14b": 116.9346387386322,
+          "q15": 4.122420310974121,
+          "q16": 135.67248511314392,
+          "q17": 17.822041749954224,
+          "q18": 14.128785848617554,
+          "q19": 4.052820682525635,
+          "q1": 15.569080829620361,
+          "q20": 2.387160062789917,
+          "q21": 2.544678211212158,
+          "q22": 56.295703649520874,
+          "q23a": 247.4616255760193,
+          "q23b": 257.0853569507599,
+          "q24a": 229.2132716178894,
+          "q24b": 206.4854953289032,
+          "q25": 13.279324769973755,
+          "q26": 8.946021318435669,
+          "q27": 11.420099258422852,
+          "q28": 165.71358847618103,
+          "q29": 29.23583960533142,
+          "q2": 45.03046679496765,
+          "q30": 13.564103603363037,
+          "q31": 13.883880853652954,
+          "q32": 3.7104649543762207,
+          "q33": 3.891069173812866,
+          "q34": 5.213241100311279,
+          "q35": 23.723448753356934,
+          "q36": 9.125530242919922,
+          "q37": 23.445617198944092,
+          "q38": 28.542686223983765,
+          "q39a": 9.563026189804077,
+          "q39b": 7.650914192199707,
+          "q3": 4.327714443206787,
+          "q40": 31.690082550048828,
+          "q41": 0.8625738620758057,
+          "q42": 1.4799180030822754,
+          "q43": 7.535755157470703,
+          "q44": 39.58154273033142,
+          "q45": 4.173614978790283,
+          "q46": 8.859374523162842,
+          "q47": 23.61845350265503,
+          "q48": 10.005386590957642,
+          "q49": 33.71731233596802,
+          "q4": 223.76294803619385,
+          "q50": 20.800864934921265,
+          "q51": 88.54041385650635,
+          "q52": 1.6073453426361084,
+          "q53": 6.1596009731292725,
+          "q54": 10.364096403121948,
+          "q55": 1.5739235877990723,
+          "q56": 3.610214948654175,
+          "q57": 20.162201404571533,
+          "q58": 4.161265850067139,
+          "q59": 35.14263844490051,
+          "q5": 18.61762809753418,
+          "q60": 4.213954210281372,
+          "q61": 4.603818655014038,
+          "q62": 15.177531719207764,
+          "q63": 5.361652851104736,
+          "q64": 128.3405077457428,
+          "q65": 64.42520952224731,
+          "q66": 18.43093180656433,
+          "q67": 398.1806061267853,
+          "q68": 4.753636837005615,
+          "q69": 9.064473628997803,
+          "q6": 4.306970834732056,
+          "q70": 19.523073196411133,
+          "q71": 5.923735857009888,
+          "q72": 410.8364288806915,
+          "q73": 4.230740547180176,
+          "q74": 43.77657914161682,
+          "q75": 124.48696899414062,
+          "q76": 38.48913025856018,
+          "q77": 6.796926975250244,
+          "q78": 177.01572823524475,
+          "q79": 6.272172927856445,
+          "q7": 9.12700080871582,
+          "q80": 62.576295137405396,
+          "q81": 13.636497735977173,
+          "q82": 37.14643907546997,
+          "q83": 3.157238721847534,
+          "q84": 23.954432010650635,
+          "q85": 22.075724363327026,
+          "q86": 7.133142471313477,
+          "q87": 28.251554250717163,
+          "q88": 71.68875098228455,
+          "q89": 6.9171178340911865,
+          "q8": 3.991089105606079,
+          "q90": 13.93109655380249,
+          "q91": 3.3528974056243896,
+          "q92": 3.067136287689209,
+          "q93": 184.0984344482422,
+          "q94": 75.65023803710938,
+          "q95": 172.9113380908966,
+          "q96": 11.162244319915771,
+          "q97": 47.39274024963379,
+          "q98": 3.6805760860443115,
+          "q99": 18.704416751861572,
+          "q9": 104.70032095909119
+        },
+        "et_time": {
+          "q10": 30.271158695220947,
+          "q11": 88.10299229621887,
+          "q12": 3.5081467628479004,
+          "q13": 20.12393879890442,
+          "q14a": 160.17420864105225,
+          "q14b": 116.93522429466248,
+          "q15": 4.12298583984375,
+          "q16": 135.6729862689972,
+          "q17": 17.822571992874146,
+          "q18": 14.129966497421265,
+          "q19": 4.053390979766846,
+          "q1": 15.569670677185059,
+          "q20": 2.3877131938934326,
+          "q21": 2.5452749729156494,
+          "q22": 56.29622268676758,
+          "q23a": 247.46268582344055,
+          "q23b": 257.0859282016754,
+          "q24a": 229.2138204574585,
+          "q24b": 206.48602151870728,
+          "q25": 13.279855966567993,
+          "q26": 8.947984457015991,
+          "q27": 11.42063307762146,
+          "q28": 165.71411800384521,
+          "q29": 29.2363862991333,
+          "q2": 45.03100252151489,
+          "q30": 13.564664602279663,
+          "q31": 13.884408950805664,
+          "q32": 3.711393117904663,
+          "q33": 3.891592502593994,
+          "q34": 5.213768005371094,
+          "q35": 23.724008321762085,
+          "q36": 9.12607479095459,
+          "q37": 23.44615387916565,
+          "q38": 28.543267250061035,
+          "q39a": 9.563546419143677,
+          "q39b": 7.651512145996094,
+          "q3": 4.3282365798950195,
+          "q40": 31.690598964691162,
+          "q41": 0.8631253242492676,
+          "q42": 1.4804422855377197,
+          "q43": 7.53628134727478,
+          "q44": 39.58209753036499,
+          "q45": 4.174772024154663,
+          "q46": 8.859887838363647,
+          "q47": 23.618969917297363,
+          "q48": 10.00595498085022,
+          "q49": 33.71780443191528,
+          "q4": 223.7634983062744,
+          "q50": 20.801395416259766,
+          "q51": 88.54095530509949,
+          "q52": 1.6078715324401855,
+          "q53": 6.160106182098389,
+          "q54": 10.364622831344604,
+          "q55": 1.5744240283966064,
+          "q56": 3.6107370853424072,
+          "q57": 20.162724256515503,
+          "q58": 4.1617960929870605,
+          "q59": 35.14316511154175,
+          "q5": 18.61818242073059,
+          "q60": 4.214513301849365,
+          "q61": 4.604377031326294,
+          "q62": 15.178040027618408,
+          "q63": 5.362174987792969,
+          "q64": 128.3410246372223,
+          "q65": 64.42666983604431,
+          "q66": 18.431445360183716,
+          "q67": 398.1811354160309,
+          "q68": 4.7541656494140625,
+          "q69": 9.065006971359253,
+          "q6": 4.307494401931763,
+          "q70": 19.52359127998352,
+          "q71": 5.9242846965789795,
+          "q72": 410.8371171951294,
+          "q73": 4.231272220611572,
+          "q74": 43.77712607383728,
+          "q75": 124.48747491836548,
+          "q76": 38.48964881896973,
+          "q77": 6.79750394821167,
+          "q78": 177.01626467704773,
+          "q79": 6.272695541381836,
+          "q7": 9.127554893493652,
+          "q80": 62.576833963394165,
+          "q81": 13.637012481689453,
+          "q82": 37.14695858955383,
+          "q83": 3.159257650375366,
+          "q84": 23.954989433288574,
+          "q85": 22.076276063919067,
+          "q86": 7.133641481399536,
+          "q87": 28.252068996429443,
+          "q88": 71.68926167488098,
+          "q89": 6.917639970779419,
+          "q8": 3.991635322570801,
+          "q90": 13.931601762771606,
+          "q91": 3.3533918857574463,
+          "q92": 3.067650079727173,
+          "q93": 184.0993537902832,
+          "q94": 75.6507670879364,
+          "q95": 172.91183948516846,
+          "q96": 11.162734270095825,
+          "q97": 47.39324069023132,
+          "q98": 3.6810920238494873,
+          "q99": 18.705050230026245,
+          "q9": 104.70089530944824
+        }
+      }
+    }
+  ]
+}

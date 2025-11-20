@@ -128,7 +128,7 @@
         <td></td>
         <td></td>
         <td></td>
-        <td></td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td rowspan="8">600G</td>
@@ -449,7 +449,7 @@
         <td>76</td>
         <td><a href="log/tpcds_600g/SMAC/32u240n3_2025-11-10-08-31-04-787671.log">查看日志</a></td>
         <td><a href="results/tpcds_600g/32u240n3____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-10-09-16-25-408598.json">查看结果</a></td>
-        <td>⏸️</td>
+        <td>✅</td>
     </tr>
     <tr>
         <td>64u</td>

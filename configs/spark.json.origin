@@ -1,7 +1,7 @@
 {
     "log_dir": "log",
     "result_dir": "results",
-    "database": "tpch_100g",
+    "database": "tpcds_600g",
     "spark": {
       "nodes": ["agent1", "agent2", "server1"],
       "server_node": "server1",
@@ -20,7 +20,7 @@
       "spark_sql_path": "/usr/local/spark/bin/spark-sql",
       "yarn_path": "/usr/local/hadoop/bin/yarn"
     },
-    "data_dir": "/srv/BigData/hadoop/data8/source_code/dbgen/saveSql",
+    "data_dir": "/home/hive-testbench-hdp3/spark-queries-tpcds",
     "files": {
       "sql_segmentation": "results/data/validate_sql_filter_20250508-060105.csv",
       "timeout_csv": "results/data/results.csv",
