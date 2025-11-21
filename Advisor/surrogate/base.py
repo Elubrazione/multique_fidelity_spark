@@ -2,10 +2,11 @@ from typing import Optional, List, Tuple
 import numpy as np
 import abc
 from ConfigSpace import ConfigurationSpace
+from sklearn.model_selection import KFold
+from openbox import logger
 
-from .weight_calculator import WeightCalculator, MFGPEWeightCalculator
-from .weight_modifier import WeightModifier, NonDecreasingTargetWeightModifier
-from .utils import cross_validate_surrogate, Normalizer
+from .weight import WeightCalculator, MFGPEWeightCalculator
+from .utils import Normalizer
 from ..acq_function import AcquisitionContext, TaskContext, HistoryLike
 
 class Surrogate(abc.ABC):
@@ -51,10 +52,10 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
         rng: np.random.RandomState = np.random.RandomState(42),
         num_src_trials: int = 50,
         weight_calculator: Optional[WeightCalculator] = None,
-        weight_modifier: Optional[WeightModifier] = None,
         source_data: Optional[List[HistoryLike]] = None,
         norm_y: bool = True,
         k_fold_num: int = 5,
+        only_source: bool = False,
         **kwargs
     ):
         super().__init__(config_space, surrogate_type, rng)
@@ -64,7 +65,6 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
         self.target_surrogate: Optional[SingleFidelitySurrogate] = None
 
         self.weight_calculator = weight_calculator or MFGPEWeightCalculator()
-        self.weight_modifier = weight_modifier or NonDecreasingTargetWeightModifier()
         
         self.normalizer = Normalizer(norm_y=norm_y)
 
@@ -72,6 +72,11 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
         self.w: np.ndarray = np.array([1.0])
         self.current_target_weight = 0.0
         self.ignored_flags: List[bool] = []
+
+        self.hist_ws = []
+        self.target_weight = []
+        self.iteration_id = 0
+        self.only_source = only_source
         
         if self._get_num_tasks() > 0:
             self._build_source_surrogates()
@@ -89,11 +94,7 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
             surrogate = self._build_single_surrogate(X, y)
             self.source_surrogates.append(surrogate)
     
-    def _build_single_surrogate(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-    ) -> Surrogate:
+    def _build_single_surrogate(self, X: np.ndarray, y: np.ndarray) -> Surrogate:
         from . import build_surrogate
         model = build_surrogate(
             surrogate_type=self.surrogate_type,
@@ -107,6 +108,7 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
         return model
     
     def train(self, X: np.ndarray, y: np.ndarray, **kwargs) -> None:
+        # build target surrogate
         self.target_surrogate = self._build_single_surrogate(X, y)
         
         if self._get_num_tasks() == 0:
@@ -123,19 +125,18 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
             mu_list.append(tar_mu)
             var_list.append(tar_var)
             
-            num_tasks = self._get_num_tasks() + 1
             new_w = self.weight_calculator.calculate(
-                mu_list, var_list, y, num_tasks
+                mu_list, var_list, y, self._get_num_tasks() + 1,
+                instance_num=len(y),
+                k_fold_num=self.k_fold_num,
+                only_source=self.only_source
             )
-            
-            if hasattr(self.weight_calculator, 'ignored_flags'):
-                self.ignored_flags = self.weight_calculator.ignored_flags
-            
-            self.w, self.current_target_weight = self.weight_modifier.modify(
+            self.ignored_flags = self.weight_calculator.get_ignored_flags()
+            self.w, self.current_target_weight = self._modify_weights(
                 new_w, 
-                self._get_num_tasks(),
                 self.current_target_weight
             )
+            self._record_weights()
     
     def predict(self, X: np.ndarray, **kwargs) -> tuple:
         mu, var = self.target_surrogate.predict(X)
@@ -185,14 +186,47 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
     def get_weights(self) -> np.ndarray:
         return self.w.copy()
     
-    def _predict_target_surrogate_cv(self, X, y, k_fold_num=None):
-        if k_fold_num is None:
-            k_fold_num = self.k_fold_num
+    def _predict_target_surrogate_cv(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """k-fold cross validation for surrogate model
         
-        def build_fn(X_train, y_train):
-            return self.builder.build_single_surrogate(X_train, y_train, normalize_y=False)
+        Parameters
+        ----------
+        X : np.ndarray
+            feature matrix [n_samples, n_features]
+        y : np.ndarray
+            target values [n_samples]
+            
+        Returns
+        -------
+        mu : np.ndarray
+            predicted mean values by cross validation [n_samples]
+        var : np.ndarray
+            predicted variance values by cross validation [n_samples]
+        """
+        if len(X) < self.k_fold_num:
+            raise ValueError(f"Not enough samples ({len(X)}) for {self.k_fold_num}-fold CV")
         
-        return cross_validate_surrogate(X, y, build_fn, k_fold=k_fold_num)
+        kf = KFold(n_splits=self.k_fold_num, shuffle=False)
+        mu_list = []
+        var_list = []
+        indices = []    # indices of validation set
+        
+        for train_idx, val_idx in kf.split(X):
+            indices.extend(list(val_idx))
+            X_train, X_val = X[train_idx], X[val_idx]
+            y_train, _ = y[train_idx], y[val_idx]
+            
+            model = self._build_single_surrogate(X_train, y_train)
+            
+            mu, var = model.predict(X_val)
+            mu, var = mu.flatten(), var.flatten()
+            
+            mu_list.extend(list(mu))
+            var_list.extend(list(var))
+    
+        assert (np.array(indices) == np.arange(X.shape[0])).all()
+        return np.asarray(mu_list), np.asarray(var_list)
+
 
     def _add_source_tasks(self, history_list: List[HistoryLike]):
         self.source_data.extend(history_list)
@@ -206,3 +240,48 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
     def _clear_source_tasks(self):
         self.source_data = []
         self.source_surrogates = []
+
+    def _modify_weights(
+        self, 
+        new_w: np.ndarray, 
+        current_target_weight: float
+    ) -> tuple[np.ndarray, float]:
+        if self._get_num_tasks() == 0:
+            return new_w, new_w[0] if len(new_w) > 0 else 0.0
+        
+        # target task is the last task
+        target_idx = self._get_num_tasks()
+        if new_w[target_idx] < current_target_weight:
+            # keep the target task weight non-decreasing
+            new_w[target_idx] = current_target_weight
+            if np.sum(new_w[: target_idx]) > 0:
+                new_w[: target_idx] = (
+                    new_w[: target_idx] / np.sum(new_w[: target_idx]) 
+                    * (1 - new_w[target_idx])
+                )
+        new_target_weight = new_w[target_idx]
+        return new_w, new_target_weight
+    
+    def _record_weights(self) -> None:
+        if self._get_num_tasks() == 0:
+            return
+        
+        w = self.w.copy()
+        weight_str = ','.join([('%.2f' % item) for item in w])
+        logger.info(f'weight: {weight_str}')
+        
+        ignored_flags = self.weight_calculator.get_ignored_flags()
+        if ignored_flags and any(ignored_flags):
+            logger.info(f'weight ignore flag: {ignored_flags}')
+        
+        w_str_list = []
+        for i in range(self._get_num_tasks()):
+            task = self._get_all_tasks()[i]
+            task_id = task.task_id if hasattr(task, 'task_id') else f'task_{i}'
+            w_str = "%s: sim%.4f" % (task_id, w[i])
+            w_str_list.append(w_str)
+        w_str_list.append("target: %.4f" % w[-1])
+        
+        self.hist_ws.append(w_str_list)
+        self.target_weight.append(w[-1])
+        self.iteration_id += 1

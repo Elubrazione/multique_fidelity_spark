@@ -97,6 +97,8 @@ class AcquisitionContext:
             raise ValueError(
                 f"Weights length ({len(self.weights)}) must match tasks length ({len(self.tasks)})"
             )
+        
+        self._main_surrogate: Optional[SurrogateModel] = None
     
     def is_multi_task(self) -> bool:
         return len(self.tasks) > 1

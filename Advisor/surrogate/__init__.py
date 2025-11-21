@@ -12,12 +12,10 @@ from .base import (
 )
 from .prf import ProbabilisticRandomForest
 from .gp import GaussianProcess
-from .gpe import MFGPE, RGPE
+from .ensemble import MFGPE, RGPE
 
 from .utils import (
     Normalizer,
-    cross_validate_surrogate,
-    predict_marginalized,
     calculate_preserving_order_num
 )
 
@@ -128,8 +126,6 @@ __all__ = [
     'MFGPE',
     
     'Normalizer',
-    'cross_validate_surrogate',
-    'predict_marginalized',
     'calculate_preserving_order_num',
     
     'build_surrogate',

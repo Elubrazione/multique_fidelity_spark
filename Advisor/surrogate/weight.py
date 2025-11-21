@@ -14,7 +14,8 @@ class WeightCalculator(ABC):
         mu_list: List[np.ndarray],
         var_list: List[np.ndarray],
         y_true: np.ndarray,
-        num_tasks: int
+        num_tasks: int,
+        **kwargs
     ) -> np.ndarray:
         """Weight Calculator Interface
         
@@ -28,6 +29,8 @@ class WeightCalculator(ABC):
             True values
         num_tasks : int
             Number of tasks (including the target task)
+        kwargs : dict
+            Additional keyword arguments
             
         Returns
         -------
@@ -50,7 +53,8 @@ class MFGPEWeightCalculator(WeightCalculator):
         mu_list: List[np.ndarray],
         var_list: List[np.ndarray],
         y_true: np.ndarray,
-        num_tasks: int
+        num_tasks: int,
+        **kwargs
     ) -> np.ndarray:
         preserving_order_p = []
         for i in range(num_tasks):
@@ -74,12 +78,11 @@ class RGPEWeightCalculator(WeightCalculator):
         mu_list: List[np.ndarray],
         var_list: List[np.ndarray],
         y_true: np.ndarray,
-        num_tasks: int
+        num_tasks: int,
+        **kwargs
     ) -> np.ndarray:
         if self.use_dilution:
-            return self.calculate_with_dilution(
-                mu_list, var_list, y_true, num_tasks, len(y_true)
-            )
+            return self.calculate_with_dilution(mu_list, var_list, y_true, num_tasks, **kwargs)
         else:
             return self._calculate_basic(mu_list, var_list, y_true, num_tasks)
     
@@ -115,10 +118,12 @@ class RGPEWeightCalculator(WeightCalculator):
         var_list: List[np.ndarray],
         y_true: np.ndarray,
         num_tasks: int,
-        instance_num: int,
-        k_fold_num: int = 5,
-        only_source: bool = False
-    ) -> tuple[np.ndarray, List[bool]]:
+        **kwargs
+    ) -> np.ndarray:
+        instance_num = kwargs.get('instance_num', len(y_true))
+        k_fold_num = kwargs.get('k_fold_num', 5)
+        only_source = kwargs.get('only_source', False)
+
         argmin_list = [0] * num_tasks
         ranking_loss_caches = []
         
@@ -169,8 +174,8 @@ class RGPEWeightCalculator(WeightCalculator):
 
         sum_w = np.sum(w)
         if sum_w == 0:
-            w = [1.0 / (num_tasks - 1)] * (num_tasks - 1) + [0.0] \
-                if only_source else [0.0] * (num_tasks - 1) + [1.0]
+            w = np.array([1.0 / (num_tasks - 1)] * (num_tasks - 1) + [0.0]) \
+                if only_source else np.array([0.0] * (num_tasks - 1) + [1.0])
         else:
             w = w / sum_w
         
