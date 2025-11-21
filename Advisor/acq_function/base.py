@@ -1,7 +1,21 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Tuple, Optional, Any, Protocol, List
-from dataclasses import dataclass, field
+from typing import Tuple, Optional, Protocol, List
+from dataclasses import dataclass
+
+class HistoryLike(Protocol):
+    @property
+    def observations(self) -> List:
+        ...
+    
+    def get_config_array(self, transform: Optional[str] = None) -> np.ndarray:
+        ...
+    
+    def get_objectives(self, transform: Optional[str] = None) -> np.ndarray:
+        ...
+
+    def get_incumbent_value(self) -> float:
+        ...
 
 class SurrogateModel(Protocol):
     def predict(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -59,9 +73,9 @@ class TransferLearningAcquisition(AcquisitionFunction):
 
 @dataclass
 class TaskContext:
-    surrogate: Any  # SurrogateModel
-    history: Any  # HistoryLike
-    eta: Any  # incumbent value
+    surrogate: SurrogateModel
+    history: HistoryLike
+    eta: float
     num_data: int
     
     def get_incumbent_value(self):
@@ -94,4 +108,9 @@ class AcquisitionContext:
         return self.tasks[:-1] if self.is_multi_task() else []
     
     def get_main_surrogate(self):
+        if self._main_surrogate is not None:
+            return self._main_surrogate
         return self.get_target_task().surrogate
+
+    def set_main_surrogate(self, surrogate: SurrogateModel) -> None:
+        self._main_surrogate = surrogate

@@ -7,6 +7,7 @@ from .base import (
     TransferLearningAcquisition,
     AcquisitionContext,
     TaskContext,
+    HistoryLike
 )
 from .ei import ExpectedImprovement
 from .ucb import UpperConfidenceBound
@@ -56,7 +57,7 @@ __all__ = [
     'AcquisitionFunction',
     'SingleObjectiveAcquisition',
     'TransferLearningAcquisition',
-    
+    'HistoryLike',
     'ExpectedImprovement',
     'UpperConfidenceBound',
     'WeightedRank',
