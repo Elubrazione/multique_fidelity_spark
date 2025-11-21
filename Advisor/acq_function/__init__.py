@@ -1,6 +1,3 @@
-"""Acquisition Functions for Bayesian Optimization
-"""
-
 from typing import Dict, Type, List
 
 from .base import (
@@ -8,6 +5,8 @@ from .base import (
     AcquisitionFunction,
     SingleObjectiveAcquisition,
     TransferLearningAcquisition,
+    AcquisitionContext,
+    TaskContext,
 )
 from .ei import ExpectedImprovement
 from .ucb import UpperConfidenceBound
@@ -61,6 +60,9 @@ __all__ = [
     'ExpectedImprovement',
     'UpperConfidenceBound',
     'WeightedRank',
+    
+    'AcquisitionContext',
+    'TaskContext',
     
     'get_acq',
     'register',

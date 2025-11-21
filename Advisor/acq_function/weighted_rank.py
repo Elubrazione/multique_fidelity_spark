@@ -1,28 +1,15 @@
 import numpy as np
 import pandas as pd
-from .base import TransferLearningAcquisition, SurrogateModel
-from ..surrogate.base import BaseTLSurrogate
+from typing import List
+from .base import (
+    TransferLearningAcquisition,
+    AcquisitionFunction,
+    SurrogateModel,
+    AcquisitionContext
+)
 
 
 class WeightedRank(TransferLearningAcquisition):
-    """Weighted Rank Acquisition Function for Transfer Learning
-    
-    Combines acquisition function values from multiple source tasks and the target task
-    using learned weights and ranking-based aggregation.
-    
-    This acquisition function:
-    1. Computes acquisition values from K source tasks and 1 target task
-    2. Converts values to rankings for each task
-    3. Combines rankings using weighted sum with learned task weights
-    
-    Attributes
-    ----------
-    inner_acq_type : str
-        Type of inner acquisition function to use (e.g., 'ei', 'ucb')
-    temperature : float
-        Temperature parameter for weight computation (currently unused)
-    """
-    
     def __init__(self, model: SurrogateModel, acq_func='ei', temperature=0.1):
         super(WeightedRank, self).__init__(model)
         self.long_name = 'Weighted Rank'
@@ -31,32 +18,31 @@ class WeightedRank(TransferLearningAcquisition):
         self.temperature = temperature
 
         self.inner_acq_type = acq_func
-        self.acq_funcs = None
+        self.acq_funcs: List[AcquisitionFunction] = None
 
-    def update(self, model, eta, num_data):
-        assert isinstance(model, BaseTLSurrogate)
-
-        self.weights = np.array(model.get_weights())
-        assert len(self.weights) == model.K + 1
+    def update(self, context=None, **kwargs):
+        if context is not None:
+            self._update_from_context(context, **kwargs)
+            return
+        
+    def _update_from_context(self, context: AcquisitionContext, **kwargs) -> None:
+        if not context.is_multi_task():
+            raise ValueError("WeightedRank requires multi-task context")
+        
+        self.weights = context.weights
+        self.eta = context.get_target_task().get_incumbent_value()
+        self.model = context.get_main_surrogate()
         
         from . import get_acq
-        self.source_acq_funcs = []
-        for i in range(model.K):
-            acq_func = get_acq(acq_type=self.inner_acq_type, model=model.source_surrogates[i])
-            acq_func.update(
-                eta=model.source_hpo_data[i].get_incumbent_value(),
-                num_data=len(model.source_hpo_data[i])
+        self.acq_funcs = []
+        for task in context.tasks:
+            acq_func = get_acq(
+                acq_type=self.inner_acq_type,
+                model=task.surrogate
             )
-            self.source_acq_funcs.append(acq_func)
-
-        self.target_acq_func = get_acq(acq_type=self.inner_acq_type, model=model.target_surrogate)
-        self.target_acq_func.update(eta=eta, num_data=num_data)
-
-        self.acq_funcs = self.source_acq_funcs + [self.target_acq_func]
-        
-        self.model = model
-        self.eta = eta
-
+            acq_func.update(context=AcquisitionContext(tasks=[task], weights=None))
+            self.acq_funcs.append(acq_func)
+    
     def _compute(self, X: np.ndarray, **kwargs) -> np.ndarray:
         if len(X.shape) == 1:
             X = X[:, np.newaxis]
