@@ -126,8 +126,8 @@
         <td>S</td>
         <td>S</td>
         <td></td>
-        <td></td>
-        <td></td>
+        <td><a href="log/tpch_100g/SMAC/640u240n3_2025-11-22-03-13-56-673892.log">查看日志</a></td>
+        <td><a href="results/tpch_100g/640u240n3____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-22-03-40-32-884306.json">查看结果</a></td>
         <td>⏸️</td>
     </tr>
     <tr>

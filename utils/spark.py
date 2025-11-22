@@ -44,25 +44,33 @@ def custom_sort(key):
 
 def analyze_timeout_and_get_fidelity_details(file_path=FILE_TIMEOUT_CSV, percentile=100,
                                              ratio_list=[], round_num=5, debug=False, add_on_ratio=1.5):
-    elapsed_timeout_dicts = analyze_sqls_timeout_from_csv(file_path=file_path, percentile=percentile, add_on_ratio=add_on_ratio)
+    # TODO: Origin Version
+    # elapsed_timeout_dicts = analyze_sqls_timeout_from_csv(file_path=file_path, percentile=percentile, add_on_ratio=add_on_ratio)
 
-    fidelity_details = {}
-    excluded_sqls = set()
-    for r in ratio_list:
-        if int(r) == 1: continue
-        selected_queries, total_time = off_line_greedy_selection(
-            time_dicts=elapsed_timeout_dicts,
-            ratio=r, excluded_sqls=excluded_sqls
-        )
-        if debug:
-            print(total_time)
-            for k, v in selected_queries.items():
-                print(k, "  ", v)
-        fidelity_details[round(r, round_num)] = sorted(list(selected_queries.keys()), key=lambda x: custom_sort(x))
-        excluded_sqls.update(selected_queries.keys())
-    fidelity_details[round(1, round_num)] = list(elapsed_timeout_dicts.keys())
+    # fidelity_details = {}
+    # excluded_sqls = set()
+    # for r in ratio_list:
+    #     if int(r) == 1: continue
+    #     selected_queries, total_time = off_line_greedy_selection(
+    #         time_dicts=elapsed_timeout_dicts,
+    #         ratio=r, excluded_sqls=excluded_sqls
+    #     )
+    #     if debug:
+    #         print(total_time)
+    #         for k, v in selected_queries.items():
+    #             print(k, "  ", v)
+    #     fidelity_details[round(r, round_num)] = sorted(list(selected_queries.keys()), key=lambda x: custom_sort(x))
+    #     excluded_sqls.update(selected_queries.keys())
+    # fidelity_details[round(1, round_num)] = list(elapsed_timeout_dicts.keys())
     
-    logger.debug(fidelity_details)
+    # logger.debug(fidelity_details)
+    # return fidelity_details, elapsed_timeout_dicts
+
+    # TODO: Temporary Version for History Collection
+    # 提取DATA_DIR下所有的文件名作为list
+    file_list = [os.path.splitext(f)[0] for f in os.listdir(DATA_DIR)]
+    fidelity_details = {round(1, 5): sorted(file_list, key=int)}
+    elapsed_timeout_dicts = {key: 10000 for key in sorted(file_list, key=int)}
     return fidelity_details, elapsed_timeout_dicts
 
 def analyze_sqls_timeout_from_csv(file_path=FILE_TIMEOUT_CSV, percentile=33, add_on_ratio=1.5):
