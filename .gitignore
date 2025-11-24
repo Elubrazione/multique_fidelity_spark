@@ -13,3 +13,5 @@ log/*
 
 catboost_info/*
 *.cbm
+
+/results/**/*.origin
