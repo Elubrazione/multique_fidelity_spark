@@ -137,6 +137,11 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
                 self.current_target_weight
             )
             self._record_weights()
+        else:
+            # If not enough data for CV, use default equal weights
+            num_tasks = self._get_num_tasks() + 1
+            self.w = np.ones(num_tasks) / num_tasks
+            self.ignored_flags = [False] * num_tasks
     
     def predict(self, X: np.ndarray, **kwargs) -> tuple:
         mu, var = self.target_surrogate.predict(X)
@@ -245,7 +250,7 @@ class TransferLearningSurrogate(SingleFidelitySurrogate):
         self, 
         new_w: np.ndarray, 
         current_target_weight: float
-    ) -> tuple[np.ndarray, float]:
+    ) -> Tuple[np.ndarray, float]:
         if self._get_num_tasks() == 0:
             return new_w, new_w[0] if len(new_w) > 0 else 0.0
         

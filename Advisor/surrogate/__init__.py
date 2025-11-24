@@ -40,6 +40,26 @@ def build_surrogate(
 ) -> Surrogate:
     surrogate_type = surrogate_type.lower()
     
+    # Alias mapping for backward compatibility
+    # reacq_* -> rgpe_* (Ranking-weighted Ensemble with Acquisition)
+    # re_* -> rgpe_* (Ranking-weighted Ensemble)
+    # mceacq_* -> mfgpe_* (Multi-Fidelity Ensemble with Acquisition)
+    # mce_* -> mfgpe_* (Multi-Fidelity Ensemble)
+    # mfes_* -> mfgpe_* (Multi-Fidelity Ensemble, no transfer learning)
+    if surrogate_type.startswith('mfes_'):
+        # mfes_* means multi-fidelity without transfer learning
+        # Map to mfgpe_* but set transfer_learning_history to None
+        surrogate_type = surrogate_type.replace('mfes_', 'mfgpe_', 1)
+        transfer_learning_history = None
+    elif surrogate_type.startswith('reacq_'):
+        surrogate_type = surrogate_type.replace('reacq_', 'rgpe_', 1)
+    elif surrogate_type.startswith('re_'):
+        surrogate_type = surrogate_type.replace('re_', 'rgpe_', 1)
+    elif surrogate_type.startswith('mceacq_'):
+        surrogate_type = surrogate_type.replace('mceacq_', 'mfgpe_', 1)
+    elif surrogate_type.startswith('mce'):
+        surrogate_type = surrogate_type.replace('mce', 'mfgpe', 1)
+    
     if surrogate_type.startswith('rgpe'):
         parts = surrogate_type.split('_')
         inner_type = parts[1] if len(parts) > 1 else 'prf'
@@ -104,13 +124,18 @@ def build_surrogate(
     available = ', '.join(sorted(_SURROGATE_REGISTRY.keys()))
     raise ValueError(
         f"Unknown surrogate type: '{surrogate_type}'. "
-        f"Available: {available}, 'rgpe_*', 'mfgpe_*', or 'gp*'"
+        f"Available: {available}, 'rgpe_*' (or 're_*', 'reacq_*'), "
+        f"'mfgpe_*' (or 'mce_*', 'mceacq_*'), or 'gp*'"
     )
 
 
 def list_available() -> List[str]:
     standard = sorted(_SURROGATE_REGISTRY.keys())
-    return standard + ['rgpe_* (transfer learning)', 'mfgpe_* (transfer learning)', 'gp* (gaussian process variants)']
+    return standard + [
+        'rgpe_* (transfer learning, aliases: re_*, reacq_*)',
+        'mfgpe_* (transfer learning, aliases: mce_*, mceacq_*)',
+        'gp* (gaussian process variants)'
+    ]
 
 
 __all__ = [

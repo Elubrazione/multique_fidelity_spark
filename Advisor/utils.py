@@ -43,56 +43,45 @@ def sanitize_spark_config(config):
         pass
     return config
 
-def build_my_surrogate(func_str='gp', config_space=None, rng=None, transfer_learning_history=None, **kwargs):
-    extra_dim = kwargs.get('extra_dim', 0)
-    seed = kwargs.get('seed', 42)
-    norm_y = kwargs.get('norm_y', True)
-
-    assert config_space is not None
-    func_str = func_str.lower()
-    types, bounds = get_types(config_space)
-    if extra_dim > 0:
-        types = np.hstack((types, np.zeros(extra_dim, dtype=np.uint)))
-        bounds = np.vstack((bounds, np.array([[0, 1]] * extra_dim)))
-
-    if func_str == 'prf':
-        from openbox.surrogate.base.rf_with_instances_sklearn import skRandomForestWithInstances
-        return skRandomForestWithInstances(types=types, bounds=bounds, seed=seed)
-    elif func_str.startswith('gp'):
-        from openbox.surrogate.base.build_gp import create_gp_model
-        return create_gp_model(model_type=func_str[:2],
-                               config_space=config_space,
-                               types=types,
-                               bounds=bounds,
-                               rng=rng)
-    elif func_str.startswith('mce'):
-        from .surrogate.rgpe import RGPE
-        inner_model = func_str.split('_')[1]
-        return RGPE(config_space=config_space, source_hpo_data=transfer_learning_history, seed=seed,
-                    surrogate_type=inner_model, norm_y=norm_y)
-    elif func_str.startswith('re'):
-        from .surrogate.mfgpe import MFGPE
-        inner_model = func_str.split('_')[1]
-        return MFGPE(config_space=config_space, source_hpo_data=transfer_learning_history, seed=seed,
-                    surrogate_type=inner_model, norm_y=norm_y)
-    elif func_str.startswith('mfes'):   # 没有迁移学习
-        from .surrogate.mfgpe import MFGPE
-        inner_model = func_str.split('_')[1]
-        return MFGPE(config_space=config_space, source_hpo_data=None, seed=seed,
-                    surrogate_type=inner_model, norm_y=norm_y)
-    else:
-        raise ValueError('Invalid string %s for surrogate!' % func_str)
-
 
 def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
-    sims = None
+    """
+    计算目标任务与源任务之间的相似度
+    
+    Parameters:
+    -----------
+    target_his : History
+        目标任务的历史观测数据
+    source_hpo_data : List[History]
+        源任务的历史观测数据列表
+    config_space : ConfigurationSpace
+        配置空间
+    **kwargs : dict
+        可选参数：
+        - inner_surrogate_model : str, default='gp'
+            内部代理模型类型
+        - use_real : bool, default=False
+            是否使用真实观测数据计算相似度（一致对占比）
+            如果为True，使用map_with_observations方法（需要至少2个观测数据）
+            如果为False，使用map_with_prediction方法（CatBoost预测，基于meta_feature）
+    
+    Returns:
+    --------
+    List[Tuple[int, float]]
+        相似度列表，每个元素为(源任务索引, 相似度值)
+    """
     inner_sm = kwargs.get('inner_surrogate_model', 'gp')
+    use_real = kwargs.get('use_real', False)
+    
     rover = RoverMapper(surrogate_type=inner_sm)
     if not source_hpo_data:
         logger.warning('No source HPO data available. Returning empty similarity list.')
         return []
     rover.fit(source_hpo_data, config_space)
-    sims = rover.map(target_his, source_hpo_data)   # 没有阈值过滤, 返回所有任务的相似度（theta=-float('inf')）
+    
+    # 调用map方法，它会根据use_real参数路由到相应的方法
+    sims = rover.map(target_his, source_hpo_data, use_real=use_real)
+    
     return sims
 
 

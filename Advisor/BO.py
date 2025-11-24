@@ -5,7 +5,7 @@ from openbox.utils.history import Observation
 from ConfigSpace import ConfigurationSpace
 
 from .base import BaseAdvisor
-from .utils import build_my_surrogate
+from .surrogate import build_surrogate
 from .acq_function import get_acq
 from .acq_function.optimizer import create_local_random_optimizer
 
@@ -23,7 +23,7 @@ class BO(BaseAdvisor):
         self.surrogate_type = surrogate_type
         self.norm_y = False if 'wrk' in self.acq_type else True
         
-        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
+        self.surrogate = build_surrogate(surrogate_type=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
                                             transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
                                             extra_dim=0, norm_y=self.norm_y)
         self.acq_func = get_acq(acq_type=self.acq_type, model=self.surrogate)
@@ -128,23 +128,16 @@ class BO(BaseAdvisor):
         
         X = self._get_surrogate_config_array()
         Y = self.history.get_objectives()
-
-        if self.surrogate_type == 'gpf':
-            self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space,
-                                                rng=self.rng,
-                                                transfer_learning_history=self.source_hpo_data,
-                                                extra_dim=self.extra_dim, norm_y=self.norm_y)
-            logger.info("Successfully rebuild the surrogate model GP!")
-            
         self.surrogate.train(X, Y)
-
         self.acq_func.update(
-            model=self.surrogate,
-            eta=self.history.get_incumbent_value(),
-            num_data=len(self.history)
+            context=self.surrogate.get_acquisition_context(
+                history=self.history
+            )
         )
         challengers = self.acq_optimizer.maximize(
-            observations=self._convert_observations_to_surrogate_space(self.history.observations),
+            observations=self._convert_observations_to_surrogate_space(
+                self.history.observations
+            ),
             num_points=2000
         )
 
@@ -221,8 +214,8 @@ class BO(BaseAdvisor):
             self.sample_space = self.compressor.sample_space
             
             # Rebuild surrogate model with new space dimensions
-            self.surrogate = build_my_surrogate(
-                func_str=self.surrogate_type,
+            self.surrogate = build_surrogate(
+                surrogate_type=self.surrogate_type,
                 config_space=self.surrogate_space,
                 rng=self.rng,
                 transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
@@ -245,9 +238,11 @@ class BO(BaseAdvisor):
             X_surrogate = self._get_surrogate_config_array()
             Y = self.history.get_objectives()
             self.surrogate.train(X_surrogate, Y)
-            
-            incumbent_value = self.history.get_incumbent_value()
-            self.acq_func.update(model=self.surrogate, eta=incumbent_value, num_data=len(self.history))
+            self.acq_func.update(
+                context=self.surrogate.get_acquisition_context(
+                    history=self.history
+                )
+            )
             
             logger.info("Surrogate model retrained after compression update")
             return True
