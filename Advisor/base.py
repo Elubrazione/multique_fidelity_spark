@@ -1,20 +1,25 @@
 import numpy as np
 import json as js
+from typing import Optional
 from openbox import logger
+from dimensio import Compressor
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 
-from .utils import build_observation, is_valid_spark_config, sanitize_spark_config
+from .utils import build_observation
+from .validation import ValidationStrategy, SparkConfigValidation
+from .warm_start import create_warm_starter
 
 
 class BaseAdvisor:
     def __init__(self, config_space: ConfigurationSpace, method_id='unknown',
                 task_id='test', ws_strategy='none',
                 tl_strategy='none',
-                seed=42, rand_prob=0.15, rand_mode='ran', 
+                seed=42, rand_prob=0.15, rand_mode='ran',
+                validation_strategy: Optional[ValidationStrategy] = None,
                 **kwargs):
         # Delay import to avoid circular dependency
-        from task_manager import TaskManager
+        from manager import TaskManager
         
         self.task_id = task_id
         self._logger_kwargs = kwargs.get('_logger_kwargs', None)
@@ -24,15 +29,22 @@ class BaseAdvisor:
         self.rand_prob = rand_prob
         self.rand_mode = rand_mode
         
+        self.validation_strategy = validation_strategy \
+                                    if validation_strategy is not None \
+                                    else SparkConfigValidation()
+        logger.info(f"Using validation strategy: {type(self.validation_strategy).__name__}")
+        
         self.task_manager = TaskManager.instance()
         self.ws_args = self.task_manager.get_ws_args()
         self.tl_args = self.task_manager.get_tl_args()
         
-        self.compressor = self.task_manager.get_compressor()
+        self.compressor: Compressor = self.task_manager.get_compressor()
         if self.compressor is None:
             raise RuntimeError("Compressor must be initialized and registered to TaskManager before creating Advisor")
 
-        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager.get_similar_tasks(topk=self.tl_args['topk']) if tl_strategy != 'none' else ([], [])
+        self.source_hpo_data, self.source_hpo_data_sims = self.task_manager. \
+                                                        get_similar_tasks(topk=self.tl_args['topk']) \
+                                                        if tl_strategy != 'none' else ([], [])
         if tl_strategy != 'none':
             # pass source_hpo_data as space_history and similarities
             self.surrogate_space, self.sample_space = self.compressor.compress_space(
@@ -47,6 +59,17 @@ class BaseAdvisor:
         self.sample_space.seed(self.seed)
         self.surrogate_space.seed(self.seed)
         self.ini_configs = list()
+        
+        self.sampling_strategy = self.compressor.get_sampling_strategy()
+        logger.info(f"Using sampling strategy: {type(self.sampling_strategy).__name__}")
+        
+        self.warm_starter = create_warm_starter(
+            ws_strategy=ws_strategy,
+            tl_strategy=tl_strategy,
+            method_id=method_id,
+            ws_args=self.ws_args
+        )
+        logger.info(f"Using warm starter: {type(self.warm_starter).__name__}")
 
         meta_feature = {}
         meta_feature['random'] = {'seed': seed, 'rand_prob': rand_prob, 'rand_mode': rand_mode}
@@ -90,34 +113,28 @@ class BaseAdvisor:
     def sample(self):
         raise NotImplementedError
 
-    @staticmethod
-    def sample_random_configs(config_space, num_configs=1, excluded_configs=None):
+    def sample_random_configs(self, num_configs=1, excluded_configs=None):
         if excluded_configs is None:
             excluded_configs = set()
 
-        configs = set()
-
-        _is_valid = is_valid_spark_config
-        _sanitize = sanitize_spark_config
+        configs = []
 
         trials = 0
         max_trials = max(100, num_configs * 20)
         while len(configs) < num_configs and trials < max_trials:
             trials += 1
-            sub_config = config_space.sample_configuration()
-            if not _is_valid(sub_config):
-                sub_config = _sanitize(sub_config)
-                if not _is_valid(sub_config):
+            sampled = self.sampling_strategy.sample(1)[0]
+            
+            if not self.validation_strategy.is_valid(sampled):
+                sampled = self.validation_strategy.sanitize(sampled)
+                if not self.validation_strategy.is_valid(sampled):
                     continue
 
-            if sub_config not in configs and sub_config not in excluded_configs:
-                sub_config.origin = "Random Sample!"
-                configs.add(sub_config)
-            else:
-                continue
+            if sampled not in configs and sampled not in excluded_configs:
+                sampled.origin = "Random Sample!"
+                configs.append(sampled)
 
-        sampled_configs = list(configs)
-        return sampled_configs
+        return configs
 
     def _cache_low_dim_config(self, config, obs):
         if not self.compressor.needs_unproject():

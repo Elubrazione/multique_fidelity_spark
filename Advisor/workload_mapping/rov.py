@@ -6,7 +6,7 @@ from openbox import logger, History
 from sklearn.preprocessing import MinMaxScaler
 
 from .base import *
-from .rover.train_model import calculate_similarity, train_model
+from .rover.train_model import calculate_similarity, train_model, calculate_relative
 from .rover.transfer import get_transfer_tasks
 
 
@@ -26,7 +26,19 @@ class RoverMapper(BaseMapper):
         self.already_fit = False
 
     @staticmethod
-    def get_src_history(source_hpo_data: List[History]) -> Tuple[np.ndarray, List[List[int]]]:
+    def history_to_list(history: History) -> List[List]:
+        his = []
+        for j in range(len(history)):
+            obs = history.observations[j]
+            config, perf = obs.config, obs.objectives[0]
+            config = convert_configurations_to_array([config])[0]
+            his.append([config, perf])
+        return his
+
+    @staticmethod
+    def get_src_history(
+        source_hpo_data: List[History]
+    ) -> Tuple[np.ndarray, List[List[int]]]:
         # meta_feature是一个n * l的numpy array,
         # 每行表示一个任务的meta feature, l是meta feature维数
         ts_meta_features = []
@@ -39,14 +51,7 @@ class RoverMapper(BaseMapper):
         for history in source_hpo_data:
             meta_feature = history.meta_info['meta_feature']
             ts_meta_features.append(meta_feature)
-
-            ts_his.append([])
-            for j in range(len(history)):
-                obs = history.observations[j]
-                config, perf = obs.config, obs.objectives[0]
-                config = convert_configurations_to_array([config])[0]
-
-                ts_his[-1].append([config, perf])
+            ts_his.append(RoverMapper.history_to_list(history))
 
         ts_meta_features = np.array(ts_meta_features).copy()
         ts_meta_features[np.isnan(ts_meta_features)] = 0
@@ -71,10 +76,8 @@ class RoverMapper(BaseMapper):
             self.already_fit = True
             return
 
-        # 检查是否有足够的历史任务
         if len(source_hpo_data) < 2:
             logger.warning(f"Only {len(source_hpo_data)} historical task(s) available. RoverMapper requires at least 2 tasks for similarity calculation.")
-            # 对于单个任务，我们跳过相似度计算和模型训练
             self.ts_meta_features = ts_meta_features  # 不进行缩放
             self.model = None
             self.already_fit = True
@@ -82,20 +85,29 @@ class RoverMapper(BaseMapper):
 
         self.scaler.fit(ts_meta_features)
         self.ts_meta_features = self.scaler.transform(ts_meta_features)
-        
         logger.info(f"Scaled meta features stats: min={self.ts_meta_features.min():.4f}, max={self.ts_meta_features.max():.4f}, std={self.ts_meta_features.std():.4f}")
 
-        # 计算相似度矩阵
         sim = calculate_similarity(ts_his, config_space)
         logger.info(f"Similarity matrix shape: {sim.shape}")
         logger.info(f"Similarity matrix stats: min={sim.min():.4f}, max={sim.max():.4f}, std={sim.std():.4f}")
 
-        # 训练模型并保存
         self.model = train_model(self.ts_meta_features, sim)
-
         self.already_fit = True
 
-    def map(self, target_history: History, source_hpo_data: List[History]) -> List[Tuple[int, float]]:
+    def map(
+        self,
+        target_history: History,
+        source_hpo_data: List[History],
+        use_real: bool = False,
+    ) -> List[Tuple[int, float]]:
+        if use_real:
+            logger.info("Using real observations to calculate similarity (consistency ratio)")
+            return self.map_with_observations(target_history, source_hpo_data)
+        else:
+            logger.info("Using CatBoost prediction to calculate similarity (based on meta_feature)")
+            return self.map_with_prediction(target_history, source_hpo_data)
+    
+    def map_with_prediction(self, target_history: History, source_hpo_data: List[History]) -> List[Tuple[int, float]]:
         target_meta_feature = np.array(target_history.meta_info.get('meta_feature', []))
 
         if len(target_meta_feature) == 0 or target_meta_feature.size == 0:
@@ -116,4 +128,41 @@ class RoverMapper(BaseMapper):
         idxes, sims = get_transfer_tasks(self.ts_meta_features, target_meta_feature, num=len(self.ts_meta_features), theta=-float('inf'))
 
         return list(zip(idxes, sims))
+    
+    def map_with_observations(
+        self,
+        target_history: History,
+        source_hpo_data: List[History]
+    ) -> List[Tuple[int, float]]:
+        """
+        使用真实观测数据计算目标任务与源任务之间的相似度（一致对占比）
+        
+        该方法使用真实观测值计算一致对占比，而不是使用CatBoost预测值。
+        适用于任务开始后有足够观测数据时。
+        
+        计算方式：
+        1. 对目标任务和源任务，分别用真实观测数据训练GP模型
+        2. 在相同的25个随机测试配置上预测性能
+        3. 计算预测序列之间的一致对占比作为相似度
+        """
+        target_his = self.history_to_list(target_history)
+        _, source_his_list = self.get_src_history(source_hpo_data)
+        
+        # 构建包含目标任务和所有源任务的历史列表，用于calculate_similarity
+        # calculate_similarity需要所有任务的历史数据来计算相似度矩阵
+        all_history = [target_his] + source_his_list
+        
+        # 使用calculate_similarity计算相似度矩阵
+        # 返回的sim矩阵中，sim[0, i+1]表示目标任务与第i个源任务的相似度
+        sim_matrix = calculate_similarity(all_history, target_history.config_space)
+        
+        sims = []
+        for idx in range(len(source_hpo_data)):
+            # sim_matrix[0, idx+1] 是目标任务与第idx个源任务的相似度
+            sim = sim_matrix[0, idx + 1]
+            sims.append((idx, sim))
+        
+        sims.sort(key=lambda x: x[1], reverse=True)
+        logger.info(f"Calculated similarity with real observations: {[(idx, f'{sim:.4f}') for idx, sim in sims[:min(5, len(sims))]]}")
+        return sims
 

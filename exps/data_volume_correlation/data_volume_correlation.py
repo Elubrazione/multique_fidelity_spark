@@ -23,7 +23,7 @@ from utils.spark import (
     get_full_queries_tasks,
 )
 
-from config import ConfigManager
+from manager import ConfigManager
 config_manager = ConfigManager()
 
 def extract_sql_performance_data(sql_results):

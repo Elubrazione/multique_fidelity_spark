@@ -1,6 +1,11 @@
 from typing import Dict, Optional
 from .BO import BO
 from .MFBO import MFBO
+from .validation import ValidationStrategy, NoOpValidation, \
+                        SparkConfigValidation, CompositeValidation
+from .warm_start import NoWarmStart, \
+                        BestConfigsWarmStart, \
+                        create_warm_starter
 
 _ADVISOR_REGISTRY = {
     'bo': BO,
@@ -79,4 +84,14 @@ __all__ = [
     'get_surrogate_type',
     'get_acq_type',
     'extract_base_surrogate',
+    # Validation strategies
+    'ValidationStrategy',
+    'NoOpValidation',
+    'SparkConfigValidation',
+    'CompositeValidation',
+    # Warm start strategies
+    'WarmStarter',
+    'NoWarmStart',
+    'BestConfigsWarmStart',
+    'create_warm_starter',
 ]

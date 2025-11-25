@@ -1,60 +1,49 @@
 import numpy as np
+import pandas as pd
+from typing import List
+from .base import (
+    TransferLearningAcquisition,
+    AcquisitionFunction,
+    SurrogateModel,
+    AcquisitionContext
+)
 
-from openbox.acquisition_function.acquisition import AbstractAcquisitionFunction
-from openbox.surrogate.base.base_model import AbstractModel
 
-from ..surrogate.base import BaseTLSurrogate
-from ..utils import build_my_acq_func, calculate_ranking
-
-
-class WeightedRank(AbstractAcquisitionFunction):
-    def __init__(self, model: AbstractModel, acq_func='ei', temperature=0.1):
+class WeightedRank(TransferLearningAcquisition):
+    def __init__(self, model: SurrogateModel, acq_func='ei', temperature=0.1):
         super(WeightedRank, self).__init__(model)
         self.long_name = 'Weighted Rank'
 
         self.eta = None
-        self.w = None
+        self.temperature = temperature
 
         self.inner_acq_type = acq_func
-        self.acq_funcs = None
+        self.acq_funcs: List[AcquisitionFunction] = None
 
-    def update(self, model, eta, num_data):
-
-        assert isinstance(model, BaseTLSurrogate)
-
-        self.w = np.array(model.get_weights())
-        assert len(self.w) == model.K + 1
+    def update(self, context=None, **kwargs):
+        if context is not None:
+            self._update_from_context(context, **kwargs)
+            return
+        
+    def _update_from_context(self, context: AcquisitionContext, **kwargs) -> None:
+        if not context.is_multi_task():
+            raise ValueError("WeightedRank requires multi-task context")
+        
+        self.weights = context.weights
+        self.eta = context.get_target_task().get_incumbent_value()
+        self.model = context.get_main_surrogate()
+        
+        from . import get_acq
         self.acq_funcs = []
-        for i in range(model.K):
-            acq_func = build_my_acq_func(func_str=self.inner_acq_type, model=model.source_surrogates[i])
-            acq_func.update(
-                eta=model.source_hpo_data[i].get_incumbent_value(),
-                num_data=len(model.source_hpo_data[i])
+        for task in context.tasks:
+            acq_func = get_acq(
+                acq_type=self.inner_acq_type,
+                model=task.surrogate
             )
+            acq_func.update(context=AcquisitionContext(tasks=[task], weights=None))
             self.acq_funcs.append(acq_func)
-
-        target_acq = build_my_acq_func(func_str=self.inner_acq_type, model=model.target_surrogate)
-        target_acq.update(eta=eta, num_data=num_data)
-
-        self.acq_funcs.append(target_acq)
-
-        self.model = model
-
-    def _compute(self, X: np.ndarray, **kwargs):
-        """Computes the EI value and its derivatives.
-
-        Parameters
-        ----------
-        X: np.ndarray(N, D), The input points where the acquisition function
-            should be evaluated. The dimensionality of X is (N, D), with N as
-            the number of points to evaluate at and D is the number of
-            dimensions of one X.
-
-        Returns
-        -------
-        np.ndarray(N, 1)
-            Expected Improvement of X
-        """
+    
+    def _compute(self, X: np.ndarray, **kwargs) -> np.ndarray:
         if len(X.shape) == 1:
             X = X[:, np.newaxis]
 
@@ -64,13 +53,23 @@ class WeightedRank(AbstractAcquisitionFunction):
 
         all_scores = []
         for i in range(len(self.acq_funcs)):
-            all_scores.append(self.acq_funcs[i]._compute(X, **kwargs).reshape(-1))
-
+            scores = self.acq_funcs[i]._compute(X, **kwargs).reshape(-1)
+            all_scores.append(scores)
         all_rankings = np.array(calculate_ranking(all_scores))
-
-        # TODO: Combine with weights
-        final_ranking = np.sum(all_rankings * self.w[:, np.newaxis], axis=0)
-
+        final_ranking = self._combine_acquisitions(all_rankings[: -1], all_rankings[-1])
         final_acq = np.max(final_ranking) - final_ranking
-
         return final_acq.reshape(-1, 1)
+    
+    def _combine_acquisitions(self, source_rankings: np.ndarray, 
+                            target_ranking: np.ndarray) -> np.ndarray:
+        all_rankings = np.vstack([source_rankings, target_ranking.reshape(1, -1)])
+        final_ranking = np.sum(all_rankings * self.weights[:, np.newaxis], axis=0)
+        return final_ranking
+
+def calculate_ranking(score_list, ascending=False):
+    rank_list = list()
+    for i in range(len(score_list)):
+        value_list = pd.Series(list(score_list[i]))
+        rank_array = np.array(value_list.rank(ascending=ascending))
+        rank_list.append(rank_array)
+    return rank_list

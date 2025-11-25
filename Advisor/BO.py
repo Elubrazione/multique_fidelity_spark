@@ -2,12 +2,12 @@ import numpy as np
 import copy
 from openbox import logger
 from openbox.utils.history import Observation
-from ConfigSpace import Configuration, ConfigurationSpace
+from ConfigSpace import ConfigurationSpace
 
 from .base import BaseAdvisor
-from .utils import build_my_surrogate, build_my_acq_func, \
-    is_valid_spark_config, sanitize_spark_config
-from .acq_optimizer.local_random import InterleavedLocalAndRandomSearch
+from .surrogate import build_surrogate
+from .acq_function import get_acq
+from .acq_function.optimizer import create_local_random_optimizer
 
 
 class BO(BaseAdvisor):
@@ -23,89 +23,53 @@ class BO(BaseAdvisor):
         self.surrogate_type = surrogate_type
         self.norm_y = False if 'wrk' in self.acq_type else True
         
-        self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
+        self.surrogate = build_surrogate(surrogate_type=self.surrogate_type, config_space=self.surrogate_space, rng=self.rng,
                                             transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
                                             extra_dim=0, norm_y=self.norm_y)
-        self.acq_func = build_my_acq_func(func_str=self.acq_type, model=self.surrogate)
-        self.acq_optimizer = InterleavedLocalAndRandomSearch(acquisition_function=self.acq_func,
-                                                            rand_prob=self.rand_prob, rand_mode=self.rand_mode, rng=self.rng,
-                                                            config_space=self.sample_space)
+        self.acq_func = get_acq(acq_type=self.acq_type, model=self.surrogate)
+        
+        self.acq_optimizer = create_local_random_optimizer(
+            acquisition_function=self.acq_func,
+            config_space=self.sample_space,
+            sampling_strategy=self.sampling_strategy,
+            rand_prob=self.rand_prob,
+            rng=self.rng,
+            candidate_multiplier=3.0
+        )
 
     def warm_start(self):
-        # no warm start if ws_strategy or tl_strategy is none
         if self.ws_strategy == 'none' or self.tl_strategy == 'none':
             return
+        self._update_ws_info()
+        num_evaluated = self.get_num_evaluated_exclude_default()
+        logger.info("Begin using warm starter: %s" % type(self.warm_starter).__name__)
         
-        sims = self.source_hpo_data_sims
+        ini_configs = self.warm_starter.get_initial_configs(
+            source_hpo_data=self.source_hpo_data,
+            source_hpo_data_sims=self.source_hpo_data_sims,
+            init_num=self.init_num,
+            compressor=self.compressor,
+            num_evaluated=num_evaluated,
+            sampling_func=lambda n: self.sample_random_configs(
+                n, excluded_configs=self.history.configurations
+            )
+        )
+        self.ini_configs = ini_configs + self.ini_configs
+        
+        logger.info("Successfully use warm starter %d configurations with %s!" 
+                % (len(self.ini_configs), type(self.warm_starter).__name__))
+    
+    def _update_ws_info(self):
         warm_str_list = []
-        for i in range(len(sims)):
-            idx, sim = sims[i]
+        for idx, sim in self.source_hpo_data_sims:
             task_str = self.source_hpo_data[idx].task_id
             warm_str = "%s: sim%.4f" % (task_str, sim)
             warm_str_list.append(warm_str)
-
         if 'warm_start' not in self.history.meta_info:
             self.history.meta_info['warm_start'] = [warm_str_list]
         else:
             self.history.meta_info['warm_start'].append(warm_str_list)
-
-        # warm_start strategy: select the best ws_args['topk'] configurations from each similar task
-        # organize configurations by ranking, here K is the number of similar tasks (tl_args['topk'])
-        #   task1_config1, task2_config1, task3_config1, ..., task_{K}_config1,
-        #   task1_config2, task2_config2, task3_config2, ..., task_{K}_config2,
-        #   ...
-        #   task1_config{ws_topk}, task2_config{ws_topk}, task3_config{ws_topk}, ..., task_{K}_config{ws_topk},
-        
-        # For BOHB/MFES: ws_topk = ws_args['topk'], length of ini_configs = self.init_num * ws_topk
-        # For others: ws_topk = 1, length of ini_configs = self.init_num
-        ws_topk = int(self.ws_args['topk']) if 'BOHB' in self.method_id or 'MFES' in self.method_id else 1
-
-        # prepare sorted configurations for each similar task
-        source_observations = []
-        for idx, sim in sims:
-            sim_obs = copy.deepcopy(self.source_hpo_data[idx].observations)
-            sim_obs = sorted(sim_obs, key=lambda x: x.objectives[0])
-            # select the best ws_args['topk'] configurations
-            top_obs = sim_obs[: min(ws_topk, len(sim_obs))]
-            source_observations.append((idx, top_obs))
-            logger.info("Source task %s: selected top %d configurations" \
-                % (self.source_hpo_data[idx].task_id, len(top_obs)))
-
-        ini_list = []
-        target_length = self.init_num * ws_topk if ws_topk > 1 else self.init_num
-        num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
-        
-        for rank in range(ws_topk):
-            if len(ini_list) + num_evaluated_exclude_default >= target_length:
-                break
-            for idx, top_obs in source_observations:
-                if len(ini_list) + num_evaluated_exclude_default >= target_length:
-                    break
-                if rank < len(top_obs):
-                    config_warm_old = top_obs[rank].config
-                    # Use compressor to convert config to surrogate space
-                    # This handles both projection (if needed) and parameter filtering
-                    config_warm = self.compressor.convert_config_to_surrogate_space(config_warm_old)
-                    config_warm.origin = self.ws_strategy + "_" + self.source_hpo_data[idx].task_id + "_" + str(sims[idx][1]) + "_rank" + str(rank)
-                    ini_list.append(config_warm)
-                    logger.info("Warm start configuration from task %s, rank %d, objective: %s, %s" % 
-                                (self.source_hpo_data[idx].task_id, rank, top_obs[rank].objectives[0], config_warm.origin))
-
-        # the best configurations should be at the end of the list, so we need to reverse the list
-        # the reversed order: task3_config2, ..., task3_config1, task2_config1, task1_config1
-        # (the last one is the first one to be used)
-        # the usage order: task1_config1, task2_config1, task3_config1, task1_config2, task2_config2
-        self.ini_configs = ini_list[::-1] + self.ini_configs
-
-        while len(self.ini_configs) + num_evaluated_exclude_default < target_length:
-            config = self.sample_random_configs(self.sample_space, 1,
-                                                excluded_configs=self.history.configurations)[0]
-            config.origin = self.ws_strategy + " Warm Start Random Sample"
-            logger.debug("Warm start configuration from random sample: %s" % config.origin)
-            self.ini_configs = [config] + self.ini_configs
-
-        logger.info("Successfully warm start %d configurations with %s!" \
-                    % (len(self.ini_configs), self.ws_strategy))
+        logger.debug("Updated warm start meta info: %s" % warm_str_list)
 
 
     def sample(self, batch_size=1, prefix=''):
@@ -140,8 +104,7 @@ class BO(BaseAdvisor):
                         batch.append(config)
                 remaining = batch_size - len(batch)
                 for _ in range(remaining):
-                    config = self.sample_random_configs(self.sample_space, 1,
-                                                        excluded_configs=self.history.configurations)[0]
+                    config = self.sample_random_configs(1, excluded_configs=self.history.configurations)[0]
                     config.origin = prefix + 'BO Warm Start Random Sample'
                     logger.debug("BOHB: take random config: %s" % config.origin)
                     batch.append(config)
@@ -155,41 +118,28 @@ class BO(BaseAdvisor):
                         config.origin = prefix + 'BO Warm Start ' + str(config.origin)
                         logger.debug("Regular BO: take config from warm start: %s" % config.origin)
                     else:
-                        config = self.sample_random_configs(self.sample_space, 1,
-                                                            excluded_configs=self.history.configurations)[0]
+                        config = self.sample_random_configs(1, excluded_configs=self.history.configurations)[0]
                         config.origin = prefix + 'BO Warm Start Random Sample'
                         logger.debug("Regular BO: take random config: %s" % config.origin)
                     batch.append(config)
             
-            if self.compressor.needs_unproject():
-                batch = self._unproject_batch(batch)
-            
+            self.compressor.unproject_points(batch)
             return batch
         
         X = self._get_surrogate_config_array()
         Y = self.history.get_objectives()
-
-        if self.surrogate_type == 'gpf':
-            self.surrogate = build_my_surrogate(func_str=self.surrogate_type, config_space=self.surrogate_space,
-                                                rng=self.rng,
-                                                transfer_learning_history=self.source_hpo_data,
-                                                extra_dim=self.extra_dim, norm_y=self.norm_y)
-            logger.info("Successfully rebuild the surrogate model GP!")
-            
         self.surrogate.train(X, Y)
-
         self.acq_func.update(
-            model=self.surrogate,
-            eta=self.history.get_incumbent_value(),
-            num_data=len(self.history)
+            context=self.surrogate.get_acquisition_context(
+                history=self.history
+            )
         )
         challengers = self.acq_optimizer.maximize(
-            observations=self._convert_observations_to_surrogate_space(self.history.observations),
+            observations=self._convert_observations_to_surrogate_space(
+                self.history.observations
+            ),
             num_points=2000
         )
-    
-        _is_valid = is_valid_spark_config
-        _sanitize = sanitize_spark_config
 
         batch = []
         # For BOHB/MFES in low-fidelity stage: take q configs from warm start, then fill rest with acquisition function
@@ -206,22 +156,22 @@ class BO(BaseAdvisor):
                 batch.append(config)
             logger.info(f"[BOHB/MFES] Take {q} configurations from warm start in low-fidelity stage, remaining: {len(self.ini_configs)}")
         
-        # Fill remaining with acquisition function samples
-        for config in challengers.challengers:
+
+        for config in challengers:
             if len(batch) >= batch_size:
                 break
             if config in self.history.configurations:
                 continue
-            if not _is_valid(config):
-                config = _sanitize(config)
-            if _is_valid(config):
-                config.origin = prefix + 'BO Acquisition'
+            if not self.validation_strategy.is_valid(config):
+                config = self.validation_strategy.sanitize(config)
+            if self.validation_strategy.is_valid(config):
+                config.origin = prefix + 'BO Acquisition ' + str(config.origin)
                 batch.append(config)
                 logger.debug("BOHB/MFES: take config from acquisition function: %s" % config.origin)
         # Fill any remaining with random samples
         if len(batch) < batch_size:
             random_configs = self.sample_random_configs(
-                self.sample_space, batch_size - len(batch),
+                batch_size - len(batch),
                 excluded_configs=self.history.configurations + batch
             )
             for config in random_configs:
@@ -229,26 +179,9 @@ class BO(BaseAdvisor):
                 logger.debug("BOHB/MFES: take random config: %s" % config.origin)
                 batch.append(config)
         
-        if self.compressor.needs_unproject():
-            batch = self._unproject_batch(batch)
-
+        self.compressor.unproject_points(batch)
         return batch
     
-    def _unproject_batch(self, batch):
-        unprojected_batch = []
-        # Determine the target space for unprojection
-        # If compressor has unprojected_space, use it; otherwise use original config_space
-        target_space = self.compressor.get_unprojected_space()
-        
-        for compressed_config in batch:
-            compressed_dict = compressed_config.get_dictionary() if hasattr(compressed_config, 'get_dictionary') else dict(compressed_config)
-            unprojected_dict = self.compressor.unproject_point(compressed_config)
-            unprojected_config = Configuration(target_space, values=unprojected_dict)
-            if hasattr(compressed_config, 'origin') and compressed_config.origin:
-                unprojected_config.origin = compressed_config.origin
-            unprojected_config._low_dim_config = compressed_dict
-            unprojected_batch.append(unprojected_config)
-        return unprojected_batch
     
     def _get_surrogate_config_array(self):
         X_surrogate = []
@@ -281,8 +214,8 @@ class BO(BaseAdvisor):
             self.sample_space = self.compressor.sample_space
             
             # Rebuild surrogate model with new space dimensions
-            self.surrogate = build_my_surrogate(
-                func_str=self.surrogate_type,
+            self.surrogate = build_surrogate(
+                surrogate_type=self.surrogate_type,
                 config_space=self.surrogate_space,
                 rng=self.rng,
                 transfer_learning_history=self.compressor.transform_source_data(self.source_hpo_data),
@@ -291,20 +224,25 @@ class BO(BaseAdvisor):
             )
             logger.info(f"Successfully rebuilt the surrogate model ({self.surrogate_type}) with {len(self.surrogate_space.get_hyperparameters())} dimensions")
             
-            self.acq_optimizer = InterleavedLocalAndRandomSearch(
+            self.sampling_strategy = self.compressor.get_sampling_strategy()
+            
+            self.acq_optimizer = create_local_random_optimizer(
                 acquisition_function=self.acq_func,
+                config_space=self.sample_space,
+                sampling_strategy=self.sampling_strategy,
                 rand_prob=self.rand_prob,
-                rand_mode=self.rand_mode,
                 rng=self.rng,
-                config_space=self.sample_space
+                candidate_multiplier=3.0
             )
             
             X_surrogate = self._get_surrogate_config_array()
             Y = self.history.get_objectives()
             self.surrogate.train(X_surrogate, Y)
-            
-            incumbent_value = self.history.get_incumbent_value()
-            self.acq_func.update(model=self.surrogate, eta=incumbent_value, num_data=len(self.history))
+            self.acq_func.update(
+                context=self.surrogate.get_acquisition_context(
+                    history=self.history
+                )
+            )
             
             logger.info("Surrogate model retrained after compression update")
             return True
