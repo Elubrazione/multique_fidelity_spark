@@ -5,11 +5,9 @@ from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
 
 from Advisor.utils import map_source_hpo_data, build_observation
-from utils.spark import resolve_runtime_metrics
 from .config_manager import ConfigManager
 from .history_manager import HistoryManager
 from .component_registry import ComponentRegistry
-
 
 
 class TaskManager:    
@@ -84,6 +82,8 @@ class TaskManager:
             return
         
         logger.info("Computing current task meta feature using default config...")
+
+        from extensions.spark import resolve_runtime_metrics
         meta_feature = resolve_runtime_metrics(spark_log_dir=self.spark_log_dir)
         
         self.history_manager.initialize_current_task(task_id, meta_feature)
