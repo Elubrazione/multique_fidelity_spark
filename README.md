@@ -181,10 +181,10 @@
         <td>S</td>
         <td>S</td>
         <td>S/T</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>153</td>
+        <td><a href="log/tpch_600g/SMAC/640u240n2_2025-11-26-07-53-44-367911.log">查看日志</a></td>
+        <td><a href="">查看结果</a></td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td rowspan="4">3节点</td>
