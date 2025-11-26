@@ -112,10 +112,10 @@
         <td>S</td>
         <td>S</td>
         <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>76</td>
+        <td><a href="log/tpch_100g/SMAC/32u240n3_2025-11-26-09-13-54-385166.log">查看日志</a></td>
+        <td><a href="results/tpch_100g/32u240n3____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-26-09-40-46-618214.json">查看结果</a></td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td>64u</td>
@@ -479,118 +479,6 @@
         <td><a href="log/tpcds_300g/SMAC/64u240n2_2025-11-02-13-57-55-765569.log">查看日志</a></td>
         <td><a href="results/tpcds_300g/64u240n2____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-02-14-26-36-050275.json">查看结果</a></td>
         <td>✅</td>
-    </tr>
-    <tr>
-        <td rowspan="8">JOB</td>
-        <td rowspan="8">600G</td>
-        <td rowspan="4">2节点</td>
-        <td rowspan="2">128G</td>
-        <td>32u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td rowspan="2">256G</td>
-        <td>32u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td>S</td>
-        <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td rowspan="4">3节点</td>
-        <td rowspan="2">128G</td>
-        <td>32u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td rowspan="2">256G</td>
-        <td>32u</td>
-        <td>S</td>
-        <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    <tr>
-        <td>64u</td>
-        <td>T</td>
-        <td>T</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
     </tr>
 </table>
 
