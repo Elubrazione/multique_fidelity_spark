@@ -115,7 +115,7 @@
         <td>76</td>
         <td><a href="log/tpch_100g/SMAC/32u240n3_2025-11-26-09-13-54-385166.log">查看日志</a></td>
         <td><a href="results/tpch_100g/32u240n3____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-26-09-40-46-618214.json">查看结果</a></td>
-        <td>⏸️</td>
+        <td>✅</td>
     </tr>
     <tr>
         <td>64u</td>
