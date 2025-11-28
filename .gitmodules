@@ -1,0 +1,3 @@
+[submodule "Compressor"]
+	path = Compressor
+	url = https://github.com/Elubrazione/dimensio.git

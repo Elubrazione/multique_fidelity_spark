@@ -17,3 +17,8 @@ catboost_info/*
 results/*
 docs/
 mock/*
+test*.py
+
+*.json
+*.png
+baselines
