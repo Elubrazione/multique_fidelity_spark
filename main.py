@@ -1,15 +1,19 @@
 from openbox import logger
 
 from manager import ConfigManager, TaskManager
-from extensions.spark.evaluator import SparkEvaluatorManager
+from core.plugin_loader import PluginLoader
 from Evaluator import MockExecutor
 from Optimizer import get_optimizer
-from Optimizer.utils import load_space_from_json
-from dimensio import get_compressor
+from Compressor.dimensio import get_compressor
 
 args = ConfigManager.parse_args()
 config_manager = ConfigManager(config_file=args.config, args=args)
-config_space = load_space_from_json(config_manager.config_space)
+
+target_system_name = config_manager.target_system
+target_system = PluginLoader.load_target_system(target_system_name)
+target_system.initialize(config_manager)
+
+config_space = target_system.get_default_config_space()
 
 logger_kwargs = config_manager.get_logger_kwargs(args.task, args.opt, args.log_level)
 logger.init(**logger_kwargs)
@@ -18,14 +22,19 @@ logger_kwargs.update({'force_init': False})
 evaluators = None
 if args.test_mode:
     evaluators = [MockExecutor(seed=42)]
-executor = SparkEvaluatorManager(
-    config_space=config_space, config_manager=config_manager, evaluators=evaluators)
+
+executor = target_system.get_evaluator_manager(
+    config_space=config_space, 
+    evaluators=evaluators,
+    test_mode=args.test_mode
+)
 
 
 task_manager = TaskManager.instance(
     config_space=config_space,
     config_manager=config_manager,
-    logger_kwargs=logger_kwargs
+    logger_kwargs=logger_kwargs,
+    target_system=target_system
 )
 executor.attach_task_manager(task_manager)
 task_manager.calculate_meta_feature(
