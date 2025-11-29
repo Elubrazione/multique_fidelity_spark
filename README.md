@@ -223,10 +223,10 @@
         <td>S</td>
         <td>S/T</td>
         <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>76</td>
+        <td><a href="log/tpch_600g/SMAC/32u240n3_2025-11-28-16-35-45-549208.log">查看日志</a></td>
+        <td><a href="results/tpch_600g/32u240n3____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-28-18-46-23-848304.json">查看结果</td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td>64u</td>
