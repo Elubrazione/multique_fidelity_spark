@@ -7,7 +7,10 @@ from ConfigSpace import ConfigurationSpace
 from Advisor.utils import map_source_hpo_data, build_observation
 from .config_manager import ConfigManager
 from .history_manager import HistoryManager
+from .config_manager import ConfigManager
+from .history_manager import HistoryManager
 from .component_registry import ComponentRegistry
+from core.interfaces import TargetSystem
 
 
 class TaskManager:    
@@ -23,6 +26,7 @@ class TaskManager:
                 config_space: ConfigurationSpace,
                 config_manager: ConfigManager,
                 logger_kwargs,
+                target_system: Optional[TargetSystem] = None,
                 **kwargs):
         if hasattr(self, "_initialized") and self._initialized:
             return
@@ -37,7 +41,8 @@ class TaskManager:
         self.logger_kwargs = logger_kwargs
         self.random_kwargs = method_args.get('random_kwargs')
         self.config_space = config_space
-        self.spark_log_dir = config_manager.spark_log_dir
+        self.target_system = target_system
+        # self.spark_log_dir = config_manager.spark_log_dir  # Removed: handled by target_system
         
         self.history_manager = HistoryManager(
             config_space=config_space,
@@ -53,13 +58,11 @@ class TaskManager:
     
     def _setup_listeners(self):
         def mark_plan_dirty(component):
-            partitioner = self.component_registry.get('sql_partitioner')
-            if partitioner is not None and hasattr(partitioner, 'mark_plan_dirty'):
-                logger.warning("Marking SQL plan dirty due to component change")
-                partitioner.mark_plan_dirty()
+            if self.target_system:
+                self.target_system.on_component_update('scheduler', component)
         
         self.component_registry.add_listener('scheduler', mark_plan_dirty)
-        self.component_registry.add_listener('sql_partitioner', mark_plan_dirty)
+        # self.component_registry.add_listener('sql_partitioner', mark_plan_dirty) # Handled by target_system if needed
     
 
     def calculate_meta_feature(self, eval_func: Callable, task_id: str = "default", **kwargs):
@@ -81,10 +84,13 @@ class TaskManager:
             self._update_similarity()
             return
         
-        logger.info("Computing current task meta feature using default config...")
+        logger.info("Computing current task meta feature using target system...")
 
-        from extensions.spark import resolve_runtime_metrics
-        meta_feature = resolve_runtime_metrics(spark_log_dir=self.spark_log_dir)
+        if self.target_system:
+            meta_feature = self.target_system.get_meta_feature(task_id, test_mode=kwargs.get('test_mode', False))
+        else:
+            logger.warning("No target system configured, using random meta feature")
+            meta_feature = np.random.rand(34)
         
         self.history_manager.initialize_current_task(task_id, meta_feature)
         self.history_manager.update_current_history(build_observation(default_config, result))
@@ -100,10 +106,8 @@ class TaskManager:
         self._mark_sql_plan_dirty()
     
     def _mark_sql_plan_dirty(self):
-        partitioner = self.component_registry.get('sql_partitioner')
-        if partitioner is not None and hasattr(partitioner, 'mark_plan_dirty'):
-            logger.warning("Marking SQL plan dirty")
-            partitioner.mark_plan_dirty()
+        if self.target_system:
+            self.target_system.on_component_update('scheduler', None)
     
     
     @property
