@@ -223,9 +223,13 @@ class ConfigManager:
         return self.multi_clusters['nodes']
 
     @property
-    def spark_log_dir(self) -> str:
-        return self.local_cluster['spark_log_dir']
-    
+    def target_system(self) -> str:
+        return self.config.get('target_system', 'spark')  # Default to spark for backward compatibility
+
+    @property
+    def system_config(self) -> Dict[str, Any]:
+        return self.config.get('system_config', {})
+
     @property
     def config_space(self) -> str:
         return os.path.join(
@@ -265,7 +269,7 @@ class ConfigManager:
         return logger_kwargs
     
     def get_cp_args(self, config_space) -> Dict[str, Any]:
-        from dimensio.utils import load_expert_params
+        from Compressor.dimensio.utils import load_expert_params
         
         cp_args = self.method_args.get('cp_args', {}).copy()
         expert_params = load_expert_params(self.expert_space)

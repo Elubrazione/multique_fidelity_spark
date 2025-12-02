@@ -2,7 +2,7 @@ import numpy as np
 import json as js
 from typing import Optional
 from openbox import logger
-from dimensio import Compressor
+from Compressor.dimensio import Compressor
 from ConfigSpace import Configuration, ConfigurationSpace
 from ConfigSpace.read_and_write.json import write
 

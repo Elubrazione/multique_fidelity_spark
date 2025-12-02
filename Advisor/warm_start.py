@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, List, Tuple
 from openbox import logger
 from ConfigSpace import Configuration
-from dimensio import Compressor
+from Compressor.dimensio import Compressor
 
 
 class WarmStarter(ABC):    
