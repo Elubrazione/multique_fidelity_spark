@@ -43,9 +43,9 @@
         <td>S</td>
         <td>S</td>
         <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>153</td>
+        <td><a href="log/tpch_100g/SMAC/64u120n2_2025-12-03-11-38-27-184405.log">查看日志</a></td>
+        <td><a href="">查看结果</td>
         <td>⏸️</td>
     </tr>
     <tr>
