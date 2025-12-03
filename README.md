@@ -43,10 +43,10 @@
         <td>S</td>
         <td>S</td>
         <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>153</td>
+        <td><a href="log/tpch_100g/SMAC/64u120n2_2025-12-03-11-38-27-184405.log">查看日志</a></td>
+        <td><a href="">查看结果</td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td rowspan="2">256G</td>
@@ -183,8 +183,8 @@
         <td>S/T</td>
         <td>153</td>
         <td><a href="log/tpch_600g/SMAC/640u240n2_2025-11-26-07-53-44-367911.log">查看日志</a></td>
-        <td><a href="">查看结果</a></td>
-        <td>⏸️</td>
+        <td><a href="results/tpch_600g/640u240n2____Wnone29Tnonek-1Cnonek51sigma2.0top_ratio0.8__Sfull__s42_2025-11-26-11-18-48-124804.json">查看结果</a></td>
+        <td>✅</td>
     </tr>
     <tr>
         <td rowspan="4">3节点</td>
