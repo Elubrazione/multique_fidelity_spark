@@ -3,7 +3,7 @@
     "result_dir": "results",
     "database": "tpch_600g",
     "spark": {
-      "nodes": ["agent1", "server1"],
+      "nodes": ["agent1", "agent2", "server1"],
       "server_node": "server1",
       "username": "root",
       "password": "rootroot"
@@ -13,7 +13,7 @@
       "passwords": ["root"],
       "servers": ["192.168.90.76"],
       "nodes": [
-        ["192.168.90.76", "192.168.90.77"]
+        ["192.168.90.76", "192.168.90.77", "192.168.90.78"]
       ]
     },
     "env": {
