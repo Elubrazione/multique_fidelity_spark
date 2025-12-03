@@ -98,10 +98,10 @@
         <td>S</td>
         <td>S</td>
         <td>S</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>76</td>
+        <td><a href="log/tpch_100g/SMAC/64u120n3_2025-12-03-12-44-50-589882.log">查看日志</td>
+        <td><a href="">查看结果</td>
+        <td>⏸️</td>
     </tr>
     <tr>
         <td rowspan="2">256G</td>
