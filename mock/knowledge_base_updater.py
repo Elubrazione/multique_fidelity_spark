@@ -23,6 +23,7 @@ def fake_update_history(update_task_id, epoch_id, logger, weights=None):
                 f"memory [{memory_thresholds[0]}m, {memory_thresholds[1]}m].")
 
     history_data = get_history_data()
+    history_data = history_data[history_data['status'] == 1]
 
     regression_model = PerformanceModel(logger=logger,
                                         core_thresholds=core_thresholds,

@@ -88,7 +88,7 @@ class PerformanceModel:
                 v = trial.suggest_int(name=key, low=min_value, high=max_value, step=step_length)
             elif knob_type == KnobType.NUMERIC:
                 min_value, max_value, step_length = details['range'][0: 3]
-                v = round(trial.suggest_float(key, min_value, max_value, step=step_length), 3)
+                v = round(trial.suggest_float(name=key, low=min_value, high=max_value, step=step_length), 3)
             else:
                 continue
             tmp.append(v)

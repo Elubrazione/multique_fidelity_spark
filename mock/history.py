@@ -19,10 +19,8 @@ class GlobalData:
         """初始化历史数据"""
         try:
             self.history_data = pd.read_csv(file_path)
-            print(f"[MFTune]: data is successfully loaded.")
             return True
         except Exception as e:
-            print(f"[MFTune]: failed to load data: {e}")
             self.history_data = pd.DataFrame()
             return False
     

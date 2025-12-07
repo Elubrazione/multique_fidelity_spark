@@ -49,6 +49,10 @@ python main.py --mode multi \
                --epochs 5 \
                --task_suffix ""
 ```
-实际使用时, 由于task_id关联到embedding vector的计算, 所以需正确设置, 对于MFTune这种使用99条query的实验略显负责, 可以将query的字符串放入new_tasks的文件中, 利用类似`run_test.sh`中的脚本进行运行.
+> 实际使用时, 由于task_id关联到embedding vector的计算, 所以需正确设置, 对于MFTune这种使用99条query的实验略显复杂, 可以将query的字符串放入new_tasks的文件中, 利用类似`run_test.sh`中的脚本进行运行.
+
+经后续思考, 决定放弃encode这一部分, 毕竟对于本问题并没有显著作用 (使用所有的queries)
 
 关于历史数据以及相关query的路径配置, 都在common.py中, 注意, 默认数据路径与`workload`(诸如TPCDS), `data_size`(诸如100), `mode`(诸如multi)是相关的, 如有需要可以后续进行修改.
+
+关于`json`历史数据到支持LOFTune的`csv`历史数据的转化, 转化工具在`./scripts/json_to_history.py`中, 使用时记得在当前文件夹下 (模块才能正确加载), 也即`python ./scripts/json_to_history.py`
