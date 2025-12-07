@@ -9,7 +9,7 @@ from hdfs import Client
 
 from config.common import *
 from config.knobs_list import *
-from sql_encoder.script import encode
+# from sql_encoder.script import encode
 from config.encoder_config import sql_embedding_dim
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine

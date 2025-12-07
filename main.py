@@ -2,8 +2,9 @@ import os
 import sys
 import argparse
 import config.config
-import pymysql
-from sqlalchemy_utils import database_exists, create_database
+import pdb
+# import pymysql
+# from sqlalchemy_utils import database_exists, create_database
 
 import pdb
 

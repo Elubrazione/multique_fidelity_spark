@@ -11,6 +11,7 @@ This repository contains the source code for our paper: **LOFTune: A Low-overhea
 - torch 1.12.1
 - tree-sitter 0.20.1
 - sqlglot 20.7.1
+- hdfs
 ***
 
 # Datasets

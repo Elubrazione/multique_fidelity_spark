@@ -59,7 +59,7 @@ def find_most_similar_by_dot_product(data, history_data, embedding_dim, logger):
         return None, 0.0
 
 
-def find_config_by_task_id(task_id, history_data, logger)-> dict | None:
+def find_config_by_task_id(task_id, history_data, logger)-> dict:
     """
     根据task_id在history_data中查找对应的配置
     """
