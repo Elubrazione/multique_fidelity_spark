@@ -461,8 +461,8 @@ def resolve_runtime_metrics(
         json_content = f.read()
     logger.info(f"Read json file: {json_file}")
     metrics = decode_results_spark(json_content)
-    os.remove(zstd_file)
-    os.remove(json_file)
+    # os.remove(zstd_file)
+    # os.remove(json_file)
     logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
 
 def config_to_dict(config: Any) -> Dict[str, Any]:

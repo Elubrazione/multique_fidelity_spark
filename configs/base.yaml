@@ -5,6 +5,8 @@ includes:
 database: tpcds_100g
 similarity_threshold: 0.5
 
+target_system: spark
+
 # Path directories
 paths:
   log_dir: log

@@ -9,18 +9,17 @@ class ConfigManager:
     def parse_args():
         parser = argparse.ArgumentParser()
         parser.add_argument('--config', type=str, default='configs/base.yaml', help='Path to config YAML file')
-        parser.add_argument('--opt', type=str, default='MFES_SMAC',
-                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 
-                                    'LLAMATUNE_SMAC', 'LLAMATUNE_GP', 'REMBO_SMAC', 'REMBO_GP', 
-                                    'HESBO_SMAC', 'HESBO_GP'])
+        parser.add_argument('--opt', type=str, default='MFES_SMAC', help='Optimizer type')
         parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
-        parser.add_argument('--iter_num', type=int, default=40)
+        parser.add_argument('--iter_num', type=int, default=40, help='Number of iterations')
         parser.add_argument('--R', type=int, default=27)
         parser.add_argument('--eta', type=int, default=3)
         
         parser.add_argument('--history_dir', type=str, default=None)
+        parser.add_argument('--data_dir', type=str, default=None)
         parser.add_argument('--save_dir', type=str, default=None)
         parser.add_argument('--target', type=str, default=None)
+        parser.add_argument('--database', type=str, default=None)
         
         parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
         parser.add_argument('--cp_topk', type=int, default=40)
@@ -42,6 +41,8 @@ class ConfigManager:
         parser.add_argument('--test_mode', action='store_true', default=False)
         parser.add_argument('--debug', action='store_true', default=False)
         parser.add_argument('--resume', type=str, default=None)
+
+        parser.add_argument('--target_system', type=str, default='spark')
         
         return parser.parse_args()
 
@@ -172,7 +173,7 @@ class ConfigManager:
     
     @property
     def data_dir(self) -> str:
-        return os.path.join(self.root_dir, self.paths['data_dir'])
+        return os.path.join(self.paths['data_dir'])
     
     @property
     def history_dir(self) -> str:
@@ -224,7 +225,7 @@ class ConfigManager:
 
     @property
     def target_system(self) -> str:
-        return self.config.get('target_system', 'spark')  # Default to spark for backward compatibility
+        return self.config.get('target_system')
 
     @property
     def system_config(self) -> Dict[str, Any]:

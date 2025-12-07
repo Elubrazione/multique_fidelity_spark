@@ -78,7 +78,7 @@ class TaskManager:
         
         if kwargs.get('test_mode', False):
             logger.info("Using test mode meta feature")
-            meta_feature = np.random.rand(34)
+            meta_feature = np.random.rand(38)  # 34 base + 4 additional (CPU, Memory, Nodes, DB size)
             self.history_manager.initialize_current_task(task_id, meta_feature)
             self.history_manager.update_current_history(build_observation(default_config, result))
             self._update_similarity()
@@ -90,7 +90,7 @@ class TaskManager:
             meta_feature = self.target_system.get_meta_feature(task_id, test_mode=kwargs.get('test_mode', False))
         else:
             logger.warning("No target system configured, using random meta feature")
-            meta_feature = np.random.rand(34)
+            meta_feature = np.random.rand(38)  # 34 base + 4 additional (CPU, Memory, Nodes, DB size)
         
         self.history_manager.initialize_current_task(task_id, meta_feature)
         self.history_manager.update_current_history(build_observation(default_config, result))

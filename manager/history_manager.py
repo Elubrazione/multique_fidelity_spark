@@ -30,17 +30,21 @@ class HistoryManager:
             logger.warning(f"History directory {self.history_dir} does not exist.")
             return
         
-        for filename in os.listdir(self.history_dir):
-            if filename.endswith('.json'):
-                filepath = os.path.join(self.history_dir, filename)
-                history = History.load_json(filename=filepath, config_space=self.config_space)
-                self.historical_tasks.append(history)
-                meta_feature = history.meta_info.get('meta_feature')
-                if meta_feature is not None:
-                    logger.debug(f"Got meta_feature: {meta_feature} from {filename}")
-                    self.historical_meta_features.append(np.array(meta_feature))
-                else:
-                    logger.warning(f"No meta_feature found in {filename}")
+        for root, dirs, files in os.walk(self.history_dir):
+            for filename in files:
+                if filename.endswith('.json'):
+                    filepath = os.path.join(root, filename)
+                    try:
+                        history = History.load_json(filename=filepath, config_space=self.config_space)
+                        self.historical_tasks.append(history)
+                        meta_feature = history.meta_info.get('meta_feature')
+                        if meta_feature is not None:
+                            logger.info(f"Got meta_feature: {meta_feature} from {filepath}")
+                            self.historical_meta_features.append(np.array(meta_feature))
+                        else:
+                            logger.warning(f"No meta_feature found in {filepath}")
+                    except Exception as e:
+                        logger.error(f"Failed to load history from {filepath}: {e}")
         
         logger.info(f"Loaded {len(self.historical_tasks)} historical tasks from {self.history_dir}")
     
@@ -94,6 +98,7 @@ class HistoryManager:
             config_space=self.config_space,
             **kwargs
         )
+        logger.info(f"Similar tasks cache: {self.similar_tasks_cache}")
         filtered_sims = [
             (idx, sim) for idx, sim in self.similar_tasks_cache 
             if sim >= self.similarity_threshold
