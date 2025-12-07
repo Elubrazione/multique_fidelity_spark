@@ -18,6 +18,8 @@ import json
 import os
 import sys
 import pandas as pd
+import numpy as np
+import torch
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
@@ -36,7 +38,10 @@ def convert(json_path: str, out_csv: str):
 
     rows = []
     # cache embedding for task_id 'q1' since user requested same task_id for all rows
-    emb_dict = gen_task_embedding('q1')
+    sql_embedding = np.ones(128)
+    norm = np.linalg.norm(sql_embedding)
+    sql_embedding = list(map(lambda x: x / norm, sql_embedding))
+    emb_dict = {f'task_embedding_{i}': sql_embedding[i] for i in range(0, 128)}
 
     for obs in observations:
         cfg = obs.get('config', {}) or {}
@@ -45,13 +50,18 @@ def convert(json_path: str, out_csv: str):
 
         row = {}
         row['app_id'] = 'not-important'
-        row['task_id'] = 'q1'
+        row['task_id'] = 'all'
         # duration to int when possible
         try:
             row['duration'] = duration if duration is not None else None
         except Exception:
             row['duration'] = duration
-        row['status'] = 1
+        
+        # if duration is not Infinity, then set status = 1
+        if duration == float('inf'):
+            row['status'] = 0
+        else:
+            row['status'] = 1
 
         row.update(cfg)
 
@@ -76,7 +86,7 @@ def convert(json_path: str, out_csv: str):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: json_to_history_csv.py input.json output.csv")
+        print("Usage: python ./scripts/json_to_history_csv.py input.json output.csv")
         sys.exit(1)
     json_path = sys.argv[1]
     out_csv = sys.argv[2]

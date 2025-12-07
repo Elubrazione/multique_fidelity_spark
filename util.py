@@ -83,14 +83,16 @@ def gen_task_embedding(task_id):
         df = pd.read_csv(f"{cwd}/data/bert-embedding/{workload}_{mode}.csv", index_col='name')
         sql_embedding = df.loc[task_id].values.tolist()
     else:
-        sqls = task_id.split('_')
-        sql_embeddings = []
-        for sql_id in sqls:
-            with open(f"{sql_base_path}/{str.lower(workload)}/{sql_id}.sql") as sql_file: # 附注, config设置的并非query的全部路径, 实际使用时还有一部分在这里
-                sql = sql_file.read()
-                sql_embeddings.append(fake_encode(sql)) # TODO: 复现功能检查时这里使用fake_encode()函数, 正常使用encode()函数
-        sql_embeddings = torch.tensor(sql_embeddings)
-        sql_embedding = torch.max(sql_embeddings, dim=0)[0].tolist()
+        # sqls = task_id.split('_')
+        # sql_embeddings = []
+        # for sql_id in sqls:
+        #     with open(f"{sql_base_path}/{str.lower(workload)}/{sql_id}.sql") as sql_file: # 附注, config设置的并非query的全部路径, 实际使用时还有一部分在这里
+        #         sql = sql_file.read()
+        #         sql_embeddings.append(encode(sql))
+        # sql_embeddings = torch.tensor(sql_embeddings)
+        # sql_embedding = torch.max(sql_embeddings, dim=0)[0].tolist()
+        # TODO: 由于encoder部分不重要, 替换成了简单的encode逻辑
+        sql_embedding = np.ones(sql_embedding_dim)
         norm = np.linalg.norm(sql_embedding)
         sql_embedding = list(map(lambda x: x / norm, sql_embedding))
     return {f'task_embedding_{i}': sql_embedding[i] for i in range(0, sql_embedding_dim)}
