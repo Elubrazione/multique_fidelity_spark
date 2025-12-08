@@ -16,6 +16,7 @@ class ConfigManager:
     
     def _setup_constants(self):
         self.ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+        self.RESULT_DIR = os.path.join(self.ROOT_DIR, self.config['result_dir'])
         
         self.DATA_DIR = self.config['data_dir']
         self.DATABASE = self.config['database']
@@ -32,10 +33,13 @@ class ConfigManager:
         self.ENV_SPARK_SQL_PATH = self.config['env']['spark_sql_path']
         self.ENV_YARN_PATH = self.config['env']['yarn_path']
 
+        self.JSON_FILE_NAME = self.config['json_file_name']
+
 
 config_manager = ConfigManager()
 
 ROOT_DIR = config_manager.ROOT_DIR
+RESULT_DIR = config_manager.RESULT_DIR
 DATA_DIR = config_manager.DATA_DIR
 ENV_SPARK_SQL_PATH = config_manager.ENV_SPARK_SQL_PATH
 DATABASE = config_manager.DATABASE
@@ -47,3 +51,4 @@ LIST_SPARK_USERNAME = config_manager.LIST_SPARK_USERNAME
 LIST_SPARK_PASSWORD = config_manager.LIST_SPARK_PASSWORD
 LIST_SPARK_SERVER = config_manager.LIST_SPARK_SERVER
 LIST_SPARK_NODES = config_manager.LIST_SPARK_NODES
+JSON_FILE_NAME = config_manager.JSON_FILE_NAME

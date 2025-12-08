@@ -1,5 +1,7 @@
 {
-  "database": "tpch_100g",
+  "database": "tpch_600g",
+  "result_dir": "result",
+  "json_file_name": "loftune_tpch600g_64u240n3.json",
   "spark": {
     "nodes": ["agent1", "agent2", "server1"],
     "server_node": "server1",

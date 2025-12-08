@@ -2,12 +2,13 @@ import os
 import sys
 import argparse
 import config.config
+import json
 # import pymysql
 # from sqlalchemy_utils import database_exists, create_database
 
 from Evaluator.executor import ExecutorManager, SparkSessionTPCDSExecutor
 from utils.spark import analyze_timeout_and_get_fidelity_details
-from mftune_config import DATA_DIR
+from mftune_config import DATA_DIR, RESULT_DIR, JSON_FILE_NAME
 
 def conf_check():
     from config.common import sql_base_path, loftune_db_url, cwd, db_name, config_path
@@ -49,8 +50,31 @@ def fake_executor(task_id, config):
     # 这里面可以接executor的逻辑, 目前先mock
     resource_ratio = round(float(1.0), 5)
     observation_dict = executor(config, resource_ratio)
+    
+    # observation格式转化
+    observation = {}
+    observation["config"] = config
+    observation["objectives"] = [observation_dict["result"]["objective"]]
+    observation["elapsed_time"] = observation_dict["elapsed_time"]
+    observation["extra_info"] = observation_dict["extra_info"]
     app_succeeded = not (observation_dict['result']['objective'] == float('inf'))
-    # TODO: 实现json的历史存储
+
+    json_file_path = os.path.join(RESULT_DIR, JSON_FILE_NAME)
+    os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
+    if os.path.exists(json_file_path):
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    else:
+        data = {"observations": []}
+
+    # 后续处理...
+    if 'observations' not in data:
+        data['observations'] = []
+    data['observations'].append(observation)
+
+    with open(json_file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
     return observation_dict['result']['objective'], app_succeeded
 
 if __name__ == "__main__":

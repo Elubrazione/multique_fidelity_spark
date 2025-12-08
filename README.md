@@ -47,6 +47,7 @@ TPCH部分实验:
 先前往`./configs/spark.json`中修改:
 - `"database": "tpch_600g"`
 - `"data_dir": "/srv/BigData/hadoop/data1/tpch-for-spark-sql/dbgen/saveSql/"`
+- 修改`result_dir`和`json_file_name`共同指定最终输出的history的位置
 
 然后执行指令:
 ```bash
@@ -66,6 +67,7 @@ TPCDS部分实验
 先前往`./configs/spark.json`中修改
 - `"database": "tpcds_600g"`
 - `"data_dir": "/home/hive-testbench-hdp3/spark-queries-tpcds/"`
+- 修改`result_dir`和`json_file_name`共同指定最终输出的history的位置
 
 然后执行指令:
 ```bash
