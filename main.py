@@ -2,12 +2,12 @@ import os
 import sys
 import argparse
 import config.config
-import pdb
 # import pymysql
 # from sqlalchemy_utils import database_exists, create_database
 
-import pdb
-
+from Evaluator.executor import ExecutorManager, SparkSessionTPCDSExecutor
+from utils.spark import analyze_timeout_and_get_fidelity_details
+from mftune_config import DATA_DIR
 
 def conf_check():
     from config.common import sql_base_path, loftune_db_url, cwd, db_name, config_path
@@ -35,6 +35,22 @@ def conf_check():
     if not os.path.exists(f'{cwd}/data'):
         os.makedirs(f'{cwd}/data')
 
+fidelity_details, elapsed_timeout_dicts = analyze_timeout_and_get_fidelity_details()
+executor = ExecutorManager(
+    sqls=fidelity_details,
+    timeout=elapsed_timeout_dicts,
+    config_space=None,
+    executor_cls=SparkSessionTPCDSExecutor,
+    executor_kwargs={'sql_dir': DATA_DIR}
+)
+
+def fake_executor(task_id, config):
+    # 返回总duration时间以及所有query执行结果的"与", 也即一个bool值表示是否全部成功
+    # 这里面可以接executor的逻辑, 目前先mock
+    resource_ratio = round(float(1.0), 5)
+    observation_dict = executor(config, resource_ratio)
+    app_succeeded = not (observation_dict['result']['objective'] == float('inf'))
+    return observation_dict['result']['objective'], app_succeeded
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -13,12 +13,10 @@ import logging.config
 # TODO: fake init_tuning_data
 from mock.history import fake_init_tuning_data, fake_update_data
 from mock.recommender import fake_recommend_config
-from mock.executor import fake_executor
+from main import fake_executor
 from mock.knowledge_base_updater import fake_update_history
 
 logging.config.dictConfig(LOGGING_CONFIG)
-
-import pdb
 
 
 def gen_result_file_name(task_id, type, num_epochs):
@@ -39,7 +37,7 @@ def run_task_and_update(task_id, config, logger, update=True):
     app_idx = "not-important"
     run_time, app_succeeded = fake_executor(task_id, config)
     if app_succeeded:
-        logger.info(f"Run successfully. Duration = {run_time} ms.")
+        logger.info(f"Run successfully. Duration = {run_time} s.")
         if update:
             # TODO: fake_update_data <->  update_data
             # update_data(app_idx, task_id, config, run_time, logger)
@@ -214,9 +212,8 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
     config, _ = fake_recommend_config(data, logger)
     if config is None:
         return
-    config = add_scale_dict(config)
+    # config = add_scale_dict(config) # 无需这一步, 因为SparkExecutor中会自动加单位
     logger.info(f"Suggested config using similar history task for {task_id} = {config}.")
-    # breakpoint()
     tuning_data = run_task_and_update(task_id, config, logger)
     logger.info(f"Start {num_epochs - 1} iters of further tuning for task {task_id}.")
     all_tuning_data = [tuning_data]
