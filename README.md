@@ -51,14 +51,14 @@ TPCH部分实验:
 
 然后执行指令:
 ```bash
-python main.py --mode multi \
+nohup python main.py --mode multi \
                --workload "TPCH" \
                --data_size "600" \
                --type recommend-config \
                --task_id "all" \
                --model tbcnn \
-               --epochs 100 \
-               --task_suffix ""
+               --epochs 200 \
+               --task_suffix "" > logs/all.log 2>&1 &
 ```
 
 ---
@@ -71,16 +71,16 @@ TPCDS部分实验
 
 然后执行指令:
 ```bash
-python main.py --mode multi \
+nohup python main.py --mode multi \
                --workload "TPCDS" \
                --data_size "600" \
                --type recommend-config \
                --task_id "all" \
                --model tbcnn \
-               --epochs 100 \
-               --task_suffix ""
+               --epochs 200 \
+               --task_suffix "" > logs/all.log 2>&1 &
 ```
 
 > 附注, 上述指令中的`mode`, `workload`, `data_size`三个选项, 实际作用为历史数据定位, 实际上executor部分由于沿用了MFTune, 故实际运行的数据库等相关内容在`./configs/spark.json`中设置
 
-关于`json`历史数据到支持LOFTune的`csv`历史数据的转化, 转化工具在`./scripts/json_to_history.py`中, 使用时记得在当前文件夹下 (模块才能正确加载), 也即`python ./scripts/json_to_history.py`, 目前已完成TPCH_600G历史数据转化, 后续将完成TPCDS_600G历史数据转化
+关于`json`历史数据到支持LOFTune的`csv`历史数据的转化, 转化工具在`./scripts/json_to_history.py`中, 使用时记得在当前文件夹下 (模块才能正确加载), 也即`python ./scripts/json_to_history.py`, 目前已完成TPCH_600G和TPCDS_600G历史数据转化
