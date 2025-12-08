@@ -3,7 +3,7 @@ from modules.knowledge_base_updater import update_knob_detail
 from modules.regression_model import PerformanceModel
 from config.knobs_list import *
 import numpy as np
-from util import check_sample, add_scale_dict
+from util import check_sample
 
 def fake_update_history(update_task_id, epoch_id, logger, weights=None):
     logger.info(f"Config {epoch_id} for history task {update_task_id} generation starts.")

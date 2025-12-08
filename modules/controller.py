@@ -44,7 +44,7 @@ def run_task_and_update(task_id, config, logger, update=True):
             fake_update_data(app_idx, task_id, config, run_time, logger)
     else:
         logger.error(f"Run failed.")
-        run_time = 3600000
+        run_time = 500000
 
     tuning_data = {"app_id": app_idx, "duration": run_time}
     tuning_data.update(config)
@@ -239,6 +239,8 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
             continue
 
         pi = (cur_best_performance - tuning_data['duration']) / cur_best_performance
+        if pi < 0:
+            pi = max(pi, -700 / 5)  # prevent overflow
         reward = 1 / (1 + math.exp(-5 * pi)) if pi < 0 else 1 / (1 + math.exp(-10 * pi))
         modified_reward = [reward / probabilities[0], 0] if selected_index == 0 else [0, reward / probabilities[1]]
         weights = [weights[0] * math.exp(rate_tradeoff * modified_reward[0] / 2),

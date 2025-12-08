@@ -38,21 +38,47 @@ This repository contains the source code for our paper: **LOFTune: A Low-overhea
 3. Execute run_tests.sh
 
 # Baseline复现
-使用的指令为:
+> 一些具体实现时的点:
+> 
+> 由于LOFTune中TPCH与TPCDS的任务使用的历史严格区分开, 故对于使用所有queries的本次实验, encode部分徒增计算量并无任何实际作用, 经后续思考, 决定放弃encode这一部分.
+
+TPCH部分实验:
+
+先前往`./configs/spark.json`中修改:
+- `"database": "tpch_600g"`
+- `"data_dir": "/srv/BigData/hadoop/data1/tpch-for-spark-sql/dbgen/saveSql/"`
+
+然后执行指令:
+```bash
+python main.py --mode multi \
+               --workload "TPCH" \
+               --data_size "600" \
+               --type recommend-config \
+               --task_id "all" \
+               --model tbcnn \
+               --epochs 100 \
+               --task_suffix ""
+```
+
+---
+TPCDS部分实验
+
+先前往`./configs/spark.json`中修改
+- `"database": "tpcds_600g"`
+- `"data_dir": "/home/hive-testbench-hdp3/spark-queries-tpcds/"`
+
+然后执行指令:
 ```bash
 python main.py --mode multi \
                --workload "TPCDS" \
-               --data_size "100" \
+               --data_size "600" \
                --type recommend-config \
-               --task_id "q1_q2" \
+               --task_id "all" \
                --model tbcnn \
-               --epochs 5 \
+               --epochs 100 \
                --task_suffix ""
 ```
-> 实际使用时, 由于task_id关联到embedding vector的计算, 所以需正确设置, 对于MFTune这种使用99条query的实验略显复杂, 可以将query的字符串放入new_tasks的文件中, 利用类似`run_test.sh`中的脚本进行运行.
 
-经后续思考, 决定放弃encode这一部分, 毕竟对于本问题并没有显著作用 (使用所有的queries)
+> 附注, 上述指令中的`mode`, `workload`, `data_size`三个选项, 实际作用为历史数据定位, 实际上executor部分由于沿用了MFTune, 故实际运行的数据库等相关内容在`./configs/spark.json`中设置
 
-关于历史数据以及相关query的路径配置, 都在common.py中, 注意, 默认数据路径与`workload`(诸如TPCDS), `data_size`(诸如100), `mode`(诸如multi)是相关的, 如有需要可以后续进行修改.
-
-关于`json`历史数据到支持LOFTune的`csv`历史数据的转化, 转化工具在`./scripts/json_to_history.py`中, 使用时记得在当前文件夹下 (模块才能正确加载), 也即`python ./scripts/json_to_history.py`
+关于`json`历史数据到支持LOFTune的`csv`历史数据的转化, 转化工具在`./scripts/json_to_history.py`中, 使用时记得在当前文件夹下 (模块才能正确加载), 也即`python ./scripts/json_to_history.py`, 目前已完成TPCH_600G历史数据转化, 后续将完成TPCDS_600G历史数据转化
