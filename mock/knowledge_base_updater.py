@@ -42,7 +42,7 @@ def fake_update_history(update_task_id, epoch_id, logger, weights=None):
             break
         else:
             logger.info(f"Config {epoch_id} for history task {update_task_id} generated failed.")
-    config = add_scale_dict(params)
+    config = params
     logger.info(f"Config {epoch_id} for history task {update_task_id} generated successfully: {config}, "
                     f"estimated running time = {estimated_running_time} ms.")
 

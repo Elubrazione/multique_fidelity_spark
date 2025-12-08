@@ -13,7 +13,7 @@ def fake_recommend_config(data:dict, logger):
 
     if similar_task_id is None:
         logger.info("未找到相似任务")
-        return None
+        return None, similar_task_id
     
     logger.info(f"新任务 = {data['task_id']}, 相似任务 = {similar_task_id}, 相似度 = {similarity}")
     
@@ -21,7 +21,7 @@ def fake_recommend_config(data:dict, logger):
     config = find_config_by_task_id(similar_task_id, history_data, logger)
     if config is None:
         logger.info(f"未找到相似任务 {similar_task_id} 的配置")
-        return None
+        return None, similar_task_id
     
     # 仅保留配置相关的信息
     config = {key: value for key, value in config.items() if key in KNOBS}  

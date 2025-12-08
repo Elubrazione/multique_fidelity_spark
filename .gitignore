@@ -253,3 +253,5 @@ dmypy.json
 # unimportant examples for scripts
 scripts/*.json
 scripts/*.csv
+
+/result/

@@ -1,7 +1,7 @@
 {
     "log_dir": "log",
     "result_dir": "results_loftune",
-    "database": "tpch_600g",
+    "database": "tpch_100g",
     "spark": {
       "nodes": ["agent1", "agent2", "server1"],
       "server_node": "server1",

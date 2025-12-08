@@ -1,6 +1,0 @@
-app_id,duration,spark.broadcast.blockSize,spark.default.parallelism,spark.driver.cores,spark.driver.memory,spark.executor.cores,spark.executor.instances,spark.executor.memory,spark.executor.memoryOverhead,spark.locality.wait,spark.memory.fraction,spark.memory.offHeap.size,spark.memory.storageFraction,spark.reducer.maxSizeInFlight,spark.shuffle.file.buffer,spark.sql.autoBroadcastJoinThreshold,spark.sql.shuffle.partitions,spark.storage.memoryMapThreshold
-not-important,52.568562251585476,12,2796,14,44,31,8,59,11929,7,0.65,5,0.4,237,125,1011,1722,2
-not-important,51.83484823585469,13,2002,6,111,24,5,76,19008,7,0.31,8,0.61,286,100,2859,1665,4
-not-important,54.967742647128084,14,2168,6,118,22,5,78,20454,7,0.278,6,0.508,286,108,2788,1709,5
-not-important,51.58605608071385,15,2100,4,114,28,5,73,19558,5,0.318,8,0.518,278,115,2980,1653,6
-not-important,56.334436907546376,13,2281,3,98,29,4,69,18782,4,0.2944,9,0.6844000000000001,235,100,2611,1452,4
