@@ -42,12 +42,12 @@ class TaskManager:
         self.random_kwargs = method_args.get('random_kwargs')
         self.config_space = config_space
         self.target_system = target_system
-        # self.spark_log_dir = config_manager.spark_log_dir  # Removed: handled by target_system
         
         self.history_manager = HistoryManager(
             config_space=config_space,
             history_dir=config_manager.history_dir,
-            similarity_threshold=config_manager.similarity_threshold
+            similarity_threshold=config_manager.similarity_threshold,
+            current_database=config_manager.database
         )
         
         self.component_registry = ComponentRegistry()
@@ -122,8 +122,14 @@ class TaskManager:
     def update_history_meta_info(self, meta_info: dict):
         self.history_manager.update_history_meta_info(meta_info)
     
-    def get_similar_tasks(self, topk: Optional[int] = None) -> Tuple[List[History], List[Tuple[int, float]]]:
-        return self.history_manager.get_similar_tasks(topk)
+    def get_similar_tasks(
+        self,
+        topk: Optional[int] = None,
+        filter_by_sql_type: bool = False
+    ) -> Tuple[List[History], List[Tuple[int, float]]]:
+        if topk is None:
+            topk = self.tl_args.get('topk') if self.tl_args else None
+        return self.history_manager.get_similar_tasks(topk, filter_by_sql_type=filter_by_sql_type)
     
     def get_current_task_history(self) -> Optional[History]:
         return self.history_manager.get_current_history()

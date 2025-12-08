@@ -167,7 +167,7 @@ class SQLPartitioner(Partitioner[PartitionPlan]):
             if current_history is not None and len(current_history) > 0:
                 histories.append((current_history, self.current_task_weight))
 
-        similar_histories, similar_scores = task_manager.get_similar_tasks()
+        similar_histories, similar_scores = task_manager.get_similar_tasks(filter_by_sql_type=True)
         if similar_histories:
             for history, (_, score) in zip(similar_histories, similar_scores):
                 weight = float(score)
