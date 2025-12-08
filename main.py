@@ -50,6 +50,7 @@ def fake_executor(task_id, config):
     resource_ratio = round(float(1.0), 5)
     observation_dict = executor(config, resource_ratio)
     app_succeeded = not (observation_dict['result']['objective'] == float('inf'))
+    # TODO: 实现json的历史存储
     return observation_dict['result']['objective'], app_succeeded
 
 if __name__ == "__main__":
