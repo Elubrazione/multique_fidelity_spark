@@ -45,6 +45,8 @@ def calculate_similarity(history, config_space):
     在搜索空间中随机采样若干个配置, 对每个任务用已观测的历史数据训练一个surrogate, 并用该surrogate对随机配置进行预测, 得到一个结果序列
     对每个任务对，计算它们的结果序列之间，预测的排序关系正确的偏序对比例，作为它们的相似度。
     """
+    from openbox import logger
+    
     types, bounds = get_types(config_space)
     seed = int(time.time())
     rng = np.random.RandomState(seed)
@@ -58,26 +60,48 @@ def calculate_similarity(history, config_space):
     testX = np.array(testX)
 
     predYs = []
-    for his in history:
-        # 这里的50是设置用于计算相似度的历史轮数上限
+    valid_indices = []
+    
+    for idx, his in enumerate(history):
         l = min(50, len(his))
+        
+        if l < 3:
+            logger.warning(f"Skipping history {idx}: only {l} observations (need at least 3 for GP training)")
+            continue
+        
         trainX = np.array([his[i][0] for i in range(l)])
         trainY = np.array([his[i][1] for i in range(l)])
+        
+        if np.any(np.isnan(trainY)) or np.any(np.isinf(trainY)):
+            logger.warning(f"Skipping history {idx}: trainY contains NaN or Inf after filtering")
+            continue
 
         # 用历史数据训练GP，并对testX中的样本进行预测
-        surrogate_gp = create_gp_model(
-            model_type='gp', config_space=config_space, types=types, bounds=bounds, rng=rng)
-        surrogate_gp.train(trainX, trainY)
+        try:
+            surrogate_gp = create_gp_model(
+                model_type='gp', config_space=config_space, types=types, bounds=bounds, rng=rng)
+            surrogate_gp.train(trainX, trainY)
 
-        predY, _ = surrogate_gp.predict(testX)
-        predYs.append(predY.reshape(-1).tolist())
+            predY, _ = surrogate_gp.predict(testX)
+            predYs.append(predY.reshape(-1).tolist())
+            valid_indices.append(idx)
+        except Exception as e:
+            logger.warning(f"Failed to train GP for history {idx}: {e}")
+            continue
+
+    if len(predYs) == 0:
+        logger.error("No valid histories for similarity calculation!")
+        return np.zeros((len(history), len(history)), dtype=np.float64)
 
     # 利用预测结果计算两两之间排序正确的偏序对比例作为相似度
     n = len(history)
     sim = np.zeros((n, n), dtype=np.float64)
-    for i in range(n):
-        for j in range(n):
-            sim[i][j] = calculate_relative(predYs[i], predYs[j])
+    
+    for i_idx, i in enumerate(valid_indices):
+        for j_idx, j in enumerate(valid_indices):
+            sim[i][j] = calculate_relative(predYs[i_idx], predYs[j_idx])
+    
+    logger.info(f"Successfully calculated similarity for {len(valid_indices)}/{len(history)} histories")
 
     return sim
 

@@ -31,6 +31,10 @@ class RoverMapper(BaseMapper):
         for j in range(len(history)):
             obs = history.observations[j]
             config, perf = obs.config, obs.objectives[0]
+            
+            if perf is None or (isinstance(perf, float) and (np.isnan(perf) or np.isinf(perf))):
+                continue
+            
             config = convert_configurations_to_array([config])[0]
             his.append([config, perf])
         return his
@@ -47,11 +51,22 @@ class RoverMapper(BaseMapper):
         # 每个his也是一个list, 其中每个元素是形如 [conf, perf] 的list, 代表一轮的历史观测数据
         # 其中conf是一个numpy array, 代表该轮的配置, perf是一个float值, 代表该轮的观测结果
         ts_his = []
-
+        
+        skipped_count = 0
         for history in source_hpo_data:
+            his_list = RoverMapper.history_to_list(history)
+            
+            if len(his_list) < 3:
+                logger.warning(f"Skipping history task {history.task_id}: only {len(his_list)} valid observations after filtering (need at least 3)")
+                skipped_count += 1
+                continue
+            
             meta_feature = history.meta_info['meta_feature']
             ts_meta_features.append(meta_feature)
-            ts_his.append(RoverMapper.history_to_list(history))
+            ts_his.append(his_list)
+
+        if skipped_count > 0:
+            logger.info(f"Filtered out {skipped_count} history tasks with insufficient valid observations, kept {len(ts_his)} valid tasks")
 
         ts_meta_features = np.array(ts_meta_features).copy()
         ts_meta_features[np.isnan(ts_meta_features)] = 0
