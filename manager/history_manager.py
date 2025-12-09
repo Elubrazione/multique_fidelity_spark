@@ -4,6 +4,7 @@ from typing import List, Tuple, Optional
 from openbox import logger
 from openbox.utils.history import History
 from ConfigSpace import ConfigurationSpace
+from .utils import load_history_with_dynamic_space
 
 
 class HistoryManager:
@@ -75,10 +76,13 @@ class HistoryManager:
         logger.info(f"Initialized current task history: {task_id}")
     
     def resume_current_task(self, history_file: str):
-        self.current_task_history = History.load_json(
+        # use custom loader that supports dynamic config space
+        self.current_task_history = load_history_with_dynamic_space(
             filename=history_file,
-            config_space=self.config_space
+            fallback_config_space=self.config_space
         )
+        if len(self.current_task_history.observations) > 0:
+            self.current_task_history.observations[0].config.origin = 'Default Configuration'
         meta_feature = self.current_task_history.meta_info.get('meta_feature')
         if meta_feature is not None:
             self.current_meta_feature = np.array(meta_feature)
@@ -145,7 +149,6 @@ class HistoryManager:
         
         if topk is None:
             topk = len(self.similar_tasks_cache)
-        topk = min(topk, len(self.similar_tasks_cache))
         
         current_sql_type = None
         if filter_by_sql_type and self.current_database:
@@ -157,7 +160,10 @@ class HistoryManager:
         filtered_sims = []
         filtered_count = 0
         
-        for i in range(topk):
+        for i in range(len(self.similar_tasks_cache)):
+            if len(filtered_histories) >= topk:
+                break
+            
             idx, sim = self.similar_tasks_cache[i]
             
             if filter_by_sql_type and current_sql_type:
@@ -175,7 +181,7 @@ class HistoryManager:
             logger.info(f"Similar task {i}: {source_info} (similarity: {sim:.3f})")
         
         if filter_by_sql_type and current_sql_type and filtered_count > 0:
-            logger.info(f"Filtered out {filtered_count} tasks with different SQL type (keeping only {current_sql_type})")
+            logger.info(f"Filtered out {filtered_count} tasks with different SQL type (final count: {len(filtered_histories)}/{topk})")
         
         # Normalize similarities
         sims_sum = sum(sim for _, sim in filtered_sims)
