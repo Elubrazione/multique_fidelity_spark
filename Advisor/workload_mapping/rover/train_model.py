@@ -6,6 +6,7 @@ from openbox.surrogate.base.build_gp import create_gp_model
 from openbox.utils.util_funcs import get_types
 from catboost import CatBoostRegressor
 from openbox import logger
+from scipy.stats import kendalltau
 # 该函数用于从任务的meta_features生成pairwise的训练数据
 # 其中A和B分别是nA * l和nB * l的numpy array, 每行表示一个任务的meta feature，l是meta feature维数
 # S是一个nA * nB的numpy array，表示A和B中的任务两两之间的相似度
@@ -31,8 +32,21 @@ def calculate_relative(A, B):
                 P += 1
     return 2 * P / (l * (l - 1))
 
+def calculate_kendall(A, B):
+    if len(A) < 2 or len(B) < 2:
+        return 0.0
+    
+    try:
+        tau, p_value = kendalltau(A, B)
+        if np.isnan(tau):
+            return 0.0
+        return tau
+    except Exception as e:
+        logger.warning(f"Failed to calculate Kendall's tau: {e}, returning 0.0")
+        return 0.0
 
-def calculate_similarity(history, config_space):
+
+def calculate_similarity(history, config_space, similarity_metric='relative'):
     """
     该函数提供一个计算任务间相似度的示例，主要展示相似度的计算方式
 
@@ -43,7 +57,18 @@ def calculate_similarity(history, config_space):
 
     相似度的计算方式如下：
     在搜索空间中随机采样若干个配置, 对每个任务用已观测的历史数据训练一个surrogate, 并用该surrogate对随机配置进行预测, 得到一个结果序列
-    对每个任务对，计算它们的结果序列之间，预测的排序关系正确的偏序对比例，作为它们的相似度。
+    对每个任务对，计算它们的结果序列之间的相似度。
+    
+    Parameters
+    ----------
+    history : list
+        任务的历史观测数据列表
+    config_space : ConfigurationSpace
+        配置空间
+    similarity_metric : str, default='relative'
+        相似度度量方式:
+        - 'relative': 一致对占比，范围[0, 1]，用于训练CatBoost模型
+        - 'kendall': Kendall's tau相关系数，范围[-1, 1]，更标准的统计方法
     """
     from openbox import logger
     
@@ -93,13 +118,19 @@ def calculate_similarity(history, config_space):
         logger.error("No valid histories for similarity calculation!")
         return np.zeros((len(history), len(history)), dtype=np.float64)
 
-    # 利用预测结果计算两两之间排序正确的偏序对比例作为相似度
     n = len(history)
     sim = np.zeros((n, n), dtype=np.float64)
     
+    if similarity_metric == 'kendall':
+        similarity_func = calculate_kendall
+        logger.info(f"Using Kendall's tau for similarity calculation")
+    else:
+        similarity_func = calculate_relative
+        logger.info(f"Using concordant pairs ratio for similarity calculation")
+    
     for i_idx, i in enumerate(valid_indices):
         for j_idx, j in enumerate(valid_indices):
-            sim[i][j] = calculate_relative(predYs[i_idx], predYs[j_idx])
+            sim[i][j] = similarity_func(predYs[i_idx], predYs[j_idx])
     
     logger.info(f"Successfully calculated similarity for {len(valid_indices)}/{len(history)} histories")
 

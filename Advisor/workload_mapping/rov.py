@@ -13,7 +13,7 @@ from .rover.transfer import get_transfer_tasks
 
 
 class RoverMapper(BaseMapper):
-    def __init__(self, surrogate_type: str, seed: int = 0):
+    def __init__(self, surrogate_type: str, seed: int = 0, similarity_metric: str = 'relative'):
         super().__init__()
 
         self.method_id = 'rover'
@@ -26,6 +26,11 @@ class RoverMapper(BaseMapper):
 
         self.model = None
         self.already_fit = False
+        
+        # 相似度度量方式
+        # 'relative': 一致对占比 [0, 1]，用于训练模型
+        # 'kendall': Kendall's tau [-1, 1]，用于实时计算
+        self.similarity_metric = similarity_metric
 
     @staticmethod
     def history_to_list(history: History) -> List[List]:
@@ -121,7 +126,7 @@ class RoverMapper(BaseMapper):
             else:
                 logger.info(f"--use_cached_model flag is set but model not found at {model_path}. Training new model...")
         
-        sim = calculate_similarity(ts_his, config_space)
+        sim = calculate_similarity(ts_his, config_space, similarity_metric='relative')
         logger.info(f"Similarity matrix shape: {sim.shape}")
         logger.info(f"Similarity matrix stats: min={sim.min():.4f}, max={sim.max():.4f}, std={sim.std():.4f}")
 
@@ -169,15 +174,17 @@ class RoverMapper(BaseMapper):
         source_hpo_data: List[History]
     ) -> List[Tuple[int, float]]:
         """
-        使用真实观测数据计算目标任务与源任务之间的相似度（一致对占比）
+        使用真实观测数据计算目标任务与源任务之间的相似度
         
-        该方法使用真实观测值计算一致对占比，而不是使用CatBoost预测值。
+        该方法使用真实观测值计算相似度，而不是使用CatBoost预测值。
         适用于任务开始后有足够观测数据时。
         
         计算方式：
         1. 对目标任务和源任务，分别用真实观测数据训练GP模型
         2. 在相同的25个随机测试配置上预测性能
-        3. 计算预测序列之间的一致对占比作为相似度
+        3. 计算预测序列之间的相似度（根据 self.similarity_metric）
+           - 'relative': 一致对占比，范围 [0, 1]
+           - 'kendall': Kendall's tau，范围 [-1, 1]
         """
         target_his = self.history_to_list(target_history)
         _, source_his_list = self.get_src_history(source_hpo_data)
@@ -188,7 +195,11 @@ class RoverMapper(BaseMapper):
         
         # 使用calculate_similarity计算相似度矩阵
         # 返回的sim矩阵中，sim[0, i+1]表示目标任务与第i个源任务的相似度
-        sim_matrix = calculate_similarity(all_history, target_history.config_space)
+        sim_matrix = calculate_similarity(
+            all_history, 
+            target_history.config_space,
+            similarity_metric=self.similarity_metric
+        )
         
         sims = []
         for idx in range(len(source_hpo_data)):
@@ -197,6 +208,7 @@ class RoverMapper(BaseMapper):
             sims.append((idx, sim))
         
         sims.sort(key=lambda x: x[1], reverse=True)
-        logger.info(f"Calculated similarity with real observations: {[(idx, f'{sim:.4f}') for idx, sim in sims[:min(5, len(sims))]]}")
+        metric_name = "Kendall's tau" if self.similarity_metric == 'kendall' else "concordant pairs ratio"
+        logger.info(f"Calculated similarity ({metric_name}) with real observations: {[(idx, f'{sim:.4f}') for idx, sim in sims[:min(5, len(sims))]]}")
         return sims
 

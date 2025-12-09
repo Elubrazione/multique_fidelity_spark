@@ -61,9 +61,15 @@ def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
         - inner_surrogate_model : str, default='gp'
             内部代理模型类型
         - use_real : bool, default=False
-            是否使用真实观测数据计算相似度（一致对占比）
+            是否使用真实观测数据计算相似度
             如果为True，使用map_with_observations方法（需要至少2个观测数据）
             如果为False，使用map_with_prediction方法（CatBoost预测，基于meta_feature）
+        - similarity_metric : str, default='relative'
+            相似度度量方式（仅在use_real=True时有效）：
+            'relative': 一致对占比，范围 [0, 1]
+            'kendall': Kendall's tau，范围 [-1, 1]
+        - use_cached_model : bool, default=False
+            是否使用缓存的CatBoost模型
     
     Returns:
     --------
@@ -73,16 +79,15 @@ def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
     inner_sm = kwargs.get('inner_surrogate_model', 'gp')
     use_real = kwargs.get('use_real', False)
     use_cached_model = kwargs.get('use_cached_model', False)
+    similarity_metric = kwargs.get('similarity_metric', 'kendall')
     
-    rover = RoverMapper(surrogate_type=inner_sm)
+    rover = RoverMapper(surrogate_type=inner_sm, similarity_metric=similarity_metric)
     if not source_hpo_data:
         logger.warning('No source HPO data available. Returning empty similarity list.')
         return []
     rover.fit(source_hpo_data, config_space, use_cached_model=use_cached_model)
     
-    # 调用map方法，它会根据use_real参数路由到相应的方法
     sims = rover.map(target_his, source_hpo_data, use_real=use_real)
-    
     return sims
 
 

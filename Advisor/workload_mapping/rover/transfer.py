@@ -5,7 +5,7 @@ from openbox import History, Advisor
 from catboost import CatBoostRegressor
 from typing import List
 
-from .trans_surrogate import RGPE_avg
+from Advisor.surrogate import RGPE_avg
 
 
 def get_transfer_tasks(src_meta_feature, target_meta_feature, num = 5, theta = 0.7, model=None):
