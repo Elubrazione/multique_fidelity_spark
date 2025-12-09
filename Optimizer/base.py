@@ -22,18 +22,21 @@ class BaseOptimizer:
                  ws_strategy='none', tl_strategy='none',
                  backup_flag=False, resume: Optional[str] = None):
 
-        assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC',
-                             'LLAMATUNE_SMAC', 'LLAMATUNE_GP', 'REMBO_SMAC', 'REMBO_GP', 'HESBO_SMAC', 'HESBO_GP']
-        assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
-        assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
-
-        scheduler_type = 'mfes' if 'MFES' in method_id else 'bohb' if 'BOHB' in method_id else 'full'
-        
+        # assert method_id in ['RS', 'SMAC', 'GP', 'GPF', 'MFES_SMAC', 'MFES_GP', 'BOHB_GP', 'BOHB_SMAC',
+        #                      'LLAMATUNE_SMAC', 'LLAMATUNE_GP', 'REMBO_SMAC', 'REMBO_GP', 'HESBO_SMAC', 'HESBO_GP']
+        # assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
+        # assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
         self.eval_func = eval_func
         self.iter_num = iter_num
 
         task_mgr = TaskManager.instance()
         self.scheduler_kwargs = task_mgr.get_scheduler_kwargs()
+        
+        use_flatten = task_mgr._config_manager.args.use_flatten_scheduler
+        scheduler_type = 'mfes' if 'MFES' in method_id else 'bohb' if 'BOHB' in method_id else 'full'
+        if use_flatten and scheduler_type in ['mfes', 'bohb']:
+            scheduler_type = f"{scheduler_type}_flatten"
+            logger.info(f"Using flatten scheduler variant: {scheduler_type}")
         self.scheduler = schedulers[scheduler_type](
             num_nodes=len(task_mgr._config_manager.multi_nodes),
             **self.scheduler_kwargs

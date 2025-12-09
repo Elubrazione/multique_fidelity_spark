@@ -537,8 +537,10 @@ def multi_fidelity_sql_selection(
     
     """
 
+    from .utils import custom_sort
+    
     sql_prefix = f"{sql_type}_"
-    sql_columns = sorted({col[len(sql_prefix):] for col in df.columns if col.startswith(sql_prefix)})
+    sql_columns = sorted({col[len(sql_prefix):] for col in df.columns if col.startswith(sql_prefix)}, key=custom_sort)
 
     if not sql_columns:
         return {}, {}

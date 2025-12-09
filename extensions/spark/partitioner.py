@@ -116,8 +116,10 @@ class SQLPartitioner(Partitioner[PartitionPlan]):
             ) if subset else 0.0
             subset_correlations[fidelity] = correlation
 
+        from .utils import custom_sort
+        
         plan = PartitionPlan(
-            fidelity_subsets={k: sorted(values) for k, values in fidelity_subsets.items()},
+            fidelity_subsets={k: sorted(values, key=custom_sort) for k, values in fidelity_subsets.items()},
             sql_stats=sql_stats,
             metadata={
                 "histories": [history.task_id for history, _ in histories_with_weights],

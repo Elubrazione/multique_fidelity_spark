@@ -9,6 +9,7 @@ schedulers = {
     'full': FullFidelityScheduler,
     'mfes': MFESFidelityScheduler,
     'flatten': FlattenFidelityScheduler,
+    'bohb_flatten': FlattenFidelityScheduler,
     'mfes_flatten': MFESFlattenFidelityScheduler
 }
 

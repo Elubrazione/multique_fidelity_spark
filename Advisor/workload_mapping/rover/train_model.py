@@ -165,6 +165,6 @@ def train_model(src_meta_feature, sim):
     surrogate_cat = CatBoostRegressor()
     surrogate_cat.fit(train_X, train_Y, silent=True)
 
-    surrogate_cat.save_model('model.cbm')  # 保存训练得到的模型
+    surrogate_cat.save_model('catboost_info/model.cbm') 
 
     return surrogate_cat

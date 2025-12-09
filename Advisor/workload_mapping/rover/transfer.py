@@ -26,7 +26,7 @@ def get_transfer_tasks(src_meta_feature, target_meta_feature, num = 5, theta = 0
     surrogate_cat = model
     if model is None:
         surrogate_cat = CatBoostRegressor()
-        surrogate_cat.load_model('model.cbm') # 加载之前训练的预测模型
+        surrogate_cat.load_model('catboost_info/model.cbm') # 加载之前训练的预测模型
 
     pred_Y = surrogate_cat.predict(target_X)
     

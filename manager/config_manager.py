@@ -14,6 +14,8 @@ class ConfigManager:
         parser.add_argument('--iter_num', type=int, default=40, help='Number of iterations')
         parser.add_argument('--R', type=int, default=27)
         parser.add_argument('--eta', type=int, default=3)
+        parser.add_argument('--use_flatten_scheduler', action='store_true', default=False,
+                          help='Use flatten scheduler variant (expand last full-fidelity bracket)')
         
         parser.add_argument('--history_dir', type=str, default=None)
         parser.add_argument('--data_dir', type=str, default=None)
