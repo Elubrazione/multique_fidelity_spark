@@ -137,3 +137,93 @@ class MFESFidelityScheduler(BOHBFidelityScheduler):
     def should_update_history(self, resource_ratio: float) -> bool:
         # always return True for MFSE - let MFBO.update decide history vs history_list
         return True
+
+
+class FlattenFidelityScheduler(BOHBFidelityScheduler):
+    """
+    Scheduler with expanded full-fidelity brackets.
+    
+    This scheduler is similar to BOHBFidelityScheduler, but expands the last 
+    full-fidelity bracket (s=0) into multiple single-configuration brackets.
+    
+    For example, if the last bracket would be (r=27, n=4), it creates 4 separate 
+    brackets each with (r=27, n=1). This allows more fine-grained scheduling of 
+    full-fidelity evaluations.
+    
+    The bracket structure stores explicit (n_configs, n_resource) tuples instead
+    of using s indices.
+    """
+    
+    def __init__(self, 
+                 num_nodes: int = 1,
+                 R: int = 9, eta: int = 3):
+        super().__init__(num_nodes=num_nodes, R=R, eta=eta)
+        
+        self.brackets = []
+        
+        for s in range(self.s_max, 0, -1):
+            n_configs = int(ceil(self.B / self.R / (s + 1) * self.eta ** s)) * self.num_nodes
+            n_resource = int(self.R * self.eta ** (-s))
+            
+            stages = []
+            for stage in range(s + 1):
+                n_configs_stage = int(n_configs * self.eta ** (-stage))
+                n_resource_stage = int(n_resource * self.eta ** stage)
+                stages.append((n_configs_stage, n_resource_stage))
+            
+            self.brackets.append({
+                's': s,
+                'n_configs': n_configs,
+                'n_resource': n_resource,
+                'stages': stages
+            })
+        
+        # Expand the last bracket (s=0) into multiple single-config brackets
+        s = 0
+        n_configs_last = int(ceil(self.B / self.R / (s + 1) * self.eta ** s)) * self.num_nodes
+        n_resource_last = int(self.R * self.eta ** (-s))
+        num_expanded = n_configs_last // self.num_nodes
+        
+        for i in range(num_expanded):
+            self.brackets.append({
+                's': 0,
+                'expanded_idx': i,
+                'n_configs': self.num_nodes,
+                'n_resource': n_resource_last,
+                'stages': [(self.num_nodes, n_resource_last)]
+            })
+        
+        logger.info(f"FlattenFidelityScheduler: Expanded last bracket (r={n_resource_last}, n={n_configs_last}) "
+                    f"into {num_expanded} brackets of (r={n_resource_last}, n={self.num_nodes})")
+        logger.info(f"Total brackets: {len(self.brackets)}")
+        
+    def get_bracket_index(self, iter_id: int) -> int:
+        return iter_id % len(self.brackets)
+    
+    def get_bracket_params(self, bracket_idx: int) -> Tuple[int, int]:
+        bracket = self.brackets[bracket_idx]
+        return bracket['n_configs'], bracket['n_resource']
+    
+    def get_stage_params(self, bracket_idx: int, stage: int) -> Tuple[int, int]:
+        bracket = self.brackets[bracket_idx]
+        return bracket['stages'][stage]
+    
+    def get_elimination_count(self, bracket_idx: int, stage: int) -> int:
+        bracket = self.brackets[bracket_idx]
+        n_configs, r_resource = bracket['stages'][stage]
+        
+        # If it's the last stage or full fidelity, keep all
+        if stage == len(bracket['stages']) - 1 or r_resource == self.R:
+            return n_configs
+        else:
+            return int(n_configs / self.eta)
+    
+
+class MFESFlattenFidelityScheduler(FlattenFidelityScheduler):
+    def __init__(self, 
+                 num_nodes: int = 1,
+                 R: int = 9, eta: int = 3):
+        super().__init__(num_nodes=num_nodes, R=R, eta=eta)
+
+    def should_update_history(self, resource_ratio: float) -> bool:
+        return True

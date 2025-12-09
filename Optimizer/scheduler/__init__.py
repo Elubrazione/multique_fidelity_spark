@@ -1,11 +1,15 @@
 from .base import BaseScheduler, FullFidelityScheduler
-from .fidelity import FixedFidelityScheduler, BOHBFidelityScheduler, MFESFidelityScheduler
+from .fidelity import FixedFidelityScheduler, \
+    BOHBFidelityScheduler, MFESFidelityScheduler, \
+    FlattenFidelityScheduler, MFESFlattenFidelityScheduler
 
 schedulers = {
     'fixed': FixedFidelityScheduler,
     'bohb': BOHBFidelityScheduler,
     'full': FullFidelityScheduler,
-    'mfes': MFESFidelityScheduler
+    'mfes': MFESFidelityScheduler,
+    'flatten': FlattenFidelityScheduler,
+    'mfes_flatten': MFESFlattenFidelityScheduler
 }
 
 __all__ = [
@@ -14,5 +18,7 @@ __all__ = [
     'FixedFidelityScheduler',
     'BOHBFidelityScheduler',
     'MFESFidelityScheduler',
+    'FlattenFidelityScheduler',
+    'MFESFlattenFidelityScheduler',
     'schedulers'
 ]
