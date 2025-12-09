@@ -3,7 +3,7 @@ from openbox import logger
 from ConfigSpace import ConfigurationSpace
 
 from .base import TransferLearningSurrogate
-from .weight import MFGPEWeightCalculator, RGPEWeightCalculator
+from .weight import MFGPEWeightCalculator, RGPEWeightCalculator, AverageWeightCalculator
 
 
 class MFGPE(TransferLearningSurrogate):
@@ -65,3 +65,31 @@ class RGPE(TransferLearningSurrogate):
             **kwargs
         )
         self.method_id = 'rgpe'
+
+
+class RGPE_avg(TransferLearningSurrogate):
+    def __init__(
+        self, 
+        config_space: ConfigurationSpace, 
+        source_hpo_data=None, 
+        seed=0,
+        surrogate_type='prf', 
+        num_src_hpo_trial=50, 
+        only_source=False, 
+        norm_y=True,
+        **kwargs
+    ):
+        weight_calculator = AverageWeightCalculator()
+        
+        super().__init__(
+            config_space=config_space,
+            source_data=source_hpo_data,
+            surrogate_type=surrogate_type,
+            only_source=only_source,
+            num_src_trials=num_src_hpo_trial,
+            weight_calculator=weight_calculator,
+            rng=np.random.RandomState(seed),
+            norm_y=norm_y,
+            **kwargs
+        )
+        self.method_id = 'rgpe_avg'

@@ -12,7 +12,7 @@ from .base import (
 )
 from .prf import ProbabilisticRandomForest
 from .gp import GaussianProcess
-from .ensemble import MFGPE, RGPE
+from .ensemble import MFGPE, RGPE, RGPE_avg
 
 from .utils import (
     Normalizer,
@@ -148,6 +148,7 @@ __all__ = [
     'GaussianProcess',
     
     'RGPE',
+    'RGPE_avg',
     'MFGPE',
     
     'Normalizer',

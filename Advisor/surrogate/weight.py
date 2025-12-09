@@ -67,6 +67,33 @@ class MFGPEWeightCalculator(WeightCalculator):
         return p_power / np.sum(p_power)
 
 
+class AverageWeightCalculator(WeightCalculator):
+    """
+    Fixed average weight calculator: source tasks share equal weights, target task weight is 0.
+    
+    Suitable for pure transfer learning scenarios, only using the knowledge of source tasks,
+    not using the observations of target tasks.
+    """
+    def __init__(self):
+        super().__init__()
+    
+    def calculate(
+        self,
+        mu_list: List[np.ndarray],
+        var_list: List[np.ndarray],
+        y_true: np.ndarray,
+        num_tasks: int,
+        **kwargs
+    ) -> np.ndarray:
+        if num_tasks <= 1:
+            return np.array([1.0])
+        
+        # source tasks share equal weights, target task weight is 0
+        num_source = num_tasks - 1
+        w = np.array([1.0 / num_source] * num_source + [0.0])
+        return w
+
+
 class RGPEWeightCalculator(WeightCalculator):
     def __init__(self, num_sample: int = 50, use_dilution: bool = False):
         self.num_sample = num_sample
