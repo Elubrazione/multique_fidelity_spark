@@ -30,7 +30,7 @@ class MFBO(BO):
     def sample(self, batch_size):
         # exclude default configuration from count
         num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
-        if len(self.ini_configs) == 0 and num_evaluated_exclude_default < self.init_num:
+        if len(self.ini_configs) == 0 or num_evaluated_exclude_default < self.init_num:
             logger.info("Begin to warm start!!!!")
             self.warm_start()
 

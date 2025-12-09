@@ -1,10 +1,10 @@
 from openbox import logger
-
 from manager import ConfigManager, TaskManager
 from core.plugin_loader import PluginLoader
 from Evaluator import MockExecutor
 from Optimizer import get_optimizer
-from Compressor.dimensio import get_compressor
+from Compressor.dimensio import KDEBoundaryRangeStep, SHAPDimensionStep, get_compressor
+from Compressor.dimensio.viz import visualize_compression_details
 
 args = ConfigManager.parse_args()
 config_manager = ConfigManager(config_file=args.config, args=args)
@@ -38,17 +38,26 @@ task_manager = TaskManager.instance(
 )
 executor.attach_task_manager(task_manager)
 task_manager.calculate_meta_feature(
-    eval_func=executor, task_id=args.task,
+    eval_func=executor, task_id=f"{args.task}_{args.target}",
     test_mode=args.test_mode, resume=args.resume
 )
 
 cp_args = config_manager.get_cp_args(config_space)
 compressor = get_compressor(
-    compressor_type=cp_args.get('strategy', 'none'),
-    config_space=config_space,
-    **cp_args
+    steps=[
+        SHAPDimensionStep(
+            topk=cp_args['topk'],
+            expert_params=cp_args['expert_params']
+        ),
+        KDEBoundaryRangeStep(
+            kde_coverage=cp_args['kde_coverage'],
+            top_ratio=cp_args['top_ratio'],
+            enable_mixed_sampling=False
+        )
+    ],
+    config_space=config_space
 )
-task_manager.register_compressor(compressor)
+task_manager.register_compressor(compressor)    
 
 opt_kwargs = {
     'config_space': config_space,
@@ -58,5 +67,7 @@ opt_kwargs = {
 optimizer = get_optimizer(args, **opt_kwargs)
 
 if __name__ == '__main__':
+    compressor._save_compression_info(output_dir='./compression_details/64u256n3')
+    visualize_compression_details(compressor, save_dir='./compression_details/64u256n3')
     for i in range(optimizer.iter_num):
         optimizer.run_one_iter()

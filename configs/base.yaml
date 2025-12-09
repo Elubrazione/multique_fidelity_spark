@@ -3,7 +3,7 @@ includes:
   - configs/cluster_multi.yaml
 
 database: tpcds_100g
-similarity_threshold: 0.5
+similarity_threshold: 0.2
 
 target_system: spark
 
@@ -27,14 +27,14 @@ method_args:
 
   ws_args:
     init_num: 4
-    topk: 4
+    topk: 20
     inner_surrogate_model: prf
 
   cp_args:
     strategy: none
-    topk: 40
-    sigma: 2.0
-    top_ratio: 0.8
+    topk: 25
+    kde_coverage: 0.8
+    top_ratio: 0.6
 
   scheduler_kwargs:
     R: 27

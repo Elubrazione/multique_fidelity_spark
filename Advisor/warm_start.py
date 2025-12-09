@@ -80,7 +80,9 @@ class BestConfigsWarmStart(WarmStarter):
         
         ini_list = []
         target_length = init_num * self.ws_topk
+        logger.info(f"Warm_start_nums: init_num({init_num}) * topk({self.ws_topk}) = lens({target_length})")
         
+        already_nums = num_evaluated
         for rank in range(self.ws_topk):
             if len(ini_list) + num_evaluated >= target_length:
                 break
@@ -88,6 +90,9 @@ class BestConfigsWarmStart(WarmStarter):
                 if len(ini_list) + num_evaluated >= target_length:
                     break
                 if rank < len(top_obs):
+                    if already_nums > 0:
+                        already_nums -= 1
+                        continue
                     config_warm_old = top_obs[rank].config
                     config_warm = compressor.conver_config_to_sample_space(config_warm_old)
                     config_warm.origin = (f"{self.ws_strategy}_{source_hpo_data[idx].task_id}_"

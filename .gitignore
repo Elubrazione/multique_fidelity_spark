@@ -10,6 +10,7 @@ exps/data_volume_correlation/**/*.png
 exps/data_volume_correlation/**/*.pdf
 exps/data_volume_correlation/**/execution_results.json
 log/*
+exps/ablation/*
 
 catboost_info/*
 *.cbm
