@@ -200,16 +200,16 @@ class FlattenFidelityScheduler(BOHBFidelityScheduler):
     def get_bracket_index(self, iter_id: int) -> int:
         return iter_id % len(self.brackets)
     
-    def get_bracket_params(self, bracket_idx: int) -> Tuple[int, int]:
-        bracket = self.brackets[bracket_idx]
+    def get_bracket_params(self, s: int) -> Tuple[int, int]:
+        bracket = self.brackets[s]
         return bracket['n_configs'], bracket['n_resource']
     
-    def get_stage_params(self, bracket_idx: int, stage: int) -> Tuple[int, int]:
-        bracket = self.brackets[bracket_idx]
+    def get_stage_params(self, s: int, stage: int) -> Tuple[int, int]:
+        bracket = self.brackets[s]
         return bracket['stages'][stage]
     
-    def get_elimination_count(self, bracket_idx: int, stage: int) -> int:
-        bracket = self.brackets[bracket_idx]
+    def get_elimination_count(self, s: int, stage: int) -> int:
+        bracket = self.brackets[s]
         n_configs, r_resource = bracket['stages'][stage]
         
         # If it's the last stage or full fidelity, keep all
