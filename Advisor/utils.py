@@ -72,12 +72,13 @@ def map_source_hpo_data(target_his, source_hpo_data, config_space, **kwargs):
     """
     inner_sm = kwargs.get('inner_surrogate_model', 'gp')
     use_real = kwargs.get('use_real', False)
+    use_cached_model = kwargs.get('use_cached_model', False)
     
     rover = RoverMapper(surrogate_type=inner_sm)
     if not source_hpo_data:
         logger.warning('No source HPO data available. Returning empty similarity list.')
         return []
-    rover.fit(source_hpo_data, config_space)
+    rover.fit(source_hpo_data, config_space, use_cached_model=use_cached_model)
     
     # 调用map方法，它会根据use_real参数路由到相应的方法
     sims = rover.map(target_his, source_hpo_data, use_real=use_real)

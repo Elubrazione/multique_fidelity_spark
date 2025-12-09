@@ -1,9 +1,11 @@
+import os
 import numpy as np
 from typing import List, Tuple
 from openbox.utils.config_space.util import convert_configurations_to_array
 from ConfigSpace import ConfigurationSpace
 from openbox import logger, History
 from sklearn.preprocessing import MinMaxScaler
+from catboost import CatBoostRegressor
 
 from .base import *
 from .rover.train_model import calculate_similarity, train_model, calculate_relative
@@ -73,7 +75,12 @@ class RoverMapper(BaseMapper):
 
         return ts_meta_features, ts_his
 
-    def fit(self, source_hpo_data: List[History], config_space: ConfigurationSpace):
+    def fit(
+        self,
+        source_hpo_data: List[History],
+        config_space: ConfigurationSpace,
+        use_cached_model: bool = False
+    ):
         if self.already_fit:
             logger.warning('RoverMapper has already been fitted!')
             return
@@ -102,6 +109,18 @@ class RoverMapper(BaseMapper):
         self.ts_meta_features = self.scaler.transform(ts_meta_features)
         logger.info(f"Scaled meta features stats: min={self.ts_meta_features.min():.4f}, max={self.ts_meta_features.max():.4f}, std={self.ts_meta_features.std():.4f}")
 
+        if use_cached_model:
+            model_path = 'catboost_info/model.cbm'
+            if os.path.exists(model_path):
+                logger.info(f"--use_cached_model flag is set. Loading existing model from {model_path}...")
+                self.model = CatBoostRegressor()
+                self.model.load_model(model_path)
+                logger.info(f"Successfully loaded cached model from {model_path}")
+                self.already_fit = True
+                return
+            else:
+                logger.info(f"--use_cached_model flag is set but model not found at {model_path}. Training new model...")
+        
         sim = calculate_similarity(ts_his, config_space)
         logger.info(f"Similarity matrix shape: {sim.shape}")
         logger.info(f"Similarity matrix stats: min={sim.min():.4f}, max={sim.max():.4f}, std={sim.std():.4f}")

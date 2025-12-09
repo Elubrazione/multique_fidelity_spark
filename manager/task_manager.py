@@ -99,9 +99,11 @@ class TaskManager:
         self._update_similarity()
     
     def _update_similarity(self):
+        ws_args_with_cache = self.ws_args.copy()
+        ws_args_with_cache['use_cached_model'] = self._config_manager.use_cached_model
         self.history_manager.compute_similarity(
             similarity_func=map_source_hpo_data,
-            **self.ws_args
+            **ws_args_with_cache
         )
         self._mark_sql_plan_dirty()
     

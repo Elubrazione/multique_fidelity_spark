@@ -44,6 +44,9 @@ class ConfigManager:
 
         parser.add_argument('--target_system', type=str, default='spark')
         
+        parser.add_argument('--use_cached_model', action='store_true', default=False,
+                          help='Use existing catboost model.cbm if available, otherwise train new model')
+        
         return parser.parse_args()
 
     def __init__(self, config_file='configs/base.yaml', args=None):
@@ -51,6 +54,7 @@ class ConfigManager:
         self.root_dir = os.path.dirname(os.path.dirname(__file__))
         self.config = self._load_config()
         self.method_id = args.opt if args else None
+        self.args = args  # Store args for later access
         self._apply_args_overrides(args)
     
     
@@ -88,7 +92,7 @@ class ConfigManager:
         if args is None:
             return
         SKIP_ARGS = {'config', 'opt', 'task', 'log_level', 'iter_num', 'warm_start', 
-                    'transfer', 'backup_flag', 'test_mode', 'debug', 'resume'}
+                    'transfer', 'backup_flag', 'test_mode', 'debug', 'resume', 'use_cached_model'}
         for arg_name, arg_value in vars(args).items():
             if arg_name in SKIP_ARGS:
                 continue
@@ -248,6 +252,10 @@ class ConfigManager:
     @property
     def similarity_threshold(self) -> float:
         return self.config['similarity_threshold']
+
+    @property
+    def use_cached_model(self) -> bool:
+        return getattr(self.args, 'use_cached_model', False) if self.args else False
 
     def get(self, key: str) -> Any:
         keys = key.split('.')
