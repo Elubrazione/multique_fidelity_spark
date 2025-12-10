@@ -151,7 +151,7 @@ class BaseOptimizer:
 
         for i in range(s + 1):
             n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
-            logger.info(f"Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
+            logger.info(f"Bracket {s} Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
             if not i:
                 candidates = self.advisor.sample(batch_size=n_configs)
                 logger.info(f"Generated {len(candidates)} initial candidates")

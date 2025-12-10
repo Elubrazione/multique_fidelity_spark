@@ -198,25 +198,52 @@ class FlattenFidelityScheduler(BOHBFidelityScheduler):
         logger.info(f"Total brackets: {len(self.brackets)}")
         
     def get_bracket_index(self, iter_id: int) -> int:
-        return iter_id % len(self.brackets)
+        bracket_idx = iter_id % len(self.brackets)
+        bracket = self.brackets[bracket_idx]
+        self._current_bracket_idx = bracket_idx
+        return bracket['s']
     
     def get_bracket_params(self, s: int) -> Tuple[int, int]:
-        bracket = self.brackets[s]
-        return bracket['n_configs'], bracket['n_resource']
+        if hasattr(self, '_current_bracket_idx'):
+            bracket = self.brackets[self._current_bracket_idx]
+            if bracket['s'] == s:
+                return bracket['n_configs'], bracket['n_resource']
+        for bracket in self.brackets:
+            if bracket['s'] == s:
+                return bracket['n_configs'], bracket['n_resource']
+        raise ValueError(f"Bracket with s={s} not found")
     
     def get_stage_params(self, s: int, stage: int) -> Tuple[int, int]:
-        bracket = self.brackets[s]
-        return bracket['stages'][stage]
+        if hasattr(self, '_current_bracket_idx'):
+            bracket = self.brackets[self._current_bracket_idx]
+            if bracket['s'] == s and stage < len(bracket['stages']):
+                return bracket['stages'][stage]
+        for bracket in self.brackets:
+            if bracket['s'] == s:
+                if stage < len(bracket['stages']):
+                    return bracket['stages'][stage]
+                else:
+                    raise ValueError(f"Stage {stage} out of range for bracket with s={s}")
+        raise ValueError(f"Bracket with s={s} not found or stage {stage} out of range")
     
     def get_elimination_count(self, s: int, stage: int) -> int:
-        bracket = self.brackets[s]
-        n_configs, r_resource = bracket['stages'][stage]
-        
-        # If it's the last stage or full fidelity, keep all
-        if stage == len(bracket['stages']) - 1 or r_resource == self.R:
-            return n_configs
-        else:
-            return int(n_configs / self.eta)
+        if hasattr(self, '_current_bracket_idx'):
+            bracket = self.brackets[self._current_bracket_idx]
+            if bracket['s'] == s and stage < len(bracket['stages']):
+                n_configs, r_resource = bracket['stages'][stage]
+                if stage == len(bracket['stages']) - 1 or r_resource == self.R:
+                    return n_configs
+                else:
+                    return int(n_configs / self.eta)
+        for bracket in self.brackets:
+            if bracket['s'] == s:
+                if stage < len(bracket['stages']):
+                    n_configs, r_resource = bracket['stages'][stage]
+                    if stage == len(bracket['stages']) - 1 or r_resource == self.R:
+                        return n_configs
+                    else:
+                        return int(n_configs / self.eta)
+        raise ValueError(f"Bracket with s={s} not found or stage {stage} out of range")
     
 
 class MFESFlattenFidelityScheduler(FlattenFidelityScheduler):

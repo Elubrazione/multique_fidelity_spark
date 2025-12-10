@@ -312,11 +312,12 @@ class ConfigManager:
             else:
                 cp_topk = cp_args.get('topk', len(config_space))
             
-            return '%sk%ds%.1fr%.1f' % (
+            return '%sk%ds%.1fr%.1fc%.1f' % (
                 cp_args.get('strategy', 'none'), 
                 cp_topk,
                 cp_args.get('sigma', 2.0), 
-                cp_args.get('top_ratio', 0.8)
+                cp_args.get('top_ratio', 0.8),
+                cp_args.get('kde_coverage', 1.0)
             )
     
     def get_ws_string(self, ws_strategy: str, method_id: str) -> str:
