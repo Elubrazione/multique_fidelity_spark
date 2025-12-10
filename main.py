@@ -14,14 +14,14 @@ logger_kwargs = config_manager.get_logger_kwargs(args.task, args.opt, args.log_l
 logger.init(**logger_kwargs)
 logger_kwargs.update({'force_init': False})
 
-# executor = ExecutorManager(
-#     config_space=config_space,
-#     test_mode=args.test_mode,
-#     debug=args.debug,
-#     config_manager=config_manager
-# )
+executor = ExecutorManager(
+    config_space=config_space,
+    test_mode=args.test_mode,
+    debug=args.debug,
+    config_manager=config_manager
+)
 
-executor = MockExecutor()
+# executor = MockExecutor()
 
 
 # Create task_manager with config_manager

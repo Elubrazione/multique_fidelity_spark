@@ -2,15 +2,15 @@ includes:
   - configs/cluster_local.yaml
   - configs/cluster_multi.yaml
 
-database: tpcds_100g
+database: tpch_600g
 similarity_threshold: 0.5
 
 # Path directories
 paths:
   log_dir: log
-  data_dir: mock/data
+  data_dir: /srv/BigData/hadoop/data1/tpch-for-spark-sql/dbgen/saveSql
   history_dir: mock/history
-  target: tpcds_100g
+  target: tpch_600g
   save_dir: results
 
 # Method-related arguments

@@ -467,3 +467,4 @@ def resolve_runtime_metrics(
     os.remove(zstd_file)
     os.remove(json_file)
     logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
+    return metrics
