@@ -56,7 +56,7 @@ class PerformancePlotter:
                     try:
                         processed_values.append(float(val))
                     except (ValueError, TypeError):
-                        # 如果转换失败，当作nan处理
+                        # 如果转换失败, 当作nan处理
                         processed_values.append(float('nan'))            
             return processed_values
         else:
@@ -65,12 +65,12 @@ class PerformancePlotter:
     def compute_cumulative_min_with_inf_skip(self, 
                                            data: List[Union[float, int]]) -> List[float]:
         """
-        计算当前轮最小值，遇到inf时跳过
+        计算当前轮最小值, 遇到inf时跳过
         
-        例如: [inf, 3, inf, 5, 2] -> [?, 3, 3, 3, 2]
+        例如: [inf, 3, inf, 5, 2] -> [None, 3, 3, 3, 2]
         
         Args:
-            data: 原始数据列表，可能包含inf
+            data: 原始数据列表, 可能包含inf
             
         Returns:
             当前轮最小值列表
@@ -96,11 +96,11 @@ class PerformancePlotter:
                     current_min = min(current_min, value)
                 result.append(current_min)
             else:
-                # 如果是无效值（inf/nan），使用前一个最小值
+                # 如果是无效值(inf/nan), 使用前一个最小值
                 if current_min is not None:
                     result.append(current_min)
                 else:
-                    # 如果还没有有效的最小值，用None占位
+                    # 如果还没有有效的最小值, 用None占位
                     result.append(None)
         
         return result
@@ -130,9 +130,6 @@ class PerformancePlotter:
             title: 图表标题
             xlabel: x轴标签
             ylabel: y轴标签
-            fill_under: 是否填充曲线下方
-            show_original_points: 是否显示原始数据点
-            original_points_alpha: 原始数据点透明度
             show_invalid_points: 是否标记无效点(inf/nan)
             invalid_points_marker: 无效点标记样式
             invalid_points_color: 无效点颜色
@@ -166,8 +163,8 @@ class PerformancePlotter:
                 inf_count = np.sum(np.isinf(data_array))
                 
                 print(f"\n任务: {task}")
-                print(f"   原始数据点: {len(data_array)} 个")
-                print(f"   inf值数量: {inf_count}")
+                print(f"原始数据点: {len(data_array)} 个")
+                print(f"inf值数量: {inf_count}")
                 
                 # 计算当前轮最小值
                 cumulative_min = self.compute_cumulative_min_with_inf_skip(original_data)
@@ -184,14 +181,14 @@ class PerformancePlotter:
                         valid_cumulative_values.append(val)
                 
                 if not valid_cumulative_values:
-                    print(f"   ✗ 无有效累积最小值数据")
+                    print(f"无有效累积最小值数据")
                     continue
                 
                 # 计算统计信息
                 valid_array = np.array(valid_cumulative_values)
-                print(f"   有效累积最小值: {len(valid_cumulative_values)} 个")
-                print(f"   最终最小值: {valid_cumulative_values[-1]:.4f}")
-                print(f"   累积最小值范围: [{np.min(valid_array):.4f}, {np.max(valid_array):.4f}]")
+                print(f"有效累积最小值: {len(valid_cumulative_values)} 个")
+                print(f"最终最小值: {valid_cumulative_values[-1]:.4f}")
+                print(f"累积最小值范围: [{np.min(valid_array):.4f}, {np.max(valid_array):.4f}]")
                 
                 # 准备x轴数据
                 x = list(range(1, len(cumulative_min) + 1))
@@ -229,7 +226,7 @@ class PerformancePlotter:
                             if idx < len(cumulative_min) and cumulative_min[idx] is not None:
                                 invalid_y.append(cumulative_min[idx])
                             else:
-                                # 如果没有累积最小值，尝试找到最近的有效值
+                                # 如果没有累积最小值, 尝试找到最近的有效值
                                 for j in range(idx-1, -1, -1):
                                     if j < len(cumulative_min) and cumulative_min[j] is not None:
                                         invalid_y.append(cumulative_min[j])
@@ -258,7 +255,7 @@ class PerformancePlotter:
                                          zorder=1)
                 
             except Exception as e:
-                print(f"✗ 处理任务 '{task}' 时出错: {str(e)}")
+                print(f"处理任务 '{task}' 时出错: {str(e)}")
                 all_cumulative_data.append([])
                 all_original_data.append([])
         
