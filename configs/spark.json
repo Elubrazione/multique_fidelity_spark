@@ -1,7 +1,7 @@
 {
-  "database": "tpch_600g",
+  "database": "tpcds_600g",
   "result_dir": "result",
-  "json_file_name": "loftune_tpch600g_64u240n3.json",
+  "json_file_name": "loftune_tpcds600g_64u240n3.json",
   "spark": {
     "nodes": ["agent1", "agent2", "server1"],
     "server_node": "server1",
@@ -20,5 +20,5 @@
     "spark_sql_path": "/usr/local/spark/bin/spark-sql",
     "yarn_path": "/usr/local/hadoop/bin/yarn"
   },
-  "data_dir": "/srv/BigData/hadoop/data1/tpch-for-spark-sql/dbgen/saveSql/"
+  "data_dir": "/home/hive-testbench-hdp3/spark-queries-tpcds"
 }

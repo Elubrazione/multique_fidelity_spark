@@ -207,6 +207,7 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
     if data is None:
         return
     data['task_id'] = task_id
+    # 如果需要ban掉热启动, 则注释掉下面的代码, 并初始化all_tuning_data以及cur_best_performance
     # TODO: fake_recommend_config <-> recommend_config
     # config, _ = recommend_config(data, logger)
     config, _ = fake_recommend_config(data, logger)
@@ -221,6 +222,11 @@ def recommend_config_for_new_task(task_id, num_epochs=1):
     cur_best_performance = tuning_data['duration']
 
     epochs = 1
+
+    # all_tuning_data = []
+    # cur_best_performance = 500000
+
+    # epochs = 0
     while True:
         epochs += 1
         if epochs > num_epochs:
