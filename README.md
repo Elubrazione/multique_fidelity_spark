@@ -42,6 +42,18 @@ This repository contains the source code for our paper: **LOFTune: A Low-overhea
 > 
 > 由于LOFTune中TPCH与TPCDS的任务使用的历史严格区分开, 故对于使用所有queries的本次实验, encode部分徒增计算量并无任何实际作用, 经后续思考, 决定放弃encode这一部分.
 
+关于LOFTune的环境, 请在MFTune的环境, 也即`spark-test`的基础上, 额外安装如下requirements:
+***
+- tokenizers 0.11.4
+- optuna 3.5.0
+- quantile-forest 1.1.3
+- scikit-learn 1.0.2
+- torch 1.12.1
+- tree-sitter 0.20.1
+- sqlglot 20.7.1
+- hdfs
+***
+
 TPCH部分实验:
 
 先前往`./configs/spark.json`中修改:
