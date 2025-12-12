@@ -8,18 +8,14 @@ nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_n
 nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_num 200 --ws_init_num 29 --task 64u240n2 --target tpcds_300g --opt SMAC > /dev/null 2>&1 &
 ```
 
-
-# Tuneful example
-```bash
-python main.py --opt tuneful --iter_num 30 --test_mode --history_dir mock/history --save_dir tuneful_test
-```
-
 # Rover example
 ```bash
 python main.py --opt rover --iter_num 10 --test_mode --history_dir mock/history --save_dir rover_test --warm_start none --tl_topk 5 --compress shap
 ```
 
 # Rover 实验运行
+关于环境, 直接沿用MFTune的环境, 也即`spark-test`即可
+
 运行tpch_600g实验时:
 需先修改`configs/base.yaml`中的相关配置:
 - 修改`database`为相应的数据库 (`tpch_600g`)
