@@ -17,5 +17,3 @@ catboost_info/*
 results/*
 docs/
 mock/*
-
-/rover_test
