@@ -152,10 +152,11 @@ class BaseOptimizer:
         for i in range(s + 1):
             n_configs, n_resource = self.scheduler.get_stage_params(s=s, stage=i)
             logger.info(f"Bracket {s} Stage {i}: n_configs={n_configs}, n_resource={n_resource}")
-            if not i:
-                candidates = self.advisor.sample(batch_size=n_configs)
-                logger.info(f"Generated {len(candidates)} initial candidates")
             resource_ratio = self.scheduler.calculate_resource_ratio(n_resource=n_resource)
+            if not i:
+                candidates = self.advisor.sample(batch_size=n_configs, resource_ratio=resource_ratio)
+                logger.info(f"Generated {len(candidates)} initial candidates")
+            logger.info(f"Length of rest candidates and perfs after elimination: {len(candidates)} == {len(perfs)}")
             perfs = self._evaluate_configurations(candidates, resource_ratio)            
             candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s=s, stage=i)
             

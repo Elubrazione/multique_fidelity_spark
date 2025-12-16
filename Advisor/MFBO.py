@@ -27,7 +27,7 @@ class MFBO(BO):
             self.resource_identifiers = [-1] * len(self.source_hpo_data)  # 占位符
 
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, resource_ratio=None):
         # exclude default configuration from count
         num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
         if len(self.ini_configs) == 0 or num_evaluated_exclude_default < self.init_num:
@@ -66,7 +66,11 @@ class MFBO(BO):
         # self.surrogate.build_source_surrogates()
 
         # Already initialized after full-fidelity initialization, use parent BO's sampling logic
-        return super().sample(batch_size=batch_size, prefix='MF')
+        return super().sample(
+            batch_size=batch_size,
+            prefix='MF',
+            resource_ratio=resource_ratio
+        )
 
     def update(self, config, results, resource_ratio=1, update=True):
         if not update:

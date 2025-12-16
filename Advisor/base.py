@@ -17,6 +17,7 @@ class BaseAdvisor:
                 tl_strategy='none',
                 seed=42, rand_prob=0.15, rand_mode='ran',
                 validation_strategy: Optional[ValidationStrategy] = None,
+                _init_num=1
                 **kwargs):
         # Delay import to avoid circular dependency
         from manager import TaskManager
@@ -86,7 +87,11 @@ class BaseAdvisor:
 
         # init_num is equal to the number of topk similar tasks if use transfer learning,
         # otherwise it is the number of initial configurations for warm start
-        self.init_num = self.ws_args['init_num'] if tl_strategy == 'none' else self.tl_args['topk']
+        self.init_num = _init_num
+        if _init_num is not None:
+            self.init_num = _init_num
+        else:
+            self.init_num = self.ws_args['init_num'] if tl_strategy == 'none' else self.tl_args['topk']
 
     def get_num_evaluated_exclude_default(self):
         """

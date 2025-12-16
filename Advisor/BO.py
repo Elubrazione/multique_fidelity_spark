@@ -72,7 +72,13 @@ class BO(BaseAdvisor):
         logger.debug("Updated warm start meta info: %s" % warm_str_list)
 
 
-    def sample(self, batch_size=1, prefix=''):
+    def sample(
+        self,
+        batch_size=1,
+        prefix='',
+        _q=2,
+        resource_ratio=None
+    ):
         # exclude default configuration from count
         num_evaluated_exclude_default = self.get_num_evaluated_exclude_default()
 
@@ -146,8 +152,11 @@ class BO(BaseAdvisor):
         # Note: MFES calls this through MFBO.sample() -> super().sample() after initialization, prefix='MF'
         if (is_bohb or is_called_from_mfbo) and len(self.ini_configs) > 0:
             # q: number of warm start configs to take in low-fidelity stage (default: 2, same as MFBO)
-            logger.info("BOHB/MFES: take configs from warm start in low-fidelity stage")
-            q = min(2, batch_size, len(self.ini_configs))
+            # when low-fidelity is equal to 1.0, take 0 from warm start configs
+            q = min(_q, batch_size, len(self.ini_configs)) \
+                if resource_ratio != round(float(1.0), 5) \
+                else 0
+            logger.info(f"BOHB/MFES: take ###{q}### configs from warm start in low-fidelity stage")
             for _ in range(q):
                 config = self.ini_configs[-1]
                 self.ini_configs.pop()
