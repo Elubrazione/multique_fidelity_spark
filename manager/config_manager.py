@@ -12,7 +12,7 @@ class ConfigManager:
         parser.add_argument('--opt', type=str, default='MFES_SMAC', help='Optimizer type')
         parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
         parser.add_argument('--iter_num', type=int, default=40, help='Number of iterations')
-        parser.add_argument('--R', type=int, default=27)
+        parser.add_argument('--R', type=int, default=None)
         parser.add_argument('--eta', type=int, default=3)
         parser.add_argument('--use_flatten_scheduler', action='store_true', default=False,
                           help='Use flatten scheduler variant (expand last full-fidelity bracket)')

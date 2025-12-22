@@ -156,9 +156,10 @@ class BaseOptimizer:
             if not i:
                 candidates = self.advisor.sample(batch_size=n_configs, resource_ratio=resource_ratio)
                 logger.info(f"Generated {len(candidates)} initial candidates")
-            logger.info(f"Length of rest candidates and perfs after elimination: {len(candidates)} == {len(perfs)}")
+            
             perfs = self._evaluate_configurations(candidates, resource_ratio)            
             candidates, perfs = self.scheduler.eliminate_candidates(candidates, perfs, s=s, stage=i)
+            logger.info(f"Length of rest candidates and perfs after elimination: {len(candidates)} == {len(perfs)}")
             
             if i == s:
                 iter_full_eval_configs.extend(candidates)
