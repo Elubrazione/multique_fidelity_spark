@@ -8,8 +8,8 @@ similarity_threshold: 0.5
 # Path directories
 paths:
   log_dir: log
-  data_dir: mock/data
-  history_dir: mock/history
+  data_dir: /home/hive-testbench-hdp3/spark-queries-tpcds
+  history_dir: history
   target: tpcds_100g
   save_dir: results
 
@@ -30,7 +30,7 @@ method_args:
 
   cp_args:
     strategy: none
-    topk: 40
+    topk: 30
     sigma: 2.0
     top_ratio: 0.8
 

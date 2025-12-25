@@ -17,11 +17,14 @@ class LOCATAdvisor(BaseAdvisor):
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_strategy='none', tl_args={'topk': 5}, cp_args={},
                 random_kwargs={},
-                n_qcsa: int = 20,
-                n_iicp: int = 10,
+                n_qcsa: int = 1,
+                n_iicp: int = 1,
                 scc_threshold: float = 0.2,
                 kpca_kernel: str = 'rbf',
+                data_size: float = 600,
                 **kwargs):
+        
+        assert tl_strategy == 'none', f"LOCAT requires tl_strategy='none', got '{tl_strategy}'"
         
         super().__init__(config_space, task_id=task_id, method_id=method_id,
                         ws_strategy=ws_strategy, ws_args=ws_args,
@@ -33,7 +36,7 @@ class LOCATAdvisor(BaseAdvisor):
         self.n_iicp = n_iicp
         self.scc_threshold = scc_threshold
         self.kpca_kernel = kpca_kernel
-        
+        self.data_size = data_size
         self.qcsa: Optional[QCSA] = None
         self.iicp: Optional[IICP] = None
         self.dagp: Optional[DAGP] = None
@@ -53,23 +56,15 @@ class LOCATAdvisor(BaseAdvisor):
         self.acq_func = None
         self.acq_optimizer = None
         
-        self.data_size = 1.0
     
     def run_qcsa(self, sql_partitioner: Optional[object] = None):
         if self.qcsa_done:
             logger.info("LOCAT: QCSA already completed, skipping...")
             return
         
-        logger.info("LOCAT: Starting QCSA analysis using similar tasks' History data...")
+        logger.info("LOCAT: Starting QCSA analysis using current task history...")
         
-        similar_histories, similar_scores = self.task_manager.get_similar_tasks(topk=None)
-        
-        if not similar_histories:
-            logger.warning("LOCAT: No similar tasks found, using current task history")
-            source_history = self.history
-        else:
-            source_history = similar_histories[0]
-            logger.info(f"LOCAT: Using most similar task history (similarity: {similar_scores[0][1] if similar_scores else 'N/A'})")
+        source_history = self.history
         
         if len(source_history) == 0:
             logger.warning("LOCAT: Source history is empty, skipping QCSA")
@@ -112,23 +107,16 @@ class LOCATAdvisor(BaseAdvisor):
             logger.info("LOCAT: IICP already completed, skipping...")
             return
         
-        logger.info("LOCAT: Starting IICP analysis using similar tasks' History data...")
+        logger.info("LOCAT: Starting IICP analysis using current task history...")
         
-        similar_histories, similar_scores = self.task_manager.get_similar_tasks(topk=None)
-        
-        if not similar_histories:
-            logger.warning("LOCAT: No similar tasks found, using current task history")
-            source_history = self.history
-        else:
-            source_history = similar_histories[0]
-            logger.info(f"LOCAT: Using most similar task history (similarity: {similar_scores[0][1] if similar_scores else 'N/A'})")
+        source_history = self.history
         
         if len(source_history) == 0:
             logger.warning("LOCAT: Source history is empty, skipping IICP")
             return
         
         self.iicp = IICP(
-            min_samples=max(5, self.n_iicp),
+            min_samples=max(1, self.n_iicp),
             scc_threshold=self.scc_threshold,
             kpca_kernel=self.kpca_kernel
         )

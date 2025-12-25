@@ -27,6 +27,12 @@ class BaseOptimizer:
         assert ws_strategy in ['none', 'best_cos', 'best_euc', 'best_rover', 'rgpe_rover', 'best_all']
         assert tl_strategy in ['none', 'mce', 're', 'mceacq', 'reacq']
 
+        # LOCAT 不支持迁移学习，强制 tl_strategy='none'
+        if method_id == 'LOCAT' and tl_strategy != 'none':
+            logger.warning(f"LOCAT does not support transfer learning (tl_strategy='{tl_strategy}'). "
+                          f"Forcing tl_strategy='none'.")
+            tl_strategy = 'none'
+
         scheduler_type = 'mfes' if 'MFES' in method_id else 'bohb' if 'BOHB' in method_id else 'full'
         
         self.eval_func = eval_func
@@ -180,25 +186,31 @@ class BaseOptimizer:
         self.iter_id += 1
         logger.info("iter =========================================================================== {:3d}".format(self.iter_id))
         
-        # LOCAT-specific initialization
-        if self.method_id == 'LOCAT' and hasattr(self.advisor, 'qcsa_done'):
-            # Run QCSA and IICP if not done (using History data, no need for eval_func)
-            if not self.advisor.qcsa_done:
-                logger.info("LOCAT: Running QCSA using History data...")
-                from task_manager import TaskManager
-                task_mgr = TaskManager.instance()
-                sql_partitioner = task_mgr.get_sql_partitioner()
-                self.advisor.run_qcsa(sql_partitioner)
-            
-            if not self.advisor.iicp_done:
-                logger.info("LOCAT: Running IICP using History data...")
-                self.advisor.run_iicp(data_size=1.0)
-        
         num_config_evaluated = self.advisor.get_num_evaluated_exclude_default()
+        
+       
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
-            logger.info(f"Initialization phase: need to evaluate {self.scheduler.num_nodes} configs, generated {len(candidates)} initial candidates")
+            logger.info(f"Initialization phase ({num_config_evaluated}/{self.advisor.init_num}): "
+                       f"evaluating {len(candidates)} random configs")
             perfs = self._evaluate_configurations(candidates, resource_ratio=round(float(1.0), 5))
+        
+
+        elif num_config_evaluated == self.advisor.init_num:
+            if self.method_id == 'LOCAT' and hasattr(self.advisor, 'qcsa_done'):
+                if not self.advisor.qcsa_done:
+                    logger.info(f"LOCAT: Random initialization complete with {num_config_evaluated} samples. Running QCSA...")
+                    from task_manager import TaskManager
+                    task_mgr = TaskManager.instance()
+                    sql_partitioner = task_mgr.get_sql_partitioner()
+                    self.advisor.run_qcsa(sql_partitioner)
+                
+                if not self.advisor.iicp_done:
+                    logger.info("LOCAT: Running IICP to compress configuration space...")
+                    self.advisor.run_iicp(data_size=600)
+            
+            candidates, perfs = self._iterate()
+        
         else:
             candidates, perfs = self._iterate()
 

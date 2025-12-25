@@ -97,7 +97,7 @@ class IICP:
             
             config_values.append(config_array)
         
-        if len(execution_times) < 3:
+        if len(execution_times) < 1:
             logger.warning("IICP: Insufficient valid samples for CPS, using all parameters")
             return self.param_names
         
@@ -167,7 +167,7 @@ class IICP:
             config_values.append(config_array)
             valid_indices.append(idx)
         
-        if len(config_values) < 2:
+        if len(config_values) < 1:
             logger.warning("IICP: Insufficient valid samples for CPE")
             return np.array([]), None
         
@@ -185,7 +185,7 @@ class IICP:
             self.kpca = KernelPCA(
                 n_components=n_components,
                 kernel=self.kpca_kernel,
-                fit_inverse_transform=True
+                fit_inverse_transform=True  
             )
             transformed_features = self.kpca.fit_transform(config_values_scaled)
             

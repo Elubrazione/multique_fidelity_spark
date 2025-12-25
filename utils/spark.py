@@ -96,10 +96,13 @@ def stop_active_spark_session() -> None:
     try:
         active_session.stop()
         logger.info("[SparkSession] SparkSession stopped")
+        # Wait longer for SparkUI and other threads to fully terminate
+        time.sleep(2.0)
     except Exception as exc:
         logger.warning(f"[SparkSession] Failed to stop existing session: {type(exc).__name__}: {str(exc)}")
     finally:
-        stop_active_spark_context(sleep_seconds=1.0)
+        # Ensure SparkContext is also stopped with adequate wait time
+        stop_active_spark_context(sleep_seconds=2.0)
 
 
 def use_database(spark: SparkSession, database: Optional[str]) -> bool:
@@ -467,3 +470,4 @@ def resolve_runtime_metrics(
     os.remove(zstd_file)
     os.remove(json_file)
     logger.info(f"Initialized current task default with meta feature shape: {metrics.shape}")
+    return metrics

@@ -21,13 +21,13 @@ class ConfigManager:
         parser.add_argument('--target', type=str, default=None)
         
         parser.add_argument('--compress', type=str, default='none', choices=['none', 'shap', 'expert'])
-        parser.add_argument('--cp_topk', type=int, default=40)
+        parser.add_argument('--cp_topk', type=int, default=None)
         parser.add_argument('--warm_start', type=str, default='none', choices=['none', 'best_rover', 'best_all'])
-        parser.add_argument('--ws_init_num', type=int, default=4)
-        parser.add_argument('--ws_topk', type=int, default=4)
+        parser.add_argument('--ws_init_num', type=int, default=None)
+        parser.add_argument('--ws_topk', type=int, default=None)
         parser.add_argument('--ws_inner_surrogate_model', type=str, default='prf')
         parser.add_argument('--transfer', type=str, default='none')
-        parser.add_argument('--tl_topk', type=int, default=3)
+        parser.add_argument('--tl_topk', type=int, default=None)
 
         parser.add_argument('--backup_flag', action='store_true', default=False)        
         parser.add_argument('--task', type=str, default='test_ws')

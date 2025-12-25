@@ -320,7 +320,11 @@ class SparkSessionTPCDSExecutor:
             if not query_executed or (result is not None and result['status'] != 'success'):
                 break
 
-        stop_active_spark_session()
+        # Stop SparkSession and ensure proper cleanup
+        try:
+            stop_active_spark_session()
+        except Exception as cleanup_exc:
+            logger.warning(f"[SparkSession] Exception during session cleanup: {cleanup_exc}")
 
         if not total_status:
             total_spark_time = float('inf')

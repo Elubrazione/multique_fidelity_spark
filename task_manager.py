@@ -24,7 +24,7 @@ class TaskManager:
                 logger_kwargs,
                 cp_args,
                 **kwargs):
-        if hasattr(self, "_initialized") and self._initialized:
+        if getattr(self, "_initialized", False):
             return
         self._initialized = True
         
@@ -97,32 +97,32 @@ class TaskManager:
             logger.info(f"Current task meta feature: {self.current_meta_feature}")
             logger.info(f"Current task history: {self.current_task_history.objectives}")
             logger.info(f"Loaded current task history from {kwargs.get('resume')}")
-            return
-
-        # use default config writen in spark_default.conf
-        default_config = self.config_space.get_default_configuration()
-        default_config.origin = 'Default Configuration'
-        result = eval_func(config=default_config, resource_ratio=1.0)
-    
-        if kwargs.get('test_mode', False):
-            logger.info("Using test mode meta feature")
-            self.current_meta_feature = np.random.rand(34)
-            self.current_task_history = History(task_id=task_id, config_space=self.config_space,
-                                                meta_info={'meta_feature': self.current_meta_feature.tolist()})
-            self.current_task_history.update_observation(build_observation(default_config, result))
             self._update_similarity()
             return
+
+        # # use default config writen in spark_default.conf
+        # default_config = self.config_space.get_default_configuration()
+        # default_config.origin = 'Default Configuration'
+        # result = eval_func(config=default_config, resource_ratio=1.0)
+    
+        # if kwargs.get('test_mode', False):
+        #     logger.info("Using test mode meta feature")
+        #     self.current_meta_feature = np.random.rand(34)
+        #     self.current_task_history = History(task_id=task_id, config_space=self.config_space,
+        #                                         meta_info={'meta_feature': self.current_meta_feature.tolist()})
+        #     self.current_task_history.update_observation(build_observation(default_config, result))
+        #     self._update_similarity()
+        #     return
         
-        logger.info("Computing current task meta feature using default config...")
+        # logger.info("Computing current task meta feature using default config...")
 
-        metrics = resolve_runtime_metrics(spark_log_dir=self.spark_log_dir)
+        # metrics = resolve_runtime_metrics(spark_log_dir=self.spark_log_dir)
 
-        self.current_meta_feature = metrics
+        self.current_meta_feature = np.random.rand(34)
         self.current_task_history = History(task_id=task_id, config_space=self.config_space,
                                             meta_info={'meta_feature': self.current_meta_feature.tolist()})
-        self.current_task_history.update_observation(build_observation(default_config, result))
+        # self.current_task_history.update_observation(build_observation(default_config, result))
         logger.info(f"Updated current task history, total observations: {len(self.current_task_history)}")
-
         self._update_similarity()
 
 
@@ -196,13 +196,11 @@ class TaskManager:
             config_space=self.config_space,
             **self.ws_args,
         )
-        
-        filtered_sims = [(idx, sim) for idx, sim in self.similar_tasks_cache if sim >= self.similarity_threshold]
+        filtered_sims = [
+            (idx, sim) for idx, sim in self.similar_tasks_cache if sim >= self.similarity_threshold]
         self.similar_tasks_cache = filtered_sims
-        
         logger.info(f"Updated similarity: {len(self.similar_tasks_cache)} tasks above threshold {self.similarity_threshold}")
         self._mark_sql_plan_dirty()
-
 
     def get_similar_tasks(self, topk: Optional[int] = None) -> Tuple[List[History], List[Tuple[int, float]]]:
         """
