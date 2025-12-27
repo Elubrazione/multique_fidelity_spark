@@ -16,6 +16,11 @@ SQL_NAMES = [
     "q98", "q99", "q9",
 ]
 
+# 把上面的"q"都去掉
+SQL_NAMES = [
+    name.replace("q", "") for name in SQL_NAMES
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()

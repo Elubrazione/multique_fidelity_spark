@@ -87,21 +87,21 @@ class ExecutorManager:
             logger.error(f"[ExecutorManager] Failed to obtain workload plan for resource {resource_ratio}: {exc}")
             logger.debug(traceback.format_exc())
 
-        if plan is None:
-            fallback_sqls = []
-            partitioner = self._ensure_partitioner()
-            if partitioner is not None:
-                fallback_sqls = partitioner.get_all_sqls()
-            logger.info(
-                "[ExecutorManager] Using fallback plan for resource %.5f (sqls=%d)",
-                resource_ratio, len(fallback_sqls)
-            )
-            plan = {
-                "sqls": fallback_sqls,
-                "timeout": {},
-                "selected_fidelity": 1.0,
-                "plan_source": "executor-fallback",
-            }
+        # if plan is None:
+        fallback_sqls = []
+        partitioner = self._ensure_partitioner()
+        if partitioner is not None:
+            fallback_sqls = partitioner.get_all_sqls()
+        logger.info(
+            "[ExecutorManager] Using fallback plan for resource %.5f (sqls=%d)",
+            resource_ratio, len(fallback_sqls)
+        )
+        plan = {
+            "sqls": fallback_sqls,
+            "timeout": {},
+            "selected_fidelity": 1.0,
+            "plan_source": "executor-fallback",
+        }
     
         result_queue = Queue()
 
@@ -236,8 +236,11 @@ class SparkSessionTPCDSExecutor:
         # only execute 2 sqls when debug mode is enabled
         if self.debug:
             plan_sqls = copy.deepcopy(plan_sqls)[: 2]
-            timeout_overrides = copy.deepcopy(timeout_overrides)[: 2]
-
+            print("--------------------------------")
+            print(f"plan_sqls: {plan_sqls}")
+            print("--------------------------------")
+            # timeout_overrides = copy.deepcopy(timeout_overrides)[: 2]
+            
         config_dict = config_to_dict(config)
         logger.info(f"[SparkSession] Evaluating fidelity {resource} on database {self.database}")
         logger.debug(f"[SparkSession] Configuration: {config_dict}")

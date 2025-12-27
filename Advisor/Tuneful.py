@@ -13,6 +13,7 @@ from openbox.utils.config_space.util import convert_configurations_to_array
 from openbox import logger
 from .mtgp import MultiTaskGP
 from .utils import build_observation
+import copy
 
 
 class Tuneful:
@@ -71,11 +72,12 @@ class Tuneful:
         self.num_objs = num_objs
         self.num_constraints = num_constraints
 
-        self.saved_configurations = []
+        # self.saved_configurations = []
         self.advisor = self.build_advisor(self.config_space)
         
         # task_manager里面的history有一个默认配置表现，初始化过来
         self.advisor.history = self.task_manager.current_task_history
+        self.full_history = copy.deepcopy(self.task_manager.current_task_history)
 
     def build_config_space(self, parameter_names: list):
         cs = ConfigurationSpace()
@@ -101,18 +103,21 @@ class Tuneful:
             conf = obs.config
             objs = obs.objectives
             new_config = self.build_config(conf, config_space)
-            new_history.update_observation(Observation(config = new_config, objectives = objs))
+            new_obs = Observation(config = new_config, objectives = objs, trial_state = obs.trial_state, extra_info = obs.extra_info, elapsed_time = obs.elapsed_time)
+            new_obs.create_time = obs.create_time
+            new_history.update_observation(new_obs)
         advisor.surrogate_model = MultiTaskGP(new_history)
 
         if old_history_container is not None:
             h = old_history_container
-            assert len(h.configurations) == len(self.saved_configurations)
+            # assert len(h.configurations) == len(self.saved_configurations)
             for obs in h.observations:
                 config = obs.config
                 objs = obs.objectives
                 new_config = self.build_config(config, config_space)
-                obs = Observation(config = new_config, objectives = objs)
-                advisor.update_observation(obs)
+                new_obs = Observation(config = new_config, objectives = objs, trial_state = obs.trial_state, extra_info = obs.extra_info, elapsed_time = obs.elapsed_time)
+                new_obs.create_time = obs.create_time
+                advisor.update_observation(new_obs)
         logger.info('New advisor built. %d observations loaded.' % len(advisor.history.configurations))
         return advisor
 
@@ -145,7 +150,8 @@ class Tuneful:
         return significant_parameters
 
     def decide_config_space(self):
-        n = len(self.saved_configurations)
+        # n = len(self.saved_configurations)
+        n = len(self.advisor.history)
         if n == 0 or self.sa_rounds_count >= self.sa_rounds or n % self.sa_iterations != 0:
             return
 
@@ -170,13 +176,17 @@ class Tuneful:
         return [self.build_config(conf, self.original_config_space)]
 
     def update(self, config, results, **kwargs):
+        full_conf = self.build_config(config, self.original_config_space)
+        full_obs = build_observation(full_conf, results)
+        self.full_history.update_observation(full_obs)
+
         new_conf = self.build_config(config, self.config_space)
         new_obs = build_observation(new_conf, results)
-        self.saved_configurations.append(new_obs.config)
+        # self.saved_configurations.append(new_obs.config)
 
         return self.advisor.update_observation(new_obs)
 
 
     @property
     def history(self):
-        return self.advisor.history
+        return self.full_history

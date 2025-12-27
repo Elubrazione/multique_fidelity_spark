@@ -11,22 +11,59 @@ from config import ConfigManager
 
 
 def build_optimizer(args, **kwargs):
-    from Optimizer.base import RoverOptimizer
-    config_manager: ConfigManager = kwargs.get('config_manager')
 
-    optimizer = RoverOptimizer(
-        config_space=kwargs['config_space'],
-        eval_func=kwargs['eval_func'],
-        iter_num=args.iter_num,
-        method_id=args.opt,
-        task_id=args.task,
-        resume=args.resume,
-        target=config_manager.target,
-        save_dir=config_manager.save_dir,
-        per_run_time_limit=kwargs.get('per_run_time_limit', None),
-    )
-    return optimizer
+    method_id = args.opt
 
+    if method_id == 'rover':
+        from Optimizer.base import RoverOptimizer
+        config_manager: ConfigManager = kwargs.get('config_manager')
+
+        optimizer = RoverOptimizer(
+            config_space=kwargs['config_space'],
+            eval_func=kwargs['eval_func'],
+            iter_num=args.iter_num,
+            method_id=args.opt,
+            task_id=args.task,
+            resume=args.resume,
+            target=config_manager.target,
+            save_dir=config_manager.save_dir,
+            per_run_time_limit=kwargs.get('per_run_time_limit', None),
+        )
+        return optimizer
+    
+    elif method_id == 'tuneful':
+        from Optimizer.base import TunefulOptimizer
+        config_manager: ConfigManager = kwargs.get('config_manager')
+
+        optimizer = TunefulOptimizer(
+            config_space=kwargs['config_space'],
+            eval_func=kwargs['eval_func'],
+            iter_num=args.iter_num,
+            method_id=args.opt,
+            task_id=args.task,
+            resume=args.resume,
+            target=config_manager.target,
+            save_dir=config_manager.save_dir,
+            per_run_time_limit=kwargs.get('per_run_time_limit', None),
+        )
+        return optimizer
+
+    elif method_id == 'toptune':
+        from Optimizer.base import ToptuneOptimizer
+        config_manager: ConfigManager = kwargs.get('config_manager')
+
+        optimizer = ToptuneOptimizer(
+            config_space=kwargs['config_space'],
+            eval_func=kwargs['eval_func'],
+            iter_num=args.iter_num,
+            method_id=args.opt,
+            task_id=args.task,
+            resume=args.resume,
+            target=config_manager.target,
+            save_dir=config_manager.save_dir,
+            per_run_time_limit=kwargs.get('per_run_time_limit', None),
+        )
+        return optimizer
 
 def wrapper_func(obj_func, queue, obj_args, obj_kwargs):
     try:

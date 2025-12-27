@@ -10,7 +10,7 @@ class ConfigManager:
         parser = argparse.ArgumentParser()
         parser.add_argument('--config', type=str, default='configs/base.yaml', help='Path to config YAML file')
         parser.add_argument('--opt', type=str, default='MFES_SMAC',
-                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC', 'tuneful', 'rover'])
+                            choices=['BOHB_GP', 'BOHB_SMAC', 'MFES_GP', 'MFES_SMAC', 'SMAC', 'GP', 'BOHB_SMAC', 'tuneful', 'rover', 'toptune'])
         parser.add_argument('--log_level', type=str, default='info', choices=['info', 'debug'])
         parser.add_argument('--iter_num', type=int, default=40)
         parser.add_argument('--R', type=int, default=27)

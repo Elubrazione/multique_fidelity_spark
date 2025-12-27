@@ -97,6 +97,7 @@ class TaskManager:
             logger.info(f"Current task meta feature: {self.current_meta_feature}")
             logger.info(f"Current task history: {self.current_task_history.objectives}")
             logger.info(f"Loaded current task history from {kwargs.get('resume')}")
+            self._update_similarity()
             return
 
         # use default config writen in spark_default.conf
