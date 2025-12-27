@@ -1,7 +1,38 @@
 import os
+import re
 import argparse
 import yaml
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
+
+
+def parse_database_string(database: str) -> Tuple[Optional[str], Optional[float]]:
+    if not database:
+        return None, None
+    
+    pattern = r'^([a-zA-Z0-9_-]+?)_(\d+(?:\.\d+)?)(g|t|m|gb|tb|mb)$'
+    match = re.match(pattern, database.lower())
+    
+    if match:
+        benchmark_type = match.group(1)
+        size_value = float(match.group(2))
+        unit = match.group(3)
+        
+        if unit in ['g', 'gb']:
+            data_size_gb = size_value
+        elif unit in ['t', 'tb']:
+            data_size_gb = size_value * 1000
+        elif unit in ['m', 'mb']:
+            data_size_gb = size_value / 1000
+        else:
+            data_size_gb = size_value 
+        
+        return benchmark_type, data_size_gb
+
+    parts = database.lower().split('_')
+    if parts:
+        return parts[0], None
+    
+    return database.lower(), None
 
 
 class ConfigManager:
@@ -240,6 +271,17 @@ class ConfigManager:
     @property
     def similarity_threshold(self) -> float:
         return self.config['similarity_threshold']
+    
+    def get_benchmark_info(self) -> Tuple[Optional[str], Optional[float]]:
+        return parse_database_string(self.database)
+    
+    def get_data_size(self, default: float = 100.0) -> float:
+        _, data_size = self.get_benchmark_info()
+        if data_size is None:
+            from openbox import logger
+            logger.warning(f"无法从 database '{self.database}' 中解析数据大小，使用默认值 {default} GB")
+            return default
+        return data_size
 
     def get(self, key: str) -> Any:
         keys = key.split('.')

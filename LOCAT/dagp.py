@@ -110,6 +110,9 @@ class DAGP:
         else:
             raise ValueError(f"DAGP: Unsupported X type: {type(X)}")
         
+        logger.info(f"DAGP: data_sizes shape={data_sizes.shape}, unique values={np.unique(data_sizes)}, "
+                   f"min={np.min(data_sizes):.4f}, max={np.max(data_sizes):.4f}, mean={np.mean(data_sizes):.4f}")
+        
         if self.norm_y:
             y, self.y_normalize_mean, self.y_normalize_std = zero_mean_unit_var_normalization(y)
         

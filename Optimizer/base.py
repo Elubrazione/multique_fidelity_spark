@@ -207,7 +207,9 @@ class BaseOptimizer:
                 
                 if not self.advisor.iicp_done:
                     logger.info("LOCAT: Running IICP to compress configuration space...")
-                    self.advisor.run_iicp(data_size=600)
+                    data_size = task_mgr._config_manager.get_data_size(default=100.0)
+                    logger.info(f"LOCAT: Using data_size={data_size} GB extracted from database '{task_mgr._config_manager.database}'")
+                    self.advisor.run_iicp(data_size=data_size)
             
             candidates, perfs = self._iterate()
         

@@ -21,7 +21,7 @@ class LOCATAdvisor(BaseAdvisor):
                 n_iicp: int = 1,
                 scc_threshold: float = 0.2,
                 kpca_kernel: str = 'rbf',
-                data_size: float = 600,
+                data_size: float = 100.0,
                 **kwargs):
         
         assert tl_strategy == 'none', f"LOCAT requires tl_strategy='none', got '{tl_strategy}'"
