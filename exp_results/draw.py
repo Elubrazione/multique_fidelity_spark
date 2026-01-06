@@ -13,6 +13,8 @@ import math
 import re
 
 
+MAX_TIME = 24
+
 
 # 机器越来越慢，写一个系数，随着时间增加，系数越来越小，时间为0时候系数为1，时间为96时候系数为0.9
 def get_coefficient(time):
@@ -35,7 +37,7 @@ METHODS = [
     # "toptune",
 ]
 
-target = 'tpch_600g_crossbench'
+target = 'tpch_100g_crossdatasize'
 
 DATA_DIR = f"./{target}"
 SAVE_DIR = f"./images/{target}"
@@ -83,7 +85,7 @@ plt.ylabel("Objectives")
 plt.title(f"{method} Performance")
 # x每4个小时一个刻度，标到48小时，包括0和48
 plt.xticks(np.arange(0, 98, 4))
-plt.xlim(0, 96)
+plt.xlim(0,MAX_TIME)
 # 设置y最大为 6000
 plt.ylim(0, 10000)
 plt.savefig(os.path.join(SAVE_DIR, f"{target}.png"))

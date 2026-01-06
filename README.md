@@ -56,7 +56,6 @@ nohup python main.py --opt tuneful --iter_num 200 --history_dir results/tpch_600
 
 nohup python main.py --opt toptune --iter_num 300 --history_dir results/tpch_600g --task toptune_tpch600g_64u240n3 --target tpch_600g --save_dir exp_results > ./log.log 2>&1 &
 
-
 nohup python main.py --opt toptune --iter_num 300 --history_dir results/tpch_600g --task toptune_tpch600g_64u240n3 --target tpch_600g --save_dir exp_results  --resume /root/codes/multique_fidelity_spark/exp_results/tpch_600g/toptune/toptune_tpch600g_64u240n3__toptune__Sfull__s42_2025-12-16-22-00-23-124592.json > ./log.log 2>&1 &
 
 awk '/"objectives":/ {getline val; if (val !~ /Infinity/) c++} END {print c}' 
@@ -65,3 +64,14 @@ awk '/"objectives":/ {getline val; if (val !~ /Infinity/) c++} END {print c}'
 nohup python main.py --opt rover --iter_num 200 --history_dir results/tpcds_600g --task rover_tpch600g_64u240n3 --target tpch_600g_crossbench --save_dir exp_results --resume /root/codes/multique_fidelity_spark/exp_results/tpch_600g_crossbench/rover/rover_tpch600g_64u240n3__rover__Sfull__s42_2025-12-22-12-53-55-486721.json> ./log.log 2>&1 &
 
 nohup python main.py --opt tuneful --iter_num 200 --history_dir results/tpcds_600g --task tuneful_tpch600g_64u240n3 --target tpch_600g_crossbench --save_dir exp_results --resume /root/codes/multique_fidelity_spark/exp_results/tpch_600g_crossbench/tuneful/tuneful_tpch600g_64u240n3__tuneful__Sfull__s42_2025-12-25-05-20-28-157471.json > ./log.log 2>&1 &
+
+# cross datasize 场景
+nohup python main.py --opt rover --iter_num 200 --history_dir results/tpch_100g --task rover_tpch600g_64u240n3 --target tpch_600g_crossdatasize --save_dir exp_results --resume /root/codes/multique_fidelity_spark/exp_results/tpch_600g_crossdatasize/rover/rover_tpch600g_64u240n3__rover__Sfull__s42_2025-12-27-23-20-11-350575.json > ./log.log 2>&1 &
+
+nohup python main.py --opt tuneful --iter_num 200 --history_dir results/tpch_100g --task tuneful_tpch600g_64u240n3 --target tpch_600g_crossdatasize --save_dir exp_results > ./log.log 2>&1 &
+
+    # 100g
+nohup python main.py --opt rover --iter_num 200 --history_dir results/tpch_600g --task rover_tpch100g_64u240n3 --target tpch_100g_crossdatasize --save_dir exp_results > ./log.log 2>&1 &
+
+
+nohup python main.py --opt tuneful --iter_num 200 --history_dir results/tpch_600g --task tuneful_tpch100g_64u240n3 --target tpch_100g_crossdatasize --save_dir exp_results > ./log.log 2>&1 &

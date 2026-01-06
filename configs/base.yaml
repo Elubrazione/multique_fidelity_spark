@@ -2,7 +2,7 @@ includes:
   - configs/cluster_local.yaml
   - configs/cluster_multi.yaml
 
-database: tpch_600g
+database: tpch_100g
 similarity_threshold: 0.5
 
 # Path directories

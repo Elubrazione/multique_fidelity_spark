@@ -96,6 +96,8 @@ class ExecutorManager:
             "[ExecutorManager] Using fallback plan for resource %.5f (sqls=%d)",
             resource_ratio, len(fallback_sqls)
         )
+        print(f"fallback_sqls: {fallback_sqls}")
+        
         plan = {
             "sqls": fallback_sqls,
             "timeout": {},

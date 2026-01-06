@@ -235,6 +235,7 @@ def execute_sql_with_timing(spark, sql_content: str, sql_file: str, *, check_con
             _ = time.time() - query_start_time
             status = 'error'
             py_err = type(exc).__name__
+            py_msg = str(exc)
             jvm_info = ""
             try:
                 java_exc = getattr(exc, 'java_exception', None)
@@ -247,7 +248,7 @@ def execute_sql_with_timing(spark, sql_content: str, sql_file: str, *, check_con
                         jvm_info = f", jvm={jvm_err}"
             except Exception:
                 pass
-            logger.error(f"     {sql_file} query {idx + 1} failed (py_err={py_err}{jvm_info})")
+            logger.error(f"     {sql_file} query {idx + 1} failed (py_err={py_err}, msg={py_msg[:200]}{jvm_info})")
 
             error_msg = str(exc).lower()
             if 'sparkcontext' in error_msg and ('shut down' in error_msg or 'cancelled' in error_msg):
