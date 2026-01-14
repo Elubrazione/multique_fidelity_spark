@@ -1,7 +1,7 @@
 from openbox import logger
 
 from config import ConfigManager
-from Evaluator.executor import ExecutorManager
+from Evaluator.executor import ExecutorManager, MockExecutor
 from Optimizer.utils import build_optimizer, load_space_from_json
 from task_manager import TaskManager
 
@@ -19,6 +19,7 @@ executor = ExecutorManager(
     debug=args.debug,
     config_manager=config_manager
 )
+# executor = MockExecutor()
 
 # Create task_manager with config_manager
 task_manager = TaskManager.instance(
@@ -27,6 +28,7 @@ task_manager = TaskManager.instance(
     logger_kwargs=logger_kwargs,
     cp_args=config_manager.get_cp_args(config_space)
 )
+
 task_manager.calculate_meta_feature(
     eval_func=executor, task_id=args.task,
     test_mode=args.test_mode, resume=args.resume

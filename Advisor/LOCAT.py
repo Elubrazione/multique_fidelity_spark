@@ -17,8 +17,8 @@ class LOCATAdvisor(BaseAdvisor):
                 ws_strategy='none', ws_args={'init_num': 5},
                 tl_strategy='none', tl_args={'topk': 5}, cp_args={},
                 random_kwargs={},
-                n_qcsa: int = 1,
-                n_iicp: int = 1,
+                n_qcsa: int = 20,
+                n_iicp: int = 20,
                 scc_threshold: float = 0.2,
                 kpca_kernel: str = 'rbf',
                 data_size: float = 100.0,
@@ -55,7 +55,6 @@ class LOCATAdvisor(BaseAdvisor):
         self.surrogate = None
         self.acq_func = None
         self.acq_optimizer = None
-        
     
     def run_qcsa(self, sql_partitioner: Optional[object] = None):
         if self.qcsa_done:
@@ -98,6 +97,16 @@ class LOCATAdvisor(BaseAdvisor):
         self.task_manager.update_history_meta_info({'qcsa': qcsa_info})
         
         self._update_planner_with_rqa()
+        for obs in self.history.observations:
+            query_times = obs.extra_info['qt_time']
+            new_obj = 0
+            for q in self.rqa_queries:
+                if q in query_times:
+                    new_obj += query_times[q]
+                else:
+                    new_obj = np.inf
+                    break
+            obs.objectives[0] = new_obj
         
         logger.info(f"LOCAT: QCSA completed. RQA has {len(self.rqa_queries)} queries "
                    f"(removed {len(ciq_queries)} CIQ queries)")

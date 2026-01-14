@@ -146,6 +146,7 @@ class ExecutorManager:
         and executor will rely on the static SQL list; once TaskManager has
         finished initialisation we register the real partitioner exactly once.
         """
+        
         if self._partitioner is not None:
             return self._partitioner
         task_manager = self._get_task_manager()

@@ -188,7 +188,6 @@ class BaseOptimizer:
         
         num_config_evaluated = self.advisor.get_num_evaluated_exclude_default()
         
-       
         if num_config_evaluated < self.advisor.init_num:
             candidates = self.advisor.sample(batch_size=self.scheduler.num_nodes)
             logger.info(f"Initialization phase ({num_config_evaluated}/{self.advisor.init_num}): "
@@ -196,13 +195,14 @@ class BaseOptimizer:
             perfs = self._evaluate_configurations(candidates, resource_ratio=round(float(1.0), 5))
         
 
-        elif num_config_evaluated == self.advisor.init_num:
+        elif num_config_evaluated >= self.advisor.init_num:
             if self.method_id == 'LOCAT' and hasattr(self.advisor, 'qcsa_done'):
                 if not self.advisor.qcsa_done:
                     logger.info(f"LOCAT: Random initialization complete with {num_config_evaluated} samples. Running QCSA...")
                     from task_manager import TaskManager
                     task_mgr = TaskManager.instance()
                     sql_partitioner = task_mgr.get_sql_partitioner()
+                    self._save_json_atomic(self.result_path+'.before_qcsa')
                     self.advisor.run_qcsa(sql_partitioner)
                 
                 if not self.advisor.iicp_done:

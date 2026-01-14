@@ -2,15 +2,16 @@ includes:
   - configs/cluster_local.yaml
   - configs/cluster_multi.yaml
 
-database: tpcds_100g
+database: tpch_600g
 similarity_threshold: 0.5
 
 # Path directories
 paths:
   log_dir: log
-  data_dir: mock/data
-  history_dir: history
-  target: tpcds_100g
+  data_dir: /srv/BigData/hadoop/data1/tpch-for-spark-sql/dbgen/saveSql
+  # data_dir: /root/codes/multique_fidelity_spark/tmpSql
+  history_dir: no_history
+  target: tpch_600g
   save_dir: results
 
 # Method-related arguments
@@ -24,7 +25,7 @@ method_args:
     topk: 3
 
   ws_args:
-    init_num: 4
+    init_num: 20
     topk: 4
     inner_surrogate_model: prf
 

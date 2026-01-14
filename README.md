@@ -30,3 +30,6 @@ nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_n
 
 nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_num 200 --ws_init_num 29 --task 64u240n2 --target tpcds_300g --opt SMAC > /dev/null 2>&1 &
 ```
+
+
+nohup python main.py --opt LOCAT --transfer reacq --iter_num 300 --task locat_64u240n3 --target tpch_600g --save_dir exp_results > ./log.log 2>&1 &
