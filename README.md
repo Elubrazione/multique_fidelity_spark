@@ -9,6 +9,7 @@ nohup env PYTHONPATH=/root/codes/multique_fidelity_spark python main.py --iter_n
 ```
 
 ## Run
+### TPCDS
 ```bash
 nohup env PYTHONPATH=/root/codes/multique_fidelity_spark \
 python main.py \
@@ -19,6 +20,24 @@ python main.py \
 --task 64u256n3 \
 --database tpcds_600g \
 --resume 64u256n3_default_config.json \
+--transfer reacq \
+--warm_start best_all \
+--cp_topk 30 \
+--R 9 \
+--use_flatten_scheduler \
+--use_cached_model > log/all.log 2>&1 &
+```
+
+### TPCH
+```bash
+nohup env PYTHONPATH=/root/codes/multique_fidelity_spark \
+python main.py \
+--opt MFES_SMAC \
+--target ours \
+--data_dir /srv/BigData/hadoop/data1/tpch-for-spark-sql/dbgen/saveSql \
+--history_dir results \
+--task 64u256n3 \
+--database tpch_600g \
 --transfer reacq \
 --warm_start best_all \
 --cp_topk 30 \
